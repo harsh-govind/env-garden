@@ -38,16 +38,17 @@ model User {
 }
 
 model Workspace {
-  id          String            @id @default(cuid())
+  id          String             @id @default(cuid())
   name        String
-  slug        String            @unique
+  slug        String             @unique
   description String?
   createdById String
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  createdBy   User              @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  createdBy   User               @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
   projects    Project[]
   members     WorkspaceMember[]
+  history     WorkspaceHistory[]
 
   @@index([createdById])
 }
@@ -110,4 +111,16 @@ model ProjectMember {
   @@index([projectId])
   @@index([workspaceMemberId])
   @@index([addedById])
+}
+
+model WorkspaceHistory {
+  id          String    @id @default(cuid())
+  operation   String
+  data        Json
+  createdAt   DateTime  @default(now())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
 }
