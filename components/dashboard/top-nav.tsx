@@ -2,6 +2,13 @@
 
 import { Menu, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import type { DashboardTopNavProps } from "@/types/workspace";
 
 export default function DashboardTopNav({
@@ -33,25 +40,22 @@ export default function DashboardTopNav({
                     <span className="text-zinc-200">{activeWorkspaceName}</span>
                 </div>
 
-                <label className="sr-only" htmlFor="workspace-selector">
-                    Select workspace
-                </label>
-                <select
-                    id="workspace-selector"
-                    value={activeWorkspaceId ?? ""}
-                    onChange={(event) => onWorkspaceChange(event.target.value)}
-                    className="max-w-48 truncate border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                <Select
+                    value={activeWorkspaceId ?? undefined}
+                    onValueChange={onWorkspaceChange}
                     disabled={workspaces.length === 0}
                 >
-                    {workspaces.length === 0 ? (
-                        <option value="">No workspaces</option>
-                    ) : null}
-                    {workspaces.map((workspace) => (
-                        <option key={workspace.id} value={workspace.id}>
-                            {workspace.name}
-                        </option>
-                    ))}
-                </select>
+                    <SelectTrigger className="w-48" aria-label="Select workspace">
+                        <SelectValue placeholder="No workspaces" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {workspaces.map((workspace) => (
+                            <SelectItem key={workspace.id} value={workspace.id}>
+                                {workspace.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
 
                 <div className="ml-auto flex items-center gap-2">
                     <button
