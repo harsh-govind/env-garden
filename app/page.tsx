@@ -1,15 +1,15 @@
-import { getServerSession } from "next-auth";
+"use client";
+
 import AuthenticatedHome from "@/components/home/AuthenticatedHome";
 import UnauthenticatedHome from "@/components/home/UnauthenticatedHome";
-import { authOptions } from "@/lib/auth";
+import { useAuthenticated } from "@/contexts/authenticated-context";
 
-export default async function Home() {
-  const session = await getServerSession(authOptions);
-  const user = session?.user;
+export default function Home() {
+  const { isAuthenticated, user } = useAuthenticated();
 
-  if (!user) {
+  if (!isAuthenticated) {
     return <UnauthenticatedHome />;
   }
 
-  return <AuthenticatedHome name={user.name} email={user.email} />;
+  return <AuthenticatedHome name={user?.name} email={user?.email} />;
 }

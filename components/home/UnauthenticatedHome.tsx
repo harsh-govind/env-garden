@@ -1,3 +1,5 @@
+"use client";
+
 import AuthButtons from "@/components/auth/auth-buttons";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
