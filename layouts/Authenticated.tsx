@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import DashboardSidebar from "@/components/dashboard/sidebar";
 import DashboardTopNav from "@/components/dashboard/top-nav";
 import { useAuthenticated } from "@/contexts/authenticated";
+import { matchesRoutePath } from "@/lib/constants";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace";
 import type { AuthenticatedLayoutProps } from "@/types/layouts";
 
@@ -25,6 +27,8 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         selectWorkspace,
         createWorkspace,
     } = useWorkspace();
+    const pathname = usePathname();
+    const router = useRouter();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const workspaceName = activeWorkspace?.name ?? "No workspace";
@@ -42,14 +46,24 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         await createWorkspace({ name: name.trim() });
     }, [createWorkspace]);
 
+    const handleWorkspaceChange = useCallback((workspaceId: string) => {
+        selectWorkspace(workspaceId);
+
+        if (matchesRoutePath(pathname, "/:workspaceId/history")) {
+            router.replace(`/${workspaceId}/history`);
+        }
+    }, [pathname, router, selectWorkspace]);
+
     return (
         <div className="min-h-screen bg-[#06070a] text-zinc-200">
             <div className="flex min-h-screen">
                 <DashboardSidebar
+                    activeWorkspaceId={activeWorkspaceId}
                     workspaceName={workspaceName}
                     projectCount={activeWorkspace?.projectCount ?? 0}
                     memberCount={activeWorkspace?.memberCount ?? 0}
                     historyCount={activeWorkspace?.history.length ?? 0}
+                    workspaceRole={activeWorkspace?.role ?? null}
                     isOpen={isSidebarOpen}
                     onClose={() => setIsSidebarOpen(false)}
                 />
@@ -61,7 +75,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                         activeWorkspaceName={workspaceName}
                         workspaceInitial={workspaceInitial}
                         isCreatingWorkspace={isCreatingWorkspace}
-                        onWorkspaceChange={selectWorkspace}
+                        onWorkspaceChange={handleWorkspaceChange}
                         onCreateWorkspace={() => {
                             void handleCreateWorkspace();
                         }}

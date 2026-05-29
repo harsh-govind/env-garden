@@ -8,26 +8,36 @@ import {
     Users,
     X,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+    canViewHistory,
+    matchesRoutePath,
+} from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type {
     DashboardSidebarProps,
     SidebarItemData,
 } from "@/types/workspace";
 
-function SidebarItem({ item }: { item: SidebarItemData }) {
+function SidebarItem({
+    item,
+    onSelect,
+}: {
+    item: SidebarItemData;
+    onSelect: () => void;
+}) {
     const Icon = item.icon;
+    const className = cn(
+        "group flex w-full items-center justify-between gap-2 border border-transparent px-2 py-2 text-left text-sm transition",
+        item.active
+            ? "bg-[#153356] text-zinc-50"
+            : "text-zinc-400 hover:border-zinc-800 hover:bg-zinc-900/70 hover:text-zinc-100"
+    );
 
-    return (
-        <button
-            type="button"
-            className={cn(
-                "group flex w-full items-center justify-between gap-2 border border-transparent px-2 py-2 text-left text-sm transition",
-                item.active
-                    ? "bg-[#153356] text-zinc-50"
-                    : "text-zinc-400 hover:border-zinc-800 hover:bg-zinc-900/70 hover:text-zinc-100"
-            )}
-        >
+    const content = (
+        <>
             <span className="flex min-w-0 items-center gap-2">
                 <Icon className="size-4 shrink-0" />
                 <span className="truncate">{item.label}</span>
@@ -38,24 +48,51 @@ function SidebarItem({ item }: { item: SidebarItemData }) {
                     {item.count}
                 </span>
             ) : null}
+        </>
+    );
+
+    if (item.href) {
+        return (
+            <Link href={item.href} className={className} onClick={onSelect}>
+                {content}
+            </Link>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            className={className}
+        >
+            {content}
         </button>
     );
 }
 
 export default function DashboardSidebar({
+    activeWorkspaceId,
     workspaceName,
     projectCount,
     memberCount,
     historyCount,
+    workspaceRole,
     isOpen,
     onClose,
 }: DashboardSidebarProps) {
+    const pathname = usePathname();
+    const isHistoryRoute = matchesRoutePath(pathname, "/:workspaceId/history");
+    const canOpenHistory =
+        workspaceRole !== null
+            ? canViewHistory(workspaceRole)
+            : false;
+
     const primaryItems: SidebarItemData[] = [
         {
             id: "overview",
             label: "Overview",
             icon: LayoutDashboard,
-            active: true,
+            href: "/",
+            active: !isHistoryRoute,
         },
         {
             id: "projects",
@@ -69,13 +106,18 @@ export default function DashboardSidebar({
             icon: Users,
             count: memberCount,
         },
-        {
+    ];
+
+    if (canOpenHistory && activeWorkspaceId) {
+        primaryItems.push({
             id: "history",
             label: "History",
             icon: History,
+            href: `/${activeWorkspaceId}/history`,
             count: historyCount,
-        },
-    ];
+            active: isHistoryRoute,
+        });
+    }
 
     const secondaryItems: SidebarItemData[] = [
         {
@@ -127,7 +169,11 @@ export default function DashboardSidebar({
                             </p>
                             <div className="space-y-0.5">
                                 {primaryItems.map((item) => (
-                                    <SidebarItem key={item.id} item={item} />
+                                    <SidebarItem
+                                        key={item.id}
+                                        item={item}
+                                        onSelect={onClose}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -136,7 +182,7 @@ export default function DashboardSidebar({
                     <div className="border-t border-zinc-800 px-2 py-2">
                         <div className="space-y-0.5">
                             {secondaryItems.map((item) => (
-                                <SidebarItem key={item.id} item={item} />
+                                <SidebarItem key={item.id} item={item} onSelect={onClose} />
                             ))}
                         </div>
                     </div>

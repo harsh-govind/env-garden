@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { protectedRoutes } from "@/lib/constants";
+import { getMatchingProtectedRoute } from "@/lib/constants";
 import type { ProtectedRouteProviderProps } from "@/types/auth";
 
 export default function ProtectedRouteProvider({
@@ -13,7 +13,7 @@ export default function ProtectedRouteProvider({
     const router = useRouter();
 
     useEffect(() => {
-        const matchedRoute = protectedRoutes.find((route) => route.path === pathname);
+        const matchedRoute = getMatchingProtectedRoute(pathname);
 
         if (matchedRoute && !isAuthenticated) {
             router.replace(matchedRoute.redirectTo);

@@ -56,6 +56,10 @@ export type CreateWorkspaceResponse = {
     workspace: WorkspaceSummary;
 };
 
+export type WorkspaceHistoryResponse = {
+    history: WorkspaceHistoryEntry[];
+};
+
 export type WorkspaceContextValue = {
     workspaces: WorkspaceSummary[];
     activeWorkspaceId: string | null;
@@ -128,10 +132,12 @@ export type CreateWorkspaceHistoryEntryInput = {
 };
 
 export type DashboardSidebarProps = {
+    activeWorkspaceId: string | null;
     workspaceName: string;
     projectCount: number;
     memberCount: number;
     historyCount: number;
+    workspaceRole: WorkspaceRoleValue | null;
     isOpen: boolean;
     onClose: () => void;
 };
@@ -140,6 +146,7 @@ export type SidebarItemData = {
     id: string;
     label: string;
     icon: LucideIcon;
+    href?: string;
     count?: number;
     active?: boolean;
 };

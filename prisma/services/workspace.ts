@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { canViewHistory } from "@/lib/constants";
 import type {
     CreateWorkspaceForUserInput,
     WorkspaceDetailRecord,
@@ -160,6 +161,9 @@ export async function getWorkspaceDetailForUser(
     const uniqueProjects = Array.from(
         new Map(scopedProjects.map((project) => [project.id, project])).values()
     );
+    const history = canViewHistory(membership.role)
+        ? membership.workspace.history
+        : [];
 
     return {
         id: membership.workspace.id,
@@ -176,7 +180,7 @@ export async function getWorkspaceDetailForUser(
         createdAt: membership.workspace.createdAt,
         updatedAt: membership.workspace.updatedAt,
         projects: uniqueProjects,
-        history: membership.workspace.history,
+        history,
     };
 }
 

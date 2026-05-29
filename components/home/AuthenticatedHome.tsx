@@ -2,7 +2,6 @@
 
 import {
     FolderKanban,
-    History,
     LogOut,
     RefreshCw,
     ShieldCheck,
@@ -268,41 +267,6 @@ export default function AuthenticatedHome() {
                         </div>
                     </section>
 
-                    <section className="border border-zinc-800 bg-[#090b11]">
-                        <div className="border-b border-zinc-800 px-4 py-3">
-                            <h2 className="inline-flex items-center gap-2 text-xl font-semibold text-zinc-100">
-                                <History className="size-4" />
-                                Workspace history
-                            </h2>
-                        </div>
-
-                        <div className="space-y-2 px-4 py-4">
-                            {activeWorkspace.history.length === 0 ? (
-                                <p className="text-sm text-zinc-400">
-                                    No history entries yet.
-                                </p>
-                            ) : (
-                                activeWorkspace.history.map((entry) => (
-                                    <article
-                                        key={entry.id}
-                                        className="border border-zinc-800 bg-zinc-950/40 px-3 py-2"
-                                    >
-                                        <p className="text-sm font-medium text-zinc-100">
-                                            {entry.message}
-                                        </p>
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <p className="text-xs text-zinc-500">
-                                                {entry.operation}
-                                            </p>
-                                            <p className="text-xs text-zinc-500">
-                                                {formatDate(entry.createdAt)}
-                                            </p>
-                                        </div>
-                                    </article>
-                                ))
-                            )}
-                        </div>
-                    </section>
                 </>
             ) : null}
         </div>
