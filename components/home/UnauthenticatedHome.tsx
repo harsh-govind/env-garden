@@ -9,7 +9,7 @@ export default function UnauthenticatedHome() {
             <Badge variant="outline" className="uppercase">
                 Unauthenticated
             </Badge>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-900">
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">
                 env-garden
             </h1>
             <p className="text-muted-foreground">
