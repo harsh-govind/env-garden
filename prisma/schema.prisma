@@ -7,10 +7,107 @@ datasource db {
   provider = "postgresql"
 }
 
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ProjectAccessScope {
+  ALL_PROJECTS
+  SELECTED_PROJECTS
+}
+
+enum ProjectRole {
+  ADMIN
+  CONTRIBUTOR
+  VIEWER
+}
+
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                   String            @id @default(cuid())
+  email                String            @unique
+  name                 String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  createdWorkspaces    Workspace[]       @relation("WorkspaceCreator")
+  createdProjects      Project[]         @relation("ProjectCreator")
+  workspaceMemberships WorkspaceMember[] @relation("WorkspaceMemberUser")
+  workspaceMembers     WorkspaceMember[] @relation("WorkspaceMemberAdder")
+  ProjectMembers       ProjectMember[]   @relation("ProjectMemberAdder")
+}
+
+model Workspace {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  description String?
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdBy   User              @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  projects    Project[]
+  members     WorkspaceMember[]
+
+  @@index([createdById])
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  description String?
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members     ProjectMember[]
+
+  @@unique([workspaceId, slug])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+  @@index([createdById])
+}
+
+model WorkspaceMember {
+  id                 String             @id @default(cuid())
+  workspaceId        String
+  userId             String
+  role               WorkspaceRole      @default(MEMBER)
+  projectAccessScope ProjectAccessScope @default(SELECTED_PROJECTS)
+  addedById          String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user               User               @relation("WorkspaceMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy            User?              @relation("WorkspaceMemberAdder", fields: [addedById], references: [id], onDelete: SetNull)
+  projectMembers     ProjectMember[]
+
+  @@unique([workspaceId, userId])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([addedById])
+}
+
+model ProjectMember {
+  id                String          @id @default(cuid())
+  workspaceId       String
+  projectId         String
+  workspaceMemberId String
+  role              ProjectRole     @default(CONTRIBUTOR)
+  addedById         String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  project           Project         @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  workspaceMember   WorkspaceMember @relation(fields: [workspaceMemberId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  addedBy           User?           @relation("ProjectMemberAdder", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, workspaceMemberId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([workspaceMemberId])
+  @@index([addedById])
 }
