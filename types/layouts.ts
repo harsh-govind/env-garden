@@ -4,6 +4,10 @@ export type RootLayoutProps = Readonly<{
     children: ReactNode;
 }>;
 
+export type LayoutSwitcherProps = RootLayoutProps & {
+    isAuthenticated: boolean;
+};
+
 export type AuthenticatedLayoutProps = {
     children: ReactNode;
 };

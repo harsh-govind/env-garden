@@ -26,5 +26,5 @@ export type AuthenticatedContextProviderProps = {
 };
 
 export type AuthenticatedProviderProps = {
-    children: ReactNode;
+    children: ReactNode | ((value: AuthenticatedContextValue) => ReactNode);
 };

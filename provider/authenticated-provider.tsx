@@ -8,15 +8,16 @@ export default async function AuthenticatedProvider({
 }: AuthenticatedProviderProps) {
     const session = await getServerSession(authOptions);
     const user = session?.user ?? null;
+    const value = {
+        isAuthenticated: Boolean(user),
+        user,
+    };
+
+    const content = typeof children === "function" ? children(value) : children;
 
     return (
-        <AuthenticatedContextProvider
-            value={{
-                isAuthenticated: Boolean(user),
-                user,
-            }}
-        >
-            {children}
+        <AuthenticatedContextProvider value={value}>
+            {content}
         </AuthenticatedContextProvider>
     );
 }

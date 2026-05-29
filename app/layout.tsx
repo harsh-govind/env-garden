@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import AuthenticatedLayout from "@/layouts/Authenticated";
+import UnauthenticatedLayout from "@/layouts/Unauthenticated";
 import AuthenticatedProvider from "@/provider/authenticated-provider";
-import type { RootLayoutProps } from "@/types/layouts";
+import ProtectedRouteProvider from "@/provider/protected-route-provider";
+import type { LayoutSwitcherProps, RootLayoutProps } from "@/types/layouts";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/provider/theme-provider";
 
@@ -24,6 +26,18 @@ export const metadata: Metadata = {
   description: "Envs, simplified",
 };
 
+function LayoutSwitcher({ isAuthenticated, children }: LayoutSwitcherProps) {
+  return (
+    <ProtectedRouteProvider isAuthenticated={isAuthenticated}>
+      {isAuthenticated ? (
+        <AuthenticatedLayout>{children}</AuthenticatedLayout>
+      ) : (
+        <UnauthenticatedLayout>{children}</UnauthenticatedLayout>
+      )}
+    </ProtectedRouteProvider>
+  );
+}
+
 export default async function RootLayout({
   children,
 }: RootLayoutProps) {
@@ -41,7 +55,9 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <AuthenticatedProvider>
-            <AuthenticatedLayout>{children}</AuthenticatedLayout>
+            {({ isAuthenticated }) => (
+              <LayoutSwitcher isAuthenticated={isAuthenticated}>{children}</LayoutSwitcher>
+            )}
           </AuthenticatedProvider>
         </ThemeProvider>
       </body>
