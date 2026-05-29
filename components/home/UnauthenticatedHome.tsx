@@ -1,11 +1,10 @@
 import AuthButtons from "@/components/auth/auth-buttons";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import UnauthenticatedLayout from "@/layouts/Unauthenticated";
 
 export default function UnauthenticatedHome() {
     return (
-        <UnauthenticatedLayout>
+        <>
             <Badge variant="outline" className="uppercase">
                 Unauthenticated
             </Badge>
@@ -21,6 +20,6 @@ export default function UnauthenticatedHome() {
             <div>
                 <AuthButtons isAuthenticated={false} />
             </div>
-        </UnauthenticatedLayout>
+        </>
     );
 }

@@ -1,7 +1,4 @@
-export type ProtectedRoute = {
-    path: string;
-    redirectTo: string;
-};
+import type { ProtectedRoute } from "@/types/auth";
 
 export const protectedRoutes: ProtectedRoute[] = [
     {

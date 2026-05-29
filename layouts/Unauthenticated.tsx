@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardContent } from "@/components/ui/card";
 import type { UnauthenticatedLayoutProps } from "@/types/layouts";
 

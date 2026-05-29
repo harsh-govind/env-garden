@@ -8,8 +8,6 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import AuthenticatedLayout from "@/layouts/Authenticated";
-import ProtectedLayout from "@/layouts/Protected";
 import type { AuthenticatedHomeProps } from "@/types/home";
 
 export default function AuthenticatedHome({
@@ -17,38 +15,36 @@ export default function AuthenticatedHome({
     email,
 }: AuthenticatedHomeProps) {
     return (
-        <ProtectedLayout pathname="/">
-            <AuthenticatedLayout>
-                <Badge className="uppercase">Authenticated</Badge>
-                <h1 className="text-3xl font-semibold tracking-tight">
-                    Home
-                </h1>
-                <p className="text-muted-foreground">
-                    Signed in as {name ?? "Unnamed user"}
-                    {email ? ` (${email})` : ""}
-                </p>
+        <>
+            <Badge className="uppercase">Authenticated</Badge>
+            <h1 className="text-3xl font-semibold tracking-tight">
+                Home
+            </h1>
+            <p className="text-muted-foreground">
+                Signed in as {name ?? "Unnamed user"}
+                {email ? ` (${email})` : ""}
+            </p>
 
-                <div className="flex items-center justify-end">
-                    <AuthButtons isAuthenticated />
-                </div>
+            <div className="flex items-center justify-end">
+                <AuthButtons isAuthenticated />
+            </div>
 
-                <Separator />
+            <Separator />
 
-                <Card className="bg-muted/30">
-                    <CardHeader>
-                        <CardTitle>Welcome to env-garden</CardTitle>
-                        <CardDescription>
-                            This is your authenticated home page. You can now continue building
-                            env management features here.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">
-                            Your session is active and ready for secure environment operations.
-                        </p>
-                    </CardContent>
-                </Card>
-            </AuthenticatedLayout>
-        </ProtectedLayout>
+            <Card className="bg-muted/30">
+                <CardHeader>
+                    <CardTitle>Welcome to env-garden</CardTitle>
+                    <CardDescription>
+                        This is your authenticated home page. You can now continue building
+                        env management features here.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">
+                        Your session is active and ready for secure environment operations.
+                    </p>
+                </CardContent>
+            </Card>
+        </>
     );
 }

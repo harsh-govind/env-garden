@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
+import AuthenticatedLayout from "@/layouts/Authenticated";
+import AuthenticatedProvider from "@/provider/authenticated-provider";
+import type { RootLayoutProps } from "@/types/layouts";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/provider/theme-provider";
 
@@ -21,11 +24,9 @@ export const metadata: Metadata = {
   description: "Envs, simplified",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: RootLayoutProps) {
   return (
     <html
       lang="en"
@@ -39,7 +40,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <AuthenticatedProvider>
+            <AuthenticatedLayout>{children}</AuthenticatedLayout>
+          </AuthenticatedProvider>
         </ThemeProvider>
       </body>
     </html>
