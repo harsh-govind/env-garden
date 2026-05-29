@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
         {
-            workspace: serializeWorkspaceSummary(workspace),
+            workspaceId: workspace.id,
         },
         { status: 201 }
     );

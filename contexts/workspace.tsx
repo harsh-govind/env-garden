@@ -159,8 +159,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 );
 
                 await refreshWorkspaces();
-                setActiveWorkspaceId(response.workspace.id);
-                persistWorkspaceId(response.workspace.id);
+                setActiveWorkspaceId(response.workspaceId);
+                persistWorkspaceId(response.workspaceId);
                 setError(null);
             } catch (createError) {
                 const message = getErrorMessage(createError);

@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { canViewHistory } from "@/lib/constants";
-import type { CreateWorkspaceHistoryEntryInput } from "@/types/workspace";
+import type {
+    CreateWorkspaceHistoryEntryInput,
+    ListWorkspaceHistoryForUserInput,
+    ListWorkspaceHistoryForUserResult,
+} from "@/types/workspace";
 
 const HISTORY_LIMIT = 100;
 
@@ -16,30 +20,6 @@ export async function createWorkspaceHistoryEntry(
         },
     });
 }
-
-type ListWorkspaceHistoryForUserInput = {
-    workspaceId: string;
-    userId: string;
-    query?: string;
-};
-
-type ListWorkspaceHistoryForUserResult =
-    | {
-          status: "NOT_FOUND";
-      }
-    | {
-          status: "FORBIDDEN";
-      }
-    | {
-          status: "OK";
-          entries: {
-              id: string;
-              operation: string;
-              message: string;
-              data: unknown;
-              createdAt: Date;
-          }[];
-      };
 
 export async function listWorkspaceHistoryForUser(
     input: ListWorkspaceHistoryForUserInput
@@ -94,7 +74,6 @@ export async function listWorkspaceHistoryForUser(
             id: true,
             operation: true,
             message: true,
-            data: true,
             createdAt: true,
         },
         orderBy: {

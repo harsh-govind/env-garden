@@ -3,16 +3,6 @@ import { auth } from "@/lib/auth";
 import { listWorkspaceHistoryForUser } from "@/prisma/services/workspace-history";
 import type { WorkspaceRouteContext } from "@/types/workspace";
 
-function toRecord(value: unknown): Record<string, unknown> {
-    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        return value as Record<string, unknown>;
-    }
-
-    return {
-        value,
-    };
-}
-
 export async function GET(request: Request, context: WorkspaceRouteContext) {
     const session = await auth();
 
@@ -63,7 +53,6 @@ export async function GET(request: Request, context: WorkspaceRouteContext) {
             id: entry.id,
             operation: entry.operation,
             message: entry.message,
-            data: toRecord(entry.data),
             createdAt: entry.createdAt.toISOString(),
         })),
     });

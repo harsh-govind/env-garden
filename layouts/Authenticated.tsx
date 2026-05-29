@@ -62,7 +62,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                     workspaceName={workspaceName}
                     projectCount={activeWorkspace?.projectCount ?? 0}
                     memberCount={activeWorkspace?.memberCount ?? 0}
-                    historyCount={activeWorkspace?.history.length ?? 0}
+                    historyCount={activeWorkspace?.historyCount ?? 0}
                     workspaceRole={activeWorkspace?.role ?? null}
                     isOpen={isSidebarOpen}
                     onClose={() => setIsSidebarOpen(false)}

@@ -12,6 +12,7 @@ import { canViewHistory } from "@/lib/constants";
 import type {
     ApiErrorPayload,
     WorkspaceHistoryEntry,
+    WorkspaceHistoryPageProps,
     WorkspaceHistoryResponse,
 } from "@/types/workspace";
 
@@ -27,13 +28,7 @@ function getErrorMessage(payload: ApiErrorPayload | null) {
     return "Failed to load workspace history.";
 }
 
-type HistoryPageProps = {
-    params: Promise<{
-        workspaceId: string;
-    }>;
-};
-
-export default function HistoryPage({ params }: HistoryPageProps) {
+export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
     const { workspaceId } = use(params);
     const { isAuthenticated } = useAuthenticated();
     const {

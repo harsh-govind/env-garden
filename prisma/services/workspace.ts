@@ -37,26 +37,11 @@ function formatProjectAccessScope(scope: "ALL_PROJECTS" | "SELECTED_PROJECTS") {
 export async function listWorkspacesForUser(userId: string): Promise<WorkspaceSummaryRecord[]> {
     const memberships = await prisma.workspaceMember.findMany({
         where: { userId },
-        include: {
+        select: {
             workspace: {
                 select: {
                     id: true,
                     name: true,
-                    slug: true,
-                    description: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    _count: {
-                        select: {
-                            members: true,
-                            projects: true,
-                        },
-                    },
-                },
-            },
-            _count: {
-                select: {
-                    projectMembers: true,
                 },
             },
         },
@@ -68,17 +53,6 @@ export async function listWorkspacesForUser(userId: string): Promise<WorkspaceSu
     return memberships.map((membership) => ({
         id: membership.workspace.id,
         name: membership.workspace.name,
-        slug: membership.workspace.slug,
-        description: membership.workspace.description,
-        role: membership.role,
-        projectAccessScope: membership.projectAccessScope,
-        projectCount:
-            membership.projectAccessScope === "ALL_PROJECTS"
-                ? membership.workspace._count.projects
-                : membership._count.projectMembers,
-        memberCount: membership.workspace._count.members,
-        createdAt: membership.workspace.createdAt,
-        updatedAt: membership.workspace.updatedAt,
     }));
 }
 
@@ -91,57 +65,20 @@ export async function getWorkspaceDetailForUser(
             workspaceId,
             userId,
         },
-        include: {
+        select: {
+            id: true,
+            role: true,
+            projectAccessScope: true,
             workspace: {
                 select: {
                     id: true,
                     name: true,
                     slug: true,
-                    description: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    projects: {
-                        select: {
-                            id: true,
-                            name: true,
-                            slug: true,
-                            createdAt: true,
-                            updatedAt: true,
-                        },
-                        orderBy: {
-                            updatedAt: "desc",
-                        },
-                    },
-                    history: {
-                        select: {
-                            id: true,
-                            operation: true,
-                            message: true,
-                            data: true,
-                            createdAt: true,
-                        },
-                        orderBy: {
-                            createdAt: "desc",
-                        },
-                        take: 25,
-                    },
                     _count: {
                         select: {
                             members: true,
                             projects: true,
-                        },
-                    },
-                },
-            },
-            projectMembers: {
-                select: {
-                    project: {
-                        select: {
-                            id: true,
-                            name: true,
-                            slug: true,
-                            createdAt: true,
-                            updatedAt: true,
+                            history: true,
                         },
                     },
                 },
@@ -153,23 +90,47 @@ export async function getWorkspaceDetailForUser(
         return null;
     }
 
-    const scopedProjects =
+    const uniqueProjects =
         membership.projectAccessScope === "ALL_PROJECTS"
-            ? membership.workspace.projects
-            : membership.projectMembers.map((projectMember) => projectMember.project);
-
-    const uniqueProjects = Array.from(
-        new Map(scopedProjects.map((project) => [project.id, project])).values()
-    );
-    const history = canViewHistory(membership.role)
-        ? membership.workspace.history
-        : [];
+            ? await prisma.project.findMany({
+                  where: {
+                      workspaceId,
+                  },
+                  select: {
+                      id: true,
+                      name: true,
+                      slug: true,
+                      createdAt: true,
+                      updatedAt: true,
+                  },
+                  orderBy: {
+                      updatedAt: "desc",
+                  },
+              })
+            : (
+                  await prisma.projectMember.findMany({
+                      where: {
+                          workspaceId,
+                          workspaceMemberId: membership.id,
+                      },
+                      select: {
+                          project: {
+                              select: {
+                                  id: true,
+                                  name: true,
+                                  slug: true,
+                                  createdAt: true,
+                                  updatedAt: true,
+                              },
+                          },
+                      },
+                  })
+              ).map((projectMember) => projectMember.project);
 
     return {
         id: membership.workspace.id,
         name: membership.workspace.name,
         slug: membership.workspace.slug,
-        description: membership.workspace.description,
         role: membership.role,
         projectAccessScope: membership.projectAccessScope,
         projectCount:
@@ -177,10 +138,10 @@ export async function getWorkspaceDetailForUser(
                 ? membership.workspace._count.projects
                 : uniqueProjects.length,
         memberCount: membership.workspace._count.members,
-        createdAt: membership.workspace.createdAt,
-        updatedAt: membership.workspace.updatedAt,
+        historyCount: canViewHistory(membership.role)
+            ? membership.workspace._count.history
+            : 0,
         projects: uniqueProjects,
-        history,
     };
 }
 
@@ -261,14 +222,6 @@ export async function createWorkspaceForUser(
             return {
                 id: workspace.id,
                 name: workspace.name,
-                slug: workspace.slug,
-                description: workspace.description,
-                role: "OWNER",
-                projectAccessScope: "ALL_PROJECTS",
-                projectCount: 0,
-                memberCount: 1,
-                createdAt: workspace.createdAt,
-                updatedAt: workspace.updatedAt,
             };
         } catch (error) {
             if (isUniqueConstraintError(error)) {

@@ -17,26 +17,24 @@ export type WorkspaceHistoryEntry = {
     id: string;
     operation: string;
     message: string;
-    data: Record<string, unknown>;
     createdAt: string;
 };
 
 export type WorkspaceSummary = {
     id: string;
     name: string;
+};
+
+export type WorkspaceDetail = {
+    id: string;
+    name: string;
     slug: string;
-    description: string | null;
     role: WorkspaceRoleValue;
     projectAccessScope: ProjectAccessScopeValue;
     projectCount: number;
     memberCount: number;
-    createdAt: string;
-    updatedAt: string;
-};
-
-export type WorkspaceDetail = WorkspaceSummary & {
+    historyCount: number;
     projects: WorkspaceProjectSummary[];
-    history: WorkspaceHistoryEntry[];
 };
 
 export type CreateWorkspaceRequest = {
@@ -53,7 +51,7 @@ export type WorkspaceResponse = {
 };
 
 export type CreateWorkspaceResponse = {
-    workspace: WorkspaceSummary;
+    workspaceId: string;
 };
 
 export type WorkspaceHistoryResponse = {
@@ -88,33 +86,32 @@ export type WorkspaceRouteContext = {
     }>;
 };
 
+export type WorkspaceHistoryPageProps = {
+    params: Promise<{
+        workspaceId: string;
+    }>;
+};
+
 export type WorkspaceSummaryRecord = {
     id: string;
     name: string;
+};
+
+export type WorkspaceDetailRecord = {
+    id: string;
+    name: string;
     slug: string;
-    description: string | null;
     role: WorkspaceRoleValue;
     projectAccessScope: ProjectAccessScopeValue;
     projectCount: number;
     memberCount: number;
-    createdAt: Date;
-    updatedAt: Date;
-};
-
-export type WorkspaceDetailRecord = WorkspaceSummaryRecord & {
+    historyCount: number;
     projects: {
         id: string;
         name: string;
         slug: string;
         createdAt: Date;
         updatedAt: Date;
-    }[];
-    history: {
-        id: string;
-        operation: string;
-        message: string;
-        data: unknown;
-        createdAt: Date;
     }[];
 };
 
@@ -129,6 +126,31 @@ export type CreateWorkspaceHistoryEntryInput = {
     operation: string;
     message: string;
     data: Prisma.InputJsonValue;
+};
+
+export type ListWorkspaceHistoryForUserInput = {
+    workspaceId: string;
+    userId: string;
+    query?: string;
+};
+
+export type ListWorkspaceHistoryForUserResult =
+    | {
+          status: "NOT_FOUND";
+      }
+    | {
+          status: "FORBIDDEN";
+      }
+    | {
+          status: "OK";
+          entries: WorkspaceHistoryEntryRecord[];
+      };
+
+export type WorkspaceHistoryEntryRecord = {
+    id: string;
+    operation: string;
+    message: string;
+    createdAt: Date;
 };
 
 export type DashboardSidebarProps = {
