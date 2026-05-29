@@ -3,11 +3,11 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import AuthenticatedLayout from "@/layouts/Authenticated";
 import UnauthenticatedLayout from "@/layouts/Unauthenticated";
-import AuthenticatedProvider from "@/provider/authenticated-provider";
-import ProtectedRouteProvider from "@/provider/protected-route-provider";
+import AuthenticatedProvider from "@/provider/authenticated";
+import ProtectedRouteProvider from "@/provider/protected-route";
 import type { LayoutSwitcherProps, RootLayoutProps } from "@/types/layouts";
 import { cn } from "@/lib/utils";
-import { ThemeProvider } from "@/provider/theme-provider";
+import { ThemeProvider } from "@/provider/theme";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 

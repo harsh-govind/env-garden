@@ -1,19 +1,17 @@
 "use client";
 
-import { ChevronDown, Menu, Plus, Search } from "lucide-react";
+import { Menu, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-type DashboardTopNavProps = {
-    breadcrumbs: string[];
-    projectName: string;
-    workspaceInitial: string;
-    onOpenSidebar: () => void;
-};
+import type { DashboardTopNavProps } from "@/types/workspace";
 
 export default function DashboardTopNav({
-    breadcrumbs,
-    projectName,
+    workspaces,
+    activeWorkspaceId,
+    activeWorkspaceName,
     workspaceInitial,
+    isCreatingWorkspace,
+    onWorkspaceChange,
+    onCreateWorkspace,
     onOpenSidebar,
 }: DashboardTopNavProps) {
     return (
@@ -30,18 +28,30 @@ export default function DashboardTopNav({
                 </Button>
 
                 <div className="hidden items-center gap-2 text-xs text-zinc-400 sm:flex">
-                    {breadcrumbs.map((crumb) => (
-                        <span key={crumb}>{crumb}</span>
-                    ))}
+                    <span>Workspaces</span>
+                    <span>/</span>
+                    <span className="text-zinc-200">{activeWorkspaceName}</span>
                 </div>
 
-                <button
-                    type="button"
-                    className="flex items-center gap-1.5 border border-transparent px-2 py-1 text-sm font-medium text-zinc-100 hover:border-zinc-800 hover:bg-zinc-900"
+                <label className="sr-only" htmlFor="workspace-selector">
+                    Select workspace
+                </label>
+                <select
+                    id="workspace-selector"
+                    value={activeWorkspaceId ?? ""}
+                    onChange={(event) => onWorkspaceChange(event.target.value)}
+                    className="max-w-48 truncate border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                    disabled={workspaces.length === 0}
                 >
-                    <span>{projectName}</span>
-                    <ChevronDown className="size-3.5 text-zinc-500" />
-                </button>
+                    {workspaces.length === 0 ? (
+                        <option value="">No workspaces</option>
+                    ) : null}
+                    {workspaces.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                            {workspace.name}
+                        </option>
+                    ))}
+                </select>
 
                 <div className="ml-auto flex items-center gap-2">
                     <button
@@ -49,19 +59,18 @@ export default function DashboardTopNav({
                         className="hidden h-8 min-w-56 items-center gap-2 border border-zinc-800 bg-zinc-950/80 px-2 text-xs text-zinc-500 lg:flex"
                     >
                         <Search className="size-3.5" />
-                        <span>Search</span>
-                        <span className="ml-auto border border-zinc-700 px-1 py-0.5 text-[10px] text-zinc-400">
-                            K
-                        </span>
+                        <span className="truncate">Search in {activeWorkspaceName}</span>
                     </button>
 
                     <Button
                         type="button"
                         size="sm"
                         className="border border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-900"
+                        onClick={onCreateWorkspace}
+                        disabled={isCreatingWorkspace}
                     >
                         <Plus />
-                        New
+                        {isCreatingWorkspace ? "Creating..." : "New workspace"}
                     </Button>
 
                     <button

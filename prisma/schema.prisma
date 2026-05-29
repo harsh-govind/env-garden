@@ -116,6 +116,7 @@ model ProjectMember {
 model WorkspaceHistory {
   id          String    @id @default(cuid())
   operation   String
+  message     String    @default("")
   data        Json
   createdAt   DateTime  @default(now())
   workspaceId String

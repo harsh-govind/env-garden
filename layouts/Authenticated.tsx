@@ -1,34 +1,70 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import DashboardSidebar from "@/components/dashboard/sidebar";
 import DashboardTopNav from "@/components/dashboard/top-nav";
-import { useAuthenticated } from "@/contexts/authenticated-context";
-import { getDashboardData } from "@/lib/dashboard-data";
+import { useAuthenticated } from "@/contexts/authenticated";
+import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace";
 import type { AuthenticatedLayoutProps } from "@/types/layouts";
 
 export default function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
+    return (
+        <WorkspaceProvider>
+            <AuthenticatedShell>{children}</AuthenticatedShell>
+        </WorkspaceProvider>
+    );
+}
+
+function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     const { user } = useAuthenticated();
+    const {
+        workspaces,
+        activeWorkspaceId,
+        activeWorkspace,
+        isCreatingWorkspace,
+        selectWorkspace,
+        createWorkspace,
+    } = useWorkspace();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    const dashboardData = useMemo(() => getDashboardData(user?.name), [user?.name]);
+    const workspaceName = activeWorkspace?.name ?? "No workspace";
+    const workspaceInitial = workspaceName.match(/[a-z]/i)?.[0]?.toUpperCase()
+        ?? user?.name?.match(/[a-z]/i)?.[0]?.toUpperCase()
+        ?? "W";
+
+    const handleCreateWorkspace = useCallback(async () => {
+        const name = window.prompt("Workspace name");
+
+        if (!name || !name.trim()) {
+            return;
+        }
+
+        await createWorkspace({ name: name.trim() });
+    }, [createWorkspace]);
 
     return (
         <div className="min-h-screen bg-[#06070a] text-zinc-200">
             <div className="flex min-h-screen">
                 <DashboardSidebar
-                    workspaceName={dashboardData.shell.workspaceName}
-                    sections={dashboardData.shell.sidebarSections}
-                    footerItems={dashboardData.shell.sidebarFooter}
+                    workspaceName={workspaceName}
+                    projectCount={activeWorkspace?.projectCount ?? 0}
+                    memberCount={activeWorkspace?.memberCount ?? 0}
+                    historyCount={activeWorkspace?.history.length ?? 0}
                     isOpen={isSidebarOpen}
                     onClose={() => setIsSidebarOpen(false)}
                 />
 
                 <div className="flex min-h-screen min-w-0 flex-1 flex-col">
                     <DashboardTopNav
-                        breadcrumbs={dashboardData.shell.breadcrumbs}
-                        projectName={dashboardData.shell.projectName}
-                        workspaceInitial={dashboardData.shell.workspaceInitial}
+                        workspaces={workspaces}
+                        activeWorkspaceId={activeWorkspaceId}
+                        activeWorkspaceName={workspaceName}
+                        workspaceInitial={workspaceInitial}
+                        isCreatingWorkspace={isCreatingWorkspace}
+                        onWorkspaceChange={selectWorkspace}
+                        onCreateWorkspace={() => {
+                            void handleCreateWorkspace();
+                        }}
                         onOpenSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
 
