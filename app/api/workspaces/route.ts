@@ -34,51 +34,69 @@ function parseCreateWorkspaceBody(body: CreateWorkspaceBody) {
 }
 
 export async function GET() {
-    const session = await auth();
+    try {
+        const session = await auth();
 
-    if (!session?.user?.id) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const workspaces = await listWorkspacesForUser(session.user.id);
+
+        return NextResponse.json({
+            workspaces: workspaces.map(serializeWorkspaceSummary),
+        });
+    } catch (error) {
+        console.error("Failed to list workspaces:", error);
+        return NextResponse.json(
+            { error: "Internal server error." },
+            { status: 500 }
+        );
     }
-
-    const workspaces = await listWorkspacesForUser(session.user.id);
-
-    return NextResponse.json({
-        workspaces: workspaces.map(serializeWorkspaceSummary),
-    });
 }
 
 export async function POST(request: Request) {
-    const session = await auth();
+    try {
+        const session = await auth();
 
-    if (!session?.user?.id) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
-    const body = (await request.json().catch(() => null)) as CreateWorkspaceBody | null;
+        const body = (await request
+            .json()
+            .catch(() => null)) as CreateWorkspaceBody | null;
 
-    if (!body) {
+        if (!body) {
+            return NextResponse.json(
+                { error: "Invalid JSON payload." },
+                { status: 400 }
+            );
+        }
+
+        const parsed = parseCreateWorkspaceBody(body);
+
+        if ("error" in parsed) {
+            return NextResponse.json({ error: parsed.error }, { status: 400 });
+        }
+
+        const workspace = await createWorkspaceForUser({
+            userId: session.user.id,
+            name: parsed.value.name,
+            description: parsed.value.description,
+        });
+
         return NextResponse.json(
-            { error: "Invalid JSON payload." },
-            { status: 400 }
+            {
+                workspaceId: workspace.id,
+            },
+            { status: 201 }
+        );
+    } catch (error) {
+        console.error("Failed to create workspace:", error);
+        return NextResponse.json(
+            { error: "Internal server error." },
+            { status: 500 }
         );
     }
-
-    const parsed = parseCreateWorkspaceBody(body);
-
-    if ("error" in parsed) {
-        return NextResponse.json({ error: parsed.error }, { status: 400 });
-    }
-
-    const workspace = await createWorkspaceForUser({
-        userId: session.user.id,
-        name: parsed.value.name,
-        description: parsed.value.description,
-    });
-
-    return NextResponse.json(
-        {
-            workspaceId: workspace.id,
-        },
-        { status: 201 }
-    );
 }
