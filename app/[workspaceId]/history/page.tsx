@@ -36,6 +36,10 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
         return <UnauthenticatedHome />;
     }
 
+    return <AuthenticatedHistoryPage workspaceId={workspaceId} />;
+}
+
+function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
     const {
         activeWorkspaceId,
         activeWorkspace,
@@ -145,14 +149,14 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
 
     if (!workspace) {
         return (
-            <section className="border border-zinc-800 bg-[#090b11] p-4">
+            <section className="border border-border bg-card p-4">
                 {isWorkspaceLoading || activeWorkspaceId !== workspaceId ? (
                     <>
                         <Skeleton className="h-5 w-40" />
                         <Skeleton className="mt-3 h-4 w-80 max-w-full" />
                     </>
                 ) : (
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-muted-foreground">
                         Workspace not found or access denied.
                     </p>
                 )}
@@ -162,12 +166,12 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
 
     if (!hasHistoryAccess) {
         return (
-            <section className="border border-zinc-800 bg-[#090b11] px-4 py-5">
-                <p className="inline-flex items-center gap-2 text-sm font-medium text-zinc-200">
+            <section className="border border-border bg-card px-4 py-5">
+                <p className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
                     <ShieldAlert className="size-4" />
                     History access restricted
                 </p>
-                <p className="mt-2 text-sm text-zinc-400">
+                <p className="mt-2 text-sm text-muted-foreground">
                     Only workspace owners and admins can view history.
                 </p>
             </section>
@@ -176,13 +180,13 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
 
     return (
         <div className="space-y-4">
-            <section className="border border-zinc-800 bg-[#090b11]">
-                <div className="border-b border-zinc-800 px-4 py-3">
-                    <h1 className="inline-flex items-center gap-2 text-xl font-semibold text-zinc-100">
+            <section className="border border-border bg-card">
+                <div className="border-b border-border px-4 py-3">
+                    <h1 className="inline-flex items-center gap-2 text-xl font-semibold text-foreground">
                         <History className="size-4" />
                         Workspace history
                     </h1>
-                    <p className="mt-1 text-sm text-zinc-400">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         Activity in {workspace.name}
                     </p>
                 </div>
@@ -190,20 +194,20 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
                     <label className="sr-only" htmlFor="history-search">
                         Search history
                     </label>
-                    <div className="flex h-9 items-center gap-2 border border-zinc-700 bg-zinc-950 px-3">
-                        <Search className="size-4 text-zinc-500" />
+                    <div className="flex h-9 items-center gap-2 border border-border bg-background px-3">
+                        <Search className="size-4 text-muted-foreground" />
                         <input
                             id="history-search"
                             value={searchInput}
                             onChange={(event) => setSearchInput(event.target.value)}
                             placeholder="Search by message or operation"
-                            className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+                            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                         />
                     </div>
                 </div>
             </section>
 
-            <section className="border border-zinc-800 bg-[#090b11] px-4 py-4">
+            <section className="border border-border bg-card px-4 py-4">
                 {historyError ? (
                     <p className="mb-3 border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
                         {historyError}
@@ -213,7 +217,7 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
                 {isHistoryLoading ? (
                     <HistoryListSkeleton />
                 ) : history.length === 0 ? (
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-muted-foreground">
                         {searchQuery
                             ? "No history entries matched your search."
                             : "No history entries yet."}
@@ -223,16 +227,16 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
                         {history.map((entry) => (
                             <article
                                 key={entry.id}
-                                className="border border-zinc-800 bg-zinc-950/40 px-3 py-2"
+                                className="border border-border bg-muted/30 px-3 py-2"
                             >
-                                <p className="text-sm font-medium text-zinc-100">
+                                <p className="text-sm font-medium text-foreground">
                                     {entry.message}
                                 </p>
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-xs text-zinc-500">
+                                    <p className="text-xs text-muted-foreground">
                                         {entry.operation}
                                     </p>
-                                    <p className="text-xs text-zinc-500">
+                                    <p className="text-xs text-muted-foreground">
                                         {formatDate(entry.createdAt)}
                                     </p>
                                 </div>

@@ -32,8 +32,8 @@ function SidebarItem({
     const className = cn(
         "group flex w-full items-center justify-between gap-2 border border-transparent px-2 py-2 text-left text-sm transition",
         item.active
-            ? "bg-[#153356] text-zinc-50"
-            : "text-zinc-400 hover:border-zinc-800 hover:bg-zinc-900/70 hover:text-zinc-100"
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:border-border hover:bg-accent hover:text-accent-foreground"
     );
 
     const content = (
@@ -44,7 +44,7 @@ function SidebarItem({
             </span>
 
             {typeof item.count === "number" ? (
-                <span className="border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                <span className="border border-border bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     {item.count}
                 </span>
             ) : null}
@@ -141,21 +141,21 @@ export default function DashboardSidebar({
 
             <aside
                 className={cn(
-                    "fixed inset-y-0 left-0 z-40 w-64 border-r border-zinc-800 bg-[#0a0b0f] transition-transform md:static md:translate-x-0",
+                    "fixed inset-y-0 left-0 z-40 w-64 border-r border-border bg-card transition-transform md:static md:translate-x-0",
                     isOpen ? "translate-x-0" : "-translate-x-full"
                 )}
             >
                 <div className="flex h-full flex-col">
-                    <div className="flex h-12 items-center justify-between border-b border-zinc-800 px-3">
+                    <div className="flex h-12 items-center justify-between border-b border-border px-3">
                         <div className="flex min-w-0 items-center gap-2">
                             <span className="size-2 rounded-full bg-cyan-400" />
-                            <span className="truncate text-sm font-medium text-zinc-100">{workspaceName}</span>
+                            <span className="truncate text-sm font-medium text-foreground">{workspaceName}</span>
                         </div>
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon-xs"
-                            className="text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 md:hidden"
+                            className="text-muted-foreground hover:bg-accent hover:text-accent-foreground md:hidden"
                             onClick={onClose}
                         >
                             <X />
@@ -164,7 +164,7 @@ export default function DashboardSidebar({
 
                     <div className="flex-1 overflow-y-auto px-2 py-2">
                         <div className="mb-4">
-                            <p className="px-2 py-2 text-[10px] font-medium tracking-[0.14em] text-zinc-500 uppercase">
+                            <p className="px-2 py-2 text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
                                 Workspace
                             </p>
                             <div className="space-y-0.5">
@@ -179,7 +179,7 @@ export default function DashboardSidebar({
                         </div>
                     </div>
 
-                    <div className="border-t border-zinc-800 px-2 py-2">
+                    <div className="border-t border-border px-2 py-2">
                         <div className="space-y-0.5">
                             {secondaryItems.map((item) => (
                                 <SidebarItem key={item.id} item={item} onSelect={onClose} />

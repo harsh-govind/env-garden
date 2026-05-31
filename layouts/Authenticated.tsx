@@ -55,7 +55,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     }, [pathname, router, selectWorkspace]);
 
     return (
-        <div className="min-h-screen bg-[#06070a] text-zinc-200">
+        <div className="min-h-screen bg-background text-foreground">
             <div className="flex min-h-screen">
                 <DashboardSidebar
                     activeWorkspaceId={activeWorkspaceId}

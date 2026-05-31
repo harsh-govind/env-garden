@@ -8,7 +8,7 @@ export default function HistoryListSkeleton() {
             {Array.from({ length: 6 }).map((_, index) => (
                 <article
                     key={index}
-                    className="border border-zinc-800 bg-zinc-950/40 px-3 py-2"
+                    className="border border-border bg-muted/30 px-3 py-2"
                 >
                     <Skeleton className="h-4 w-4/5" />
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
