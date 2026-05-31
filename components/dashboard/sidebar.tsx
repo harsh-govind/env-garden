@@ -3,7 +3,6 @@
 import {
     FolderKanban,
     History,
-    LayoutDashboard,
     Settings,
     Users,
     X,
@@ -71,7 +70,6 @@ function SidebarItem({
 
 export default function DashboardSidebar({
     activeWorkspaceId,
-    workspaceName,
     projectCount,
     memberCount,
     historyCount,
@@ -88,17 +86,12 @@ export default function DashboardSidebar({
 
     const primaryItems: SidebarItemData[] = [
         {
-            id: "overview",
-            label: "Overview",
-            icon: LayoutDashboard,
-            href: "/",
-            active: !isHistoryRoute,
-        },
-        {
             id: "projects",
             label: "Projects",
             icon: FolderKanban,
+            href: "/",
             count: projectCount,
+            active: !isHistoryRoute,
         },
         {
             id: "members",
@@ -147,10 +140,19 @@ export default function DashboardSidebar({
             >
                 <div className="flex h-full flex-col">
                     <div className="flex h-12 items-center justify-between border-b border-border px-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <span className="size-2 rounded-full bg-cyan-400" />
-                            <span className="truncate text-sm font-medium text-foreground">{workspaceName}</span>
-                        </div>
+                        <Link
+                            href="/"
+                            className="flex min-w-0 items-center gap-2.5"
+                            onClick={onClose}
+                            aria-label="Go to env.garden home"
+                        >
+                            <span className="grid size-7 place-items-center border border-border bg-accent text-xs font-bold tracking-tight text-accent-foreground">
+                                eg
+                            </span>
+                            <span className="truncate text-base leading-none font-extrabold tracking-tight text-foreground">
+                                env.garden
+                            </span>
+                        </Link>
                         <Button
                             type="button"
                             variant="ghost"

@@ -1,11 +1,19 @@
 "use client";
 
-import { LogOut, Menu, Moon, Plus, Search, Sun, User } from "lucide-react";
+import { FolderKanban, LogOut, Menu, Moon, Plus, Sun, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuthenticated } from "@/contexts/authenticated";
 import {
     Select,
@@ -23,6 +31,7 @@ export default function DashboardTopNav({
     workspaceInitial,
     isCreatingWorkspace,
     onWorkspaceChange,
+    onCreateProject,
     onCreateWorkspace,
     onOpenSidebar,
 }: DashboardTopNavProps) {
@@ -97,24 +106,33 @@ export default function DashboardTopNav({
                 </Select>
 
                 <div className="ml-auto flex items-center gap-2">
-                    <button
-                        type="button"
-                        className="hidden h-8 min-w-56 items-center gap-2 border border-border bg-card/80 px-2 text-xs text-muted-foreground lg:flex"
-                    >
-                        <Search className="size-3.5" />
-                        <span className="truncate">Search in {activeWorkspaceName}</span>
-                    </button>
-
-                    <Button
-                        type="button"
-                        size="sm"
-                        className="border border-border bg-card text-foreground hover:bg-accent"
-                        onClick={onCreateWorkspace}
-                        disabled={isCreatingWorkspace}
-                    >
-                        <Plus />
-                        {isCreatingWorkspace ? "Creating..." : "New workspace"}
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="border border-border bg-card text-foreground hover:bg-accent"
+                            >
+                                <Plus />
+                                Add
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Add new</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={onCreateProject}>
+                                <FolderKanban className="size-4" />
+                                Project
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={onCreateWorkspace}
+                                disabled={isCreatingWorkspace}
+                            >
+                                <Plus className="size-4" />
+                                {isCreatingWorkspace ? "Creating workspace..." : "Workspace"}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
                     <div className="relative" ref={profileMenuRef}>
                         <button

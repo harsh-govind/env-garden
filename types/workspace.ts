@@ -136,15 +136,15 @@ export type ListWorkspaceHistoryForUserInput = {
 
 export type ListWorkspaceHistoryForUserResult =
     | {
-          status: "NOT_FOUND";
-      }
+        status: "NOT_FOUND";
+    }
     | {
-          status: "FORBIDDEN";
-      }
+        status: "FORBIDDEN";
+    }
     | {
-          status: "OK";
-          entries: WorkspaceHistoryEntryRecord[];
-      };
+        status: "OK";
+        entries: WorkspaceHistoryEntryRecord[];
+    };
 
 export type WorkspaceHistoryEntryRecord = {
     id: string;
@@ -155,7 +155,6 @@ export type WorkspaceHistoryEntryRecord = {
 
 export type DashboardSidebarProps = {
     activeWorkspaceId: string | null;
-    workspaceName: string;
     projectCount: number;
     memberCount: number;
     historyCount: number;
@@ -180,6 +179,7 @@ export type DashboardTopNavProps = {
     workspaceInitial: string;
     isCreatingWorkspace: boolean;
     onWorkspaceChange: (workspaceId: string) => void;
+    onCreateProject: () => void;
     onCreateWorkspace: () => void;
     onOpenSidebar: () => void;
 };

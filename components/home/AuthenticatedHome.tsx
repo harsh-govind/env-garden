@@ -1,25 +1,12 @@
 "use client";
 
-import {
-    FolderKanban,
-    LogOut,
-    RefreshCw,
-    ShieldCheck,
-    Users,
-} from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
-import { cn } from "@/lib/utils";
 
 function formatDate(value: string) {
     return new Date(value).toLocaleString();
-}
-
-function formatAccessScope(scope: "ALL_PROJECTS" | "SELECTED_PROJECTS") {
-    return scope === "ALL_PROJECTS" ? "All projects" : "Selected projects";
 }
 
 export default function AuthenticatedHome() {
@@ -27,11 +14,9 @@ export default function AuthenticatedHome() {
     const {
         workspaces,
         activeWorkspace,
-        isLoading,
         isWorkspaceLoading,
         isCreatingWorkspace,
         error,
-        refreshWorkspaces,
         createWorkspace,
     } = useWorkspace();
 
@@ -79,7 +64,7 @@ export default function AuthenticatedHome() {
             <section className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
-                        Workspace dashboard
+                        Workspace projects
                     </p>
                     <h1 className="mt-1 text-4xl font-semibold tracking-tight text-foreground">
                         {activeWorkspace?.name ?? "Create your first workspace"}
@@ -90,30 +75,6 @@ export default function AuthenticatedHome() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
-                        onClick={() => {
-                            void refreshWorkspaces();
-                        }}
-                    >
-                        <RefreshCw className={cn("size-4", isLoading ? "animate-spin" : "")} />
-                        Refresh
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
-                        onClick={() => signOut({ callbackUrl: "/" })}
-                    >
-                        <LogOut className="size-4" />
-                        Sign out
-                    </Button>
-                </div>
             </section>
 
             {error ? (
@@ -174,41 +135,6 @@ export default function AuthenticatedHome() {
 
             {activeWorkspace ? (
                 <>
-                    <section className="grid gap-3 sm:grid-cols-3">
-                        <article className="border border-border bg-card p-4">
-                            <p className="inline-flex items-center gap-2 text-xs tracking-wide text-muted-foreground uppercase">
-                                <FolderKanban className="size-3.5" />
-                                Projects
-                            </p>
-                            <p className="mt-2 text-2xl font-semibold text-foreground">
-                                {activeWorkspace.projectCount}
-                            </p>
-                        </article>
-
-                        <article className="border border-border bg-card p-4">
-                            <p className="inline-flex items-center gap-2 text-xs tracking-wide text-muted-foreground uppercase">
-                                <Users className="size-3.5" />
-                                Members
-                            </p>
-                            <p className="mt-2 text-2xl font-semibold text-foreground">
-                                {activeWorkspace.memberCount}
-                            </p>
-                        </article>
-
-                        <article className="border border-border bg-card p-4">
-                            <p className="inline-flex items-center gap-2 text-xs tracking-wide text-muted-foreground uppercase">
-                                <ShieldCheck className="size-3.5" />
-                                Access
-                            </p>
-                            <p className="mt-2 text-sm font-medium text-foreground">
-                                Role: {activeWorkspace.role}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                Scope: {formatAccessScope(activeWorkspace.projectAccessScope)}
-                            </p>
-                        </article>
-                    </section>
-
                     <section className="border border-border bg-card">
                         <div className="border-b border-border px-4 py-3">
                             <h2 className="text-xl font-semibold text-foreground">
