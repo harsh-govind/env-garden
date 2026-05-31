@@ -28,6 +28,7 @@ model User {
   id                   String            @id @default(cuid())
   email                String            @unique
   name                 String?
+  avatar               String            @default("sprout")
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   createdWorkspaces    Workspace[]       @relation("WorkspaceCreator")

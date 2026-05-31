@@ -176,7 +176,6 @@ export type DashboardTopNavProps = {
     workspaces: WorkspaceSummary[];
     activeWorkspaceId: string | null;
     activeWorkspaceName: string;
-    workspaceInitial: string;
     isCreatingWorkspace: boolean;
     onWorkspaceChange: (workspaceId: string) => void;
     onCreateProject: () => void;

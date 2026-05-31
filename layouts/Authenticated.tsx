@@ -13,7 +13,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { useAuthenticated } from "@/contexts/authenticated";
 import { matchesRoutePath } from "@/lib/constants";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace";
 import type { AuthenticatedLayoutProps } from "@/types/layouts";
@@ -27,7 +26,6 @@ export default function AuthenticatedLayout({ children }: AuthenticatedLayoutPro
 }
 
 function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
-    const { user } = useAuthenticated();
     const {
         workspaces,
         activeWorkspaceId,
@@ -46,9 +44,6 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     const [createDialogError, setCreateDialogError] = useState<string | null>(null);
 
     const workspaceName = activeWorkspace?.name ?? "No workspace";
-    const workspaceInitial = workspaceName.match(/[a-z]/i)?.[0]?.toUpperCase()
-        ?? user?.name?.match(/[a-z]/i)?.[0]?.toUpperCase()
-        ?? "W";
 
     const handleCreateDialogOpenChange = useCallback((isOpen: boolean) => {
         setIsCreateDialogOpen(isOpen);
@@ -135,7 +130,6 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                         workspaces={workspaces}
                         activeWorkspaceId={activeWorkspaceId}
                         activeWorkspaceName={workspaceName}
-                        workspaceInitial={workspaceInitial}
                         isCreatingWorkspace={isCreatingWorkspace}
                         onWorkspaceChange={handleWorkspaceChange}
                         onCreateProject={handleOpenCreateProjectDialog}

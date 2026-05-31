@@ -1,7 +1,15 @@
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
-import { prisma } from "@/lib/prisma";
+import {
+    DEFAULT_AVATAR_PRESET_ID,
+    isAvatarPresetId,
+} from "@/lib/avatar-presets";
+import {
+    createUserFromAuth,
+    findUserByEmail,
+    updateUserName,
+} from "@/prisma/services/user";
 
 function normalizeEmail(email: string) {
     return email.trim().toLowerCase();
@@ -29,37 +37,41 @@ export const authOptions: NextAuthOptions = {
                 return token;
             }
 
-            const existing = await prisma.user.findUnique({
-                where: { email },
-            });
+            const existing = await findUserByEmail(email);
 
             if (!existing) {
-                const created = await prisma.user.create({
-                    data: {
-                        email,
-                        name: name || null,
-                    },
+                const created = await createUserFromAuth({
+                    email,
+                    name: name || null,
                 });
 
                 token.sub = created.id;
+                token.avatar = isAvatarPresetId(created.avatar)
+                    ? created.avatar
+                    : DEFAULT_AVATAR_PRESET_ID;
                 return token;
             }
 
             if (name && name !== existing.name) {
-                await prisma.user.update({
-                    where: { id: existing.id },
-                    data: {
-                        name,
-                    },
-                });
+                await updateUserName(existing.id, name);
             }
 
             token.sub = existing.id;
+            token.avatar = isAvatarPresetId(existing.avatar)
+                ? existing.avatar
+                : DEFAULT_AVATAR_PRESET_ID;
             return token;
         },
         async session({ session, token }) {
             if (session.user && typeof token.sub === "string") {
                 session.user.id = token.sub;
+
+                if (
+                    typeof token.avatar === "string"
+                    && isAvatarPresetId(token.avatar)
+                ) {
+                    session.user.avatar = token.avatar;
+                }
             }
 
             return session;

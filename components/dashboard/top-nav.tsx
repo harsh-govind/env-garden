@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
+import {
+    AvatarPresetBadge,
+    DEFAULT_AVATAR_PRESET_ID,
+} from "@/components/avatar/presets";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -22,13 +26,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { isAvatarPresetId } from "@/lib/avatar-presets";
 import type { DashboardTopNavProps } from "@/types/workspace";
 
 export default function DashboardTopNav({
     workspaces,
     activeWorkspaceId,
     activeWorkspaceName,
-    workspaceInitial,
     isCreatingWorkspace,
     onWorkspaceChange,
     onCreateProject,
@@ -68,6 +72,10 @@ export default function DashboardTopNav({
     }, [isProfileMenuOpen]);
 
     const activeTheme = theme ?? "system";
+    const profileAvatar =
+        user?.avatar && isAvatarPresetId(user.avatar)
+            ? user.avatar
+            : DEFAULT_AVATAR_PRESET_ID;
 
     return (
         <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-sm">
@@ -137,13 +145,17 @@ export default function DashboardTopNav({
                     <div className="relative" ref={profileMenuRef}>
                         <button
                             type="button"
-                            className="grid size-7 place-items-center rounded-full border border-border bg-card text-xs font-semibold text-foreground"
+                            className="grid size-7 place-items-center rounded-full border border-border bg-card p-0"
                             aria-label="Open profile menu"
                             aria-haspopup="menu"
                             aria-expanded={isProfileMenuOpen}
                             onClick={() => setIsProfileMenuOpen((prev) => !prev)}
                         >
-                            {workspaceInitial}
+                            <AvatarPresetBadge
+                                presetId={profileAvatar}
+                                size="sm"
+                                className="size-7 rounded-full"
+                            />
                         </button>
 
                         {isProfileMenuOpen ? (
