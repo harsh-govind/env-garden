@@ -31,6 +31,11 @@ function getErrorMessage(payload: ApiErrorPayload | null) {
 export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
     const { workspaceId } = use(params);
     const { isAuthenticated } = useAuthenticated();
+
+    if (!isAuthenticated) {
+        return <UnauthenticatedHome />;
+    }
+
     const {
         activeWorkspaceId,
         activeWorkspace,
@@ -137,10 +142,6 @@ export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
             controller.abort();
         };
     }, [workspace, workspaceId, hasHistoryAccess, searchQuery]);
-
-    if (!isAuthenticated) {
-        return <UnauthenticatedHome />;
-    }
 
     if (!workspace) {
         return (
