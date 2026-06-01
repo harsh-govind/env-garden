@@ -30,7 +30,6 @@ export function serializeWorkspaceDetail(
         projects: record.projects.map((project) => ({
             id: project.id,
             name: project.name,
-            createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
         })),
     };

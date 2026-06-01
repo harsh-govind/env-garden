@@ -78,7 +78,6 @@ export async function getWorkspaceDetailForUser(
                   select: {
                       id: true,
                       name: true,
-                      createdAt: true,
                       updatedAt: true,
                   },
                   orderBy: {
@@ -96,7 +95,6 @@ export async function getWorkspaceDetailForUser(
                               select: {
                                   id: true,
                                   name: true,
-                                  createdAt: true,
                                   updatedAt: true,
                               },
                           },

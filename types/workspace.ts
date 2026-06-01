@@ -8,7 +8,6 @@ export type ProjectAccessScopeValue = "ALL_PROJECTS" | "SELECTED_PROJECTS";
 export type WorkspaceProjectSummary = {
     id: string;
     name: string;
-    createdAt: string;
     updatedAt: string;
 };
 
@@ -118,7 +117,6 @@ export type WorkspaceDetailRecord = {
     projects: {
         id: string;
         name: string;
-        createdAt: Date;
         updatedAt: Date;
     }[];
 };

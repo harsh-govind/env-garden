@@ -6,10 +6,7 @@ import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
 import debounce from "lodash/debounce";
 import { Skeleton } from "@/components/ui/skeleton";
-
-function formatDate(value: string) {
-    return new Date(value).toLocaleString();
-}
+import { formatTimeAgo } from "@/lib/utils";
 
 export default function AuthenticatedHome() {
     const { user } = useAuthenticated();
@@ -217,7 +214,7 @@ export default function AuthenticatedHome() {
                                             paginated.map((project) => (
                                                 <div key={project.id} className="border border-border bg-card p-4 rounded-md">
                                                     <div className="text-lg font-semibold text-foreground">{project.name}</div>
-                                                    <div className="mt-2 text-sm text-muted-foreground">Updated {formatDate(project.updatedAt)}</div>
+                                                    <div className="mt-2 text-sm text-muted-foreground">Updated {formatTimeAgo(project.updatedAt)}</div>
                                                 </div>
                                             ))
                                         ) : (
