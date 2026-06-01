@@ -8,6 +8,7 @@ import HistoryListSkeleton from "@/components/history/history-list-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
+import { createInMemoryCache } from "@/lib/cache";
 import { canViewHistory } from "@/lib/constants";
 import type {
     ApiErrorPayload,
@@ -15,6 +16,8 @@ import type {
     WorkspaceHistoryPageProps,
     WorkspaceHistoryResponse,
 } from "@/types/workspace";
+
+const historyCache = createInMemoryCache<WorkspaceHistoryEntry[]>(5 * 60 * 1000);
 
 function formatDate(value: string) {
     return new Date(value).toLocaleString();
@@ -50,7 +53,7 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
     const [history, setHistory] = useState<WorkspaceHistoryEntry[]>([]);
     const [searchInput, setSearchInput] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
-    const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
 
     const workspace =
@@ -96,12 +99,23 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
             params.set("q", searchQuery);
         }
 
+        const queryString = params.toString();
+        const cacheKey = `${workspaceId}::${queryString}`;
+        const endpoint = queryString
+            ? `/api/workspaces/${workspaceId}/history?${queryString}`
+            : `/api/workspaces/${workspaceId}/history`;
+
+        const cached = historyCache.get(cacheKey);
+
+        if (cached) {
+            setHistory(cached);
+            setHistoryError(null);
+            setIsHistoryLoading(false);
+            return;
+        }
+
         const loadWorkspaceHistory = async () => {
             setIsHistoryLoading(true);
-            const queryString = params.toString();
-            const endpoint = queryString
-                ? `/api/workspaces/${workspaceId}/history?${queryString}`
-                : `/api/workspaces/${workspaceId}/history`;
 
             try {
                 const response = await fetch(endpoint, {
@@ -121,6 +135,7 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
                 }
 
                 setHistory(payload.history);
+                historyCache.set(cacheKey, payload.history);
                 setHistoryError(null);
             } catch (historyLoadError) {
                 if (controller.signal.aborted) {
