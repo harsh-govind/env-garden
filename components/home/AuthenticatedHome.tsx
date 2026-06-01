@@ -16,6 +16,7 @@ export default function AuthenticatedHome() {
     const {
         workspaces,
         activeWorkspace,
+        isLoading,
         isWorkspaceLoading,
         isCreatingWorkspace,
         error,
@@ -117,7 +118,7 @@ export default function AuthenticatedHome() {
                 </p>
             ) : null}
 
-            {!hasWorkspaces ? (
+            {!isLoading && !hasWorkspaces ? (
                 <section className="border border-border bg-card p-5">
                     <h2 className="text-xl font-semibold text-foreground">Create Workspace</h2>
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -167,7 +168,7 @@ export default function AuthenticatedHome() {
                 </section>
             ) : null}
 
-            {activeWorkspace ? (
+            {!isLoading && activeWorkspace ? (
                 <>
                     <section className="border border-border bg-card">
                         <div className="border-b border-border px-4 py-3">

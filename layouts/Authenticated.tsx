@@ -30,6 +30,8 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         workspaces,
         activeWorkspaceId,
         activeWorkspace,
+        isLoading,
+        isWorkspaceLoading,
         isCreatingWorkspace,
         selectWorkspace,
         createWorkspace,
@@ -163,6 +165,21 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
             router.replace(`/${workspaceId}/history`);
         }
     }, [pathname, router, selectWorkspace]);
+
+    const showFullPageLoading =
+        isLoading ||
+        (Boolean(activeWorkspaceId) && isWorkspaceLoading && !activeWorkspace);
+
+    if (showFullPageLoading) {
+        return (
+            <div className="grid min-h-screen place-items-center bg-background text-foreground">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading workspace...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-background text-foreground">

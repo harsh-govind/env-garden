@@ -90,7 +90,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
     const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceDetail | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
     const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
     const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -282,8 +282,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         [
             activeWorkspace,
             activeWorkspaceId,
+            createProject,
             createWorkspace,
             error,
+            isCreatingProject,
             isCreatingWorkspace,
             isLoading,
             isWorkspaceLoading,
