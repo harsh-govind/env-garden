@@ -33,6 +33,8 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         isCreatingWorkspace,
         selectWorkspace,
         createWorkspace,
+        createProject,
+        isCreatingProject,
     } = useWorkspace();
     const pathname = usePathname();
     const router = useRouter();
@@ -42,6 +44,8 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     const [workspaceNameInput, setWorkspaceNameInput] = useState("");
     const [workspaceDescriptionInput, setWorkspaceDescriptionInput] = useState("");
     const [createDialogError, setCreateDialogError] = useState<string | null>(null);
+    const [projectNameInput, setProjectNameInput] = useState("");
+    const [projectDescriptionInput, setProjectDescriptionInput] = useState("");
 
     const workspaceName = activeWorkspace?.name ?? "No workspace";
 
@@ -104,6 +108,54 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         }
     }, [createWorkspace, workspaceDescriptionInput, workspaceNameInput]);
 
+    const handleCreateProjectSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        const name = projectNameInput.trim();
+        const description = projectDescriptionInput.trim();
+
+        if (!activeWorkspaceId) {
+            setCreateDialogError("No active workspace selected.");
+            return;
+        }
+
+        if (name.length < 2) {
+            setCreateDialogError("Project name must be at least 2 characters.");
+            return;
+        }
+
+        if (name.length > 80) {
+            setCreateDialogError("Project name must be 80 characters or less.");
+            return;
+        }
+
+        if (description.length > 280) {
+            setCreateDialogError("Project description must be 280 characters or less.");
+            return;
+        }
+
+        try {
+            if (!createProject) {
+                throw new Error("Project creation is not available.");
+            }
+
+            await createProject({
+                workspaceId: activeWorkspaceId,
+                name,
+                description: description || undefined,
+            });
+
+            setProjectNameInput("");
+            setProjectDescriptionInput("");
+            setCreateDialogError(null);
+            setIsCreateDialogOpen(false);
+        } catch (createError) {
+            setCreateDialogError(
+                createError instanceof Error ? createError.message : "Failed to create project."
+            );
+        }
+    }, [projectDescriptionInput, projectNameInput, activeWorkspaceId, createProject]);
+
     const handleWorkspaceChange = useCallback((workspaceId: string) => {
         selectWorkspace(workspaceId);
 
@@ -131,6 +183,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                         activeWorkspaceId={activeWorkspaceId}
                         activeWorkspaceName={workspaceName}
                         isCreatingWorkspace={isCreatingWorkspace}
+                        isCreatingProject={isCreatingProject}
                         onWorkspaceChange={handleWorkspaceChange}
                         onCreateProject={handleOpenCreateProjectDialog}
                         onCreateWorkspace={handleOpenCreateWorkspaceDialog}
@@ -210,19 +263,71 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                                         <DialogTitle>Add project</DialogTitle>
                                         <DialogDescription>
                                             {activeWorkspaceId
-                                                ? "Project creation dialog will be available soon."
+                                                ? `Create a new project in ${activeWorkspace?.name}.`
                                                 : "Create or select a workspace first before adding a project."}
                                         </DialogDescription>
                                     </DialogHeader>
-                                    <DialogFooter>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => setIsCreateDialogOpen(false)}
+
+                                    {activeWorkspaceId ? (
+                                        <form
+                                            className="space-y-3"
+                                            onSubmit={(event) => {
+                                                void handleCreateProjectSubmit(event);
+                                            }}
                                         >
-                                            Close
-                                        </Button>
-                                    </DialogFooter>
+                                            <label className="block text-xs tracking-wide text-muted-foreground uppercase">
+                                                Project name
+                                                <input
+                                                    value={projectNameInput}
+                                                    onChange={(event) => {
+                                                        setProjectNameInput(event.target.value);
+                                                    }}
+                                                    placeholder="My Project"
+                                                    className="mt-2 w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                                                    required
+                                                />
+                                            </label>
+
+                                            <label className="block text-xs tracking-wide text-muted-foreground uppercase">
+                                                Description (optional)
+                                                <textarea
+                                                    value={projectDescriptionInput}
+                                                    onChange={(event) => {
+                                                        setProjectDescriptionInput(event.target.value);
+                                                    }}
+                                                    placeholder="A short description"
+                                                    className="mt-2 h-20 w-full resize-none border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                                                />
+                                            </label>
+
+                                            {createDialogError ? (
+                                                <p className="text-sm text-red-300">{createDialogError}</p>
+                                            ) : null}
+
+                                            <DialogFooter>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => setIsCreateDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" disabled={isCreatingProject}>
+                                                    {isCreatingProject ? "Creating project..." : "Create project"}
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    ) : (
+                                        <DialogFooter>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => setIsCreateDialogOpen(false)}
+                                            >
+                                                Close
+                                            </Button>
+                                        </DialogFooter>
+                                    )}
                                 </>
                             )}
                         </DialogContent>

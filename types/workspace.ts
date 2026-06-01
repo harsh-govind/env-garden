@@ -52,6 +52,16 @@ export type CreateWorkspaceResponse = {
     workspaceId: string;
 };
 
+export type CreateProjectRequest = {
+    workspaceId: string;
+    name: string;
+    description?: string;
+};
+
+export type CreateProjectResponse = {
+    projectId: string;
+};
+
 export type WorkspaceHistoryResponse = {
     history: WorkspaceHistoryEntry[];
 };
@@ -63,10 +73,12 @@ export type WorkspaceContextValue = {
     isLoading: boolean;
     isWorkspaceLoading: boolean;
     isCreatingWorkspace: boolean;
+    isCreatingProject?: boolean;
     error: string | null;
     selectWorkspace: (workspaceId: string) => void;
     refreshWorkspaces: () => Promise<void>;
     createWorkspace: (input: CreateWorkspaceRequest) => Promise<void>;
+    createProject?: (input: CreateProjectRequest) => Promise<void>;
 };
 
 export type ApiErrorPayload = {
@@ -173,6 +185,7 @@ export type DashboardTopNavProps = {
     activeWorkspaceId: string | null;
     activeWorkspaceName: string;
     isCreatingWorkspace: boolean;
+    isCreatingProject?: boolean;
     onWorkspaceChange: (workspaceId: string) => void;
     onCreateProject: () => void;
     onCreateWorkspace: () => void;

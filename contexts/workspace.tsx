@@ -14,6 +14,7 @@ import type {
     ApiErrorPayload,
     CreateWorkspaceRequest,
     CreateWorkspaceResponse,
+    CreateProjectResponse,
     WorkspaceContextValue,
     WorkspaceDetail,
     WorkspaceResponse,
@@ -92,6 +93,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
     const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+    const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const refreshWorkspaces = useCallback(async () => {
@@ -173,6 +175,48 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         [refreshWorkspaces]
     );
 
+    const createProject = useCallback(
+        async (input: { workspaceId: string; name: string; description?: string }) => {
+            setIsCreatingProject(true);
+
+            try {
+                const response = await fetchJson<CreateProjectResponse>(
+                    `/api/workspaces/${input.workspaceId}/projects`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ name: input.name, description: input.description }),
+                    }
+                );
+
+                await refreshWorkspaces();
+
+                // If the created project belongs to the active workspace, reload its detail
+                if (activeWorkspaceId === input.workspaceId) {
+                    try {
+                        const workspaceResponse = await fetchJson<WorkspaceResponse>(
+                            `/api/workspaces/${input.workspaceId}`
+                        );
+                        setActiveWorkspace(workspaceResponse.workspace);
+                    } catch (e) {
+                        // ignore; workspace refresh will surface errors elsewhere
+                    }
+                }
+
+                setError(null);
+            } catch (createError) {
+                const message = getErrorMessage(createError);
+                setError(message);
+                throw new Error(message);
+            } finally {
+                setIsCreatingProject(false);
+            }
+        },
+        [activeWorkspaceId, refreshWorkspaces]
+    );
+
     useEffect(() => {
         void refreshWorkspaces();
     }, [refreshWorkspaces]);
@@ -228,10 +272,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             isLoading,
             isWorkspaceLoading,
             isCreatingWorkspace,
+            isCreatingProject,
             error,
             selectWorkspace,
             refreshWorkspaces,
             createWorkspace,
+            createProject,
         }),
         [
             activeWorkspace,

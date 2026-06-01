@@ -34,6 +34,7 @@ export default function DashboardTopNav({
     activeWorkspaceId,
     activeWorkspaceName,
     isCreatingWorkspace,
+    isCreatingProject,
     onWorkspaceChange,
     onCreateProject,
     onCreateWorkspace,
@@ -128,9 +129,9 @@ export default function DashboardTopNav({
                         <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Add new</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={onCreateProject}>
+                            <DropdownMenuItem onSelect={onCreateProject} disabled={isCreatingProject}>
                                 <FolderKanban className="size-4" />
-                                Project
+                                {isCreatingProject ? "Creating project..." : "Project"}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 onSelect={onCreateWorkspace}
