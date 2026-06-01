@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, useMemo, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
+import debounce from "lodash/debounce";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function formatDate(value: string) {
     return new Date(value).toLocaleString();
@@ -24,6 +26,38 @@ export default function AuthenticatedHome() {
     const [workspaceDescription, setWorkspaceDescription] = useState("");
     const [formError, setFormError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Search + pagination
+    const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
+    const [page, setPage] = useState(1);
+    const pageSize = 10;
+
+    useEffect(() => {
+        const handler = debounce((val: string) => {
+            setDebouncedQuery(val);
+            setPage(1);
+        }, 300);
+
+        handler(searchQuery);
+
+        return () => {
+            handler.cancel();
+        };
+    }, [searchQuery]);
+
+    const filteredProjects = useMemo(() => {
+        if (!activeWorkspace) return [];
+        const q = debouncedQuery.trim().toLowerCase();
+        if (!q) return activeWorkspace.projects;
+        return activeWorkspace.projects.filter((p) =>
+            p.name.toLowerCase().includes(q)
+        );
+    }, [activeWorkspace, debouncedQuery]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const paginated = filteredProjects.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const hasWorkspaces = workspaces.length > 0;
 
@@ -150,41 +184,61 @@ export default function AuthenticatedHome() {
                         <div className="px-4 py-4">
                             {activeWorkspace.projects.length === 0 ? (
                                 <p className="border border-border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
-                                    {activeWorkspace.projectAccessScope ===
-                                        "SELECTED_PROJECTS"
+                                    {activeWorkspace.projectAccessScope === "SELECTED_PROJECTS"
                                         ? "No project access granted yet for your member scope."
                                         : "No projects exist yet in this workspace."}
                                 </p>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-180 w-full border-collapse text-left text-sm">
-                                        <thead className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            <tr className="border-b border-border">
-                                                <th className="py-2 pr-3 font-medium">Name</th>
-                                                <th className="py-2 pr-3 font-medium">Created</th>
-                                                <th className="py-2 pr-3 font-medium">Updated</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {activeWorkspace.projects.map((project) => (
-                                                <tr
-                                                    key={project.id}
-                                                    className="border-b border-border/70 text-foreground"
-                                                >
-                                                    <td className="py-2 pr-3 font-medium text-foreground">
-                                                        {project.name}
-                                                    </td>
-                                                    <td className="py-2 pr-3 text-muted-foreground">
-                                                        {formatDate(project.createdAt)}
-                                                    </td>
-                                                    <td className="py-2 pr-3 text-muted-foreground">
-                                                        {formatDate(project.updatedAt)}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <>
+                                    <div className="mb-4">
+                                        <input
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="Search projects"
+                                            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                                        />
+
+                                        <div className="mt-2 flex items-center justify-between">
+                                            <p className="text-sm text-muted-foreground">{filteredProjects.length} results</p>
+                                            <div className="text-sm text-muted-foreground">Page {currentPage} of {totalPages}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {(isWorkspaceLoading || (searchQuery.trim() !== "" && searchQuery !== debouncedQuery)) ? (
+                                            Array.from({ length: pageSize }).map((_, i) => (
+                                                <div key={`skeleton-${i}`} className="border border-border bg-card p-4 rounded-md">
+                                                    <Skeleton className="h-6 w-3/4 mb-2" />
+                                                    <Skeleton className="h-4 w-1/2" />
+                                                </div>
+                                            ))
+                                        ) : paginated.length > 0 ? (
+                                            paginated.map((project) => (
+                                                <div key={project.id} className="border border-border bg-card p-4 rounded-md">
+                                                    <div className="text-lg font-semibold text-foreground">{project.name}</div>
+                                                    <div className="mt-2 text-sm text-muted-foreground">Updated {formatDate(project.updatedAt)}</div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="col-span-full py-6 text-sm text-muted-foreground">No projects match your search.</div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-4 flex items-center justify-between">
+                                        <div className="text-sm text-muted-foreground">
+                                            Showing {(filteredProjects.length === 0) ? 0 : (currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredProjects.length)} of {filteredProjects.length}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <Button type="button" size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                                                Prev
+                                            </Button>
+                                            <Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                                                Next
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </>
                             )}
                         </div>
                     </section>
