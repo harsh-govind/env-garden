@@ -22,7 +22,6 @@ export function serializeWorkspaceDetail(
     return {
         id: record.id,
         name: record.name,
-        slug: record.slug,
         role: record.role,
         projectAccessScope: record.projectAccessScope,
         projectCount: record.projectCount,
@@ -31,7 +30,6 @@ export function serializeWorkspaceDetail(
         projects: record.projects.map((project) => ({
             id: project.id,
             name: project.name,
-            slug: project.slug,
             createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
         })),

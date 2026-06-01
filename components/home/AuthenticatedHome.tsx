@@ -143,7 +143,7 @@ export default function AuthenticatedHome() {
                             <p className="mt-1 text-sm text-muted-foreground">
                                 {isWorkspaceLoading
                                     ? "Refreshing workspace data..."
-                                    : `Workspace slug: ${activeWorkspace.slug}`}
+                                    : `${activeWorkspace.memberCount} members • ${activeWorkspace.projectCount} projects`}
                             </p>
                         </div>
 
@@ -161,7 +161,6 @@ export default function AuthenticatedHome() {
                                         <thead className="text-xs tracking-wide text-muted-foreground uppercase">
                                             <tr className="border-b border-border">
                                                 <th className="py-2 pr-3 font-medium">Name</th>
-                                                <th className="py-2 pr-3 font-medium">Slug</th>
                                                 <th className="py-2 pr-3 font-medium">Created</th>
                                                 <th className="py-2 pr-3 font-medium">Updated</th>
                                             </tr>
@@ -174,9 +173,6 @@ export default function AuthenticatedHome() {
                                                 >
                                                     <td className="py-2 pr-3 font-medium text-foreground">
                                                         {project.name}
-                                                    </td>
-                                                    <td className="py-2 pr-3 text-muted-foreground">
-                                                        {project.slug}
                                                     </td>
                                                     <td className="py-2 pr-3 text-muted-foreground">
                                                         {formatDate(project.createdAt)}

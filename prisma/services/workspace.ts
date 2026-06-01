@@ -6,26 +6,6 @@ import type {
     WorkspaceSummaryRecord,
 } from "@/types/workspace";
 
-function toSlugBase(name: string) {
-    const slug = name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
-    return slug || "workspace";
-}
-
-function isUniqueConstraintError(error: unknown) {
-    if (typeof error !== "object" || error === null) {
-        return false;
-    }
-
-    return "code" in error && (error as { code?: string }).code === "P2002";
-}
-
 function formatUserEmail(email: string | null | undefined, userId: string) {
     return email ?? `user:${userId}`;
 }
@@ -73,7 +53,6 @@ export async function getWorkspaceDetailForUser(
                 select: {
                     id: true,
                     name: true,
-                    slug: true,
                     _count: {
                         select: {
                             members: true,
@@ -99,7 +78,6 @@ export async function getWorkspaceDetailForUser(
                   select: {
                       id: true,
                       name: true,
-                      slug: true,
                       createdAt: true,
                       updatedAt: true,
                   },
@@ -118,7 +96,6 @@ export async function getWorkspaceDetailForUser(
                               select: {
                                   id: true,
                                   name: true,
-                                  slug: true,
                                   createdAt: true,
                                   updatedAt: true,
                               },
@@ -130,7 +107,6 @@ export async function getWorkspaceDetailForUser(
     return {
         id: membership.workspace.id,
         name: membership.workspace.name,
-        slug: membership.workspace.slug,
         role: membership.role,
         projectAccessScope: membership.projectAccessScope,
         projectCount:
@@ -150,87 +126,69 @@ export async function createWorkspaceForUser(
 ): Promise<WorkspaceSummaryRecord> {
     const name = input.name.trim();
     const description = input.description?.trim() || null;
-    const slugBase = toSlugBase(name);
+    const workspace = await prisma.$transaction(async (tx) => {
+        const creator = await tx.user.findUnique({
+            where: { id: input.userId },
+            select: { email: true },
+        });
+        const creatorEmail = formatUserEmail(creator?.email, input.userId);
 
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-        const slug = attempt === 0 ? slugBase : `${slugBase}-${attempt + 1}`;
+        const createdWorkspace = await tx.workspace.create({
+            data: {
+                name,
+                description,
+                createdById: input.userId,
+            },
+        });
 
-        try {
-            const workspace = await prisma.$transaction(async (tx) => {
-                const creator = await tx.user.findUnique({
-                    where: { id: input.userId },
-                    select: { email: true },
-                });
-                const creatorEmail = formatUserEmail(creator?.email, input.userId);
+        await tx.workspaceMember.create({
+            data: {
+                workspaceId: createdWorkspace.id,
+                userId: input.userId,
+                role: "OWNER",
+                projectAccessScope: "ALL_PROJECTS",
+                addedById: input.userId,
+            },
+        });
 
-                const createdWorkspace = await tx.workspace.create({
-                    data: {
-                        name,
-                        slug,
-                        description,
-                        createdById: input.userId,
-                    },
-                });
+        await tx.workspaceHistory.create({
+            data: {
+                workspaceId: createdWorkspace.id,
+                operation: "WORKSPACE_CREATED",
+                message: `Workspace "${createdWorkspace.name}" was created by ${creatorEmail}.`,
+                data: {
+                    workspaceId: createdWorkspace.id,
+                    createdByUserId: input.userId,
+                    createdByEmail: creatorEmail,
+                    name: createdWorkspace.name,
+                },
+            },
+        });
 
-                await tx.workspaceMember.create({
-                    data: {
-                        workspaceId: createdWorkspace.id,
-                        userId: input.userId,
-                        role: "OWNER",
-                        projectAccessScope: "ALL_PROJECTS",
-                        addedById: input.userId,
-                    },
-                });
+        await tx.workspaceHistory.create({
+            data: {
+                workspaceId: createdWorkspace.id,
+                operation: "WORKSPACE_MEMBER_ADDED",
+                message: `${creatorEmail} was added by ${creatorEmail} as OWNER with project access to ${formatProjectAccessScope(
+                    "ALL_PROJECTS"
+                )}.`,
+                data: {
+                    workspaceId: createdWorkspace.id,
+                    targetUserId: input.userId,
+                    targetEmail: creatorEmail,
+                    role: "OWNER",
+                    projectAccessScope: "ALL_PROJECTS",
+                    addedByUserId: input.userId,
+                    addedByEmail: creatorEmail,
+                },
+            },
+        });
 
-                await tx.workspaceHistory.create({
-                    data: {
-                        workspaceId: createdWorkspace.id,
-                        operation: "WORKSPACE_CREATED",
-                        message: `Workspace "${createdWorkspace.name}" was created by ${creatorEmail}.`,
-                        data: {
-                            workspaceId: createdWorkspace.id,
-                            createdByUserId: input.userId,
-                            createdByEmail: creatorEmail,
-                            name: createdWorkspace.name,
-                            slug: createdWorkspace.slug,
-                        },
-                    },
-                });
+        return createdWorkspace;
+    });
 
-                await tx.workspaceHistory.create({
-                    data: {
-                        workspaceId: createdWorkspace.id,
-                        operation: "WORKSPACE_MEMBER_ADDED",
-                        message: `${creatorEmail} was added by ${creatorEmail} as OWNER with project access to ${formatProjectAccessScope(
-                            "ALL_PROJECTS"
-                        )}.`,
-                        data: {
-                            workspaceId: createdWorkspace.id,
-                            targetUserId: input.userId,
-                            targetEmail: creatorEmail,
-                            role: "OWNER",
-                            projectAccessScope: "ALL_PROJECTS",
-                            addedByUserId: input.userId,
-                            addedByEmail: creatorEmail,
-                        },
-                    },
-                });
-
-                return createdWorkspace;
-            });
-
-            return {
-                id: workspace.id,
-                name: workspace.name,
-            };
-        } catch (error) {
-            if (isUniqueConstraintError(error)) {
-                continue;
-            }
-
-            throw error;
-        }
-    }
-
-    throw new Error("Unable to create workspace with a unique slug.");
+    return {
+        id: workspace.id,
+        name: workspace.name,
+    };
 }

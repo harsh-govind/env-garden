@@ -41,7 +41,6 @@ model User {
 model Workspace {
   id          String             @id @default(cuid())
   name        String
-  slug        String             @unique
   description String?
   createdById String
   createdAt   DateTime           @default(now())
@@ -58,7 +57,6 @@ model Project {
   id          String          @id @default(cuid())
   workspaceId String
   name        String
-  slug        String
   description String?
   createdById String
   createdAt   DateTime        @default(now())
@@ -67,7 +65,6 @@ model Project {
   createdBy   User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
   members     ProjectMember[]
 
-  @@unique([workspaceId, slug])
   @@unique([id, workspaceId])
   @@index([workspaceId])
   @@index([createdById])

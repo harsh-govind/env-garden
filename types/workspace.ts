@@ -8,7 +8,6 @@ export type ProjectAccessScopeValue = "ALL_PROJECTS" | "SELECTED_PROJECTS";
 export type WorkspaceProjectSummary = {
     id: string;
     name: string;
-    slug: string;
     createdAt: string;
     updatedAt: string;
 };
@@ -28,7 +27,6 @@ export type WorkspaceSummary = {
 export type WorkspaceDetail = {
     id: string;
     name: string;
-    slug: string;
     role: WorkspaceRoleValue;
     projectAccessScope: ProjectAccessScopeValue;
     projectCount: number;
@@ -100,7 +98,6 @@ export type WorkspaceSummaryRecord = {
 export type WorkspaceDetailRecord = {
     id: string;
     name: string;
-    slug: string;
     role: WorkspaceRoleValue;
     projectAccessScope: ProjectAccessScopeValue;
     projectCount: number;
@@ -109,7 +106,6 @@ export type WorkspaceDetailRecord = {
     projects: {
         id: string;
         name: string;
-        slug: string;
         createdAt: Date;
         updatedAt: Date;
     }[];
