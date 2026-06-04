@@ -34,9 +34,11 @@ model User {
   updatedAt            DateTime          @updatedAt
   createdWorkspaces    Workspace[]       @relation("WorkspaceCreator")
   createdProjects      Project[]         @relation("ProjectCreator")
+  createdEnvFiles      EnvFile[]         @relation("EnvFileCreator")
   workspaceMemberships WorkspaceMember[] @relation("WorkspaceMemberUser")
   workspaceMembers     WorkspaceMember[] @relation("WorkspaceMemberAdder")
-  ProjectMembers       ProjectMember[]   @relation("ProjectMemberAdder")
+  projectMembers       ProjectMember[]   @relation("ProjectMemberAdder")
+  envAccesses          ProjectEnvAccess[] @relation("ProjectEnvAccessGrantor")
 }
 
 model Workspace {
@@ -65,6 +67,8 @@ model Project {
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy   User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
   members     ProjectMember[]
+  envFiles    EnvFile[]
+  envAccesses ProjectEnvAccess[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -104,12 +108,71 @@ model ProjectMember {
   project           Project         @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   workspaceMember   WorkspaceMember @relation(fields: [workspaceMemberId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   addedBy           User?           @relation("ProjectMemberAdder", fields: [addedById], references: [id], onDelete: SetNull)
+  envAccesses       ProjectEnvAccess[]
 
   @@unique([projectId, workspaceMemberId])
+  @@unique([id, projectId])
   @@index([workspaceId])
   @@index([projectId])
   @@index([workspaceMemberId])
   @@index([addedById])
+}
+
+model EnvFile {
+  id          String            @id @default(cuid())
+  workspaceId String
+  projectId   String
+  name        String
+  environment String
+  description String?
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  project     Project           @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  createdBy   User              @relation("EnvFileCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  variables   EnvVariable[]
+
+  @@unique([projectId, name])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([projectId, environment])
+  @@index([createdById])
+}
+
+model EnvVariable {
+  id        String   @id @default(cuid())
+  envFileId String
+  key       String
+  value     String
+  note      String?
+  isSecret  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  envFile   EnvFile  @relation(fields: [envFileId], references: [id], onDelete: Cascade)
+
+  @@unique([envFileId, key])
+  @@index([envFileId])
+}
+
+model ProjectEnvAccess {
+  id              String          @id @default(cuid())
+  workspaceId     String
+  projectId       String
+  projectMemberId String
+  environment     String
+  grantedById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  project         Project         @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  projectMember   ProjectMember   @relation(fields: [projectMemberId, projectId], references: [id, projectId], onDelete: Cascade)
+  grantedBy       User?           @relation("ProjectEnvAccessGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectMemberId, environment])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([projectId, environment])
+  @@index([projectMemberId])
+  @@index([grantedById])
 }
 
 model WorkspaceHistory {

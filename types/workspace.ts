@@ -5,6 +5,36 @@ export type WorkspaceRoleValue = "OWNER" | "ADMIN" | "MEMBER";
 
 export type ProjectAccessScopeValue = "ALL_PROJECTS" | "SELECTED_PROJECTS";
 
+export type EnvironmentTypeValue =
+    | "PRODUCTION"
+    | "STAGING"
+    | "BETA"
+    | "DEVELOPMENT"
+    | "QA"
+    | "TESTING"
+    | "UAT"
+    | "SANDBOX"
+    | "PREVIEW"
+    | "DEMO"
+    | "CANARY"
+    | "LOCAL"
+    | "OTHER_1"
+    | "OTHER_2"
+    | "OTHER_3"
+    | "OTHER_4"
+    | "OTHER_5"
+    | "OTHER_6"
+    | "OTHER_7"
+    | "OTHER_8"
+    | "OTHER_9";
+
+export type EnvironmentTypeOption = {
+    key: EnvironmentTypeValue;
+    label: string;
+    shortDescription: string;
+    color: string;
+};
+
 export type WorkspaceProjectSummary = {
     id: string;
     name: string;
