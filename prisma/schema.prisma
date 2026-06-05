@@ -145,7 +145,6 @@ model EnvVariable {
   key       String
   value     String
   note      String?
-  isSecret  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   envFile   EnvFile  @relation(fields: [envFileId], references: [id], onDelete: Cascade)

@@ -1,9 +1,4 @@
-import type { InMemoryCache } from "@/types/cache";
-
-type CacheEntry<T> = {
-    value: T;
-    expiresAt: number | null;
-};
+import type { CacheEntry, InMemoryCache } from "@/types/cache";
 
 function isExpired(expiresAt: number | null) {
     return expiresAt !== null && Date.now() > expiresAt;

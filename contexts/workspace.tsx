@@ -12,6 +12,7 @@ import {
 import { useAuthenticated } from "@/contexts/authenticated";
 import type {
     ApiErrorPayload,
+    CreateProjectRequest,
     CreateWorkspaceRequest,
     CreateWorkspaceResponse,
     CreateProjectResponse,
@@ -176,18 +177,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     );
 
     const createProject = useCallback(
-        async (input: { workspaceId: string; name: string; description?: string }) => {
+        async (input: CreateProjectRequest) => {
             setIsCreatingProject(true);
 
             try {
-                const response = await fetchJson<CreateProjectResponse>(
+                await fetchJson<CreateProjectResponse>(
                     `/api/workspaces/${input.workspaceId}/projects`,
                     {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
                         },
-                        body: JSON.stringify({ name: input.name, description: input.description }),
+                        body: JSON.stringify({
+                            name: input.name,
+                            description: input.description,
+                            environments: input.environments,
+                        }),
                     }
                 );
 
@@ -200,7 +205,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                             `/api/workspaces/${input.workspaceId}`
                         );
                         setActiveWorkspace(workspaceResponse.workspace);
-                    } catch (e) {
+                    } catch {
                         // ignore; workspace refresh will surface errors elsewhere
                     }
                 }

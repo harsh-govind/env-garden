@@ -85,10 +85,12 @@ export type CreateProjectRequest = {
     workspaceId: string;
     name: string;
     description?: string;
+    environments?: EnvironmentTypeValue[];
 };
 
 export type CreateProjectResponse = {
     projectId: string;
+    envFileCount?: number;
 };
 
 export type WorkspaceHistoryResponse = {
@@ -117,6 +119,12 @@ export type ApiErrorPayload = {
 export type CreateWorkspaceBody = {
     name?: unknown;
     description?: unknown;
+};
+
+export type CreateProjectBody = {
+    name?: unknown;
+    description?: unknown;
+    environments?: unknown;
 };
 
 export type WorkspaceRouteContext = {

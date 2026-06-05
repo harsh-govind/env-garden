@@ -134,6 +134,24 @@ export const environmentTypeLabels: Record<EnvironmentTypeValue, string> = Objec
     environmentTypes.map((environmentType) => [environmentType.key, environmentType.label])
 ) as Record<EnvironmentTypeValue, string>;
 
+export const environmentTypeValues = environmentTypes.map(
+    (environmentType) => environmentType.key
+);
+
+export const defaultProjectEnvironmentTypes: EnvironmentTypeValue[] = [
+    "DEVELOPMENT",
+    "STAGING",
+    "PRODUCTION",
+];
+
+export function isEnvironmentTypeValue(value: unknown): value is EnvironmentTypeValue {
+    return typeof value === "string" && environmentTypeValues.includes(value as EnvironmentTypeValue);
+}
+
+export function formatEnvironmentFileName(environment: EnvironmentTypeValue) {
+    return `.env.${environment.toLowerCase().replaceAll("_", "-")}`;
+}
+
 export const protectedRoutes: ProtectedRoute[] = [
     {
         path: "/",
@@ -141,6 +159,10 @@ export const protectedRoutes: ProtectedRoute[] = [
     },
     {
         path: "/:workspaceId/history",
+        redirectTo: "/",
+    },
+    {
+        path: "/:workspaceId/projects/:projectId",
         redirectTo: "/",
     },
 ];

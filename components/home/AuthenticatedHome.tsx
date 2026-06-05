@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, type FormEvent } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
@@ -212,10 +213,14 @@ export default function AuthenticatedHome() {
                                             ))
                                         ) : paginated.length > 0 ? (
                                             paginated.map((project) => (
-                                                <div key={project.id} className="border border-border bg-card p-4 rounded-md">
+                                                <Link
+                                                    key={project.id}
+                                                    href={`/${activeWorkspace.id}/projects/${project.id}`}
+                                                    className="border border-border bg-card p-4 transition hover:border-foreground hover:bg-accent"
+                                                >
                                                     <div className="text-lg font-semibold text-foreground">{project.name}</div>
                                                     <div className="mt-2 text-sm text-muted-foreground">Updated {formatTimeAgo(project.updatedAt)}</div>
-                                                </div>
+                                                </Link>
                                             ))
                                         ) : (
                                             <div className="col-span-full py-6 text-sm text-muted-foreground">No projects match your search.</div>

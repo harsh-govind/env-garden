@@ -13,9 +13,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { matchesRoutePath } from "@/lib/constants";
+import {
+    defaultProjectEnvironmentTypes,
+    environmentTypes,
+    matchesRoutePath,
+} from "@/lib/constants";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace";
 import type { AuthenticatedLayoutProps } from "@/types/layouts";
+import type { EnvironmentTypeValue } from "@/types/workspace";
 
 export default function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     return (
@@ -48,6 +53,9 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     const [createDialogError, setCreateDialogError] = useState<string | null>(null);
     const [projectNameInput, setProjectNameInput] = useState("");
     const [projectDescriptionInput, setProjectDescriptionInput] = useState("");
+    const [projectEnvironmentsInput, setProjectEnvironmentsInput] = useState<EnvironmentTypeValue[]>(
+        [...defaultProjectEnvironmentTypes]
+    );
 
     const workspaceName = activeWorkspace?.name ?? "No workspace";
 
@@ -68,8 +76,26 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     const handleOpenCreateProjectDialog = useCallback(() => {
         setCreateTarget("project");
         setCreateDialogError(null);
+        setProjectEnvironmentsInput([...defaultProjectEnvironmentTypes]);
         setIsCreateDialogOpen(true);
     }, []);
+
+    const handleProjectEnvironmentToggle = useCallback(
+        (environment: EnvironmentTypeValue, isChecked: boolean) => {
+            setProjectEnvironmentsInput((currentEnvironments) => {
+                if (isChecked) {
+                    return currentEnvironments.includes(environment)
+                        ? currentEnvironments
+                        : [...currentEnvironments, environment];
+                }
+
+                return currentEnvironments.filter(
+                    (currentEnvironment) => currentEnvironment !== environment
+                );
+            });
+        },
+        []
+    );
 
     const handleCreateWorkspaceSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -136,6 +162,11 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
             return;
         }
 
+        if (projectEnvironmentsInput.length === 0) {
+            setCreateDialogError("Select at least one project environment.");
+            return;
+        }
+
         try {
             if (!createProject) {
                 throw new Error("Project creation is not available.");
@@ -145,10 +176,12 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                 workspaceId: activeWorkspaceId,
                 name,
                 description: description || undefined,
+                environments: projectEnvironmentsInput,
             });
 
             setProjectNameInput("");
             setProjectDescriptionInput("");
+            setProjectEnvironmentsInput([...defaultProjectEnvironmentTypes]);
             setCreateDialogError(null);
             setIsCreateDialogOpen(false);
         } catch (createError) {
@@ -156,13 +189,21 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                 createError instanceof Error ? createError.message : "Failed to create project."
             );
         }
-    }, [projectDescriptionInput, projectNameInput, activeWorkspaceId, createProject]);
+    }, [
+        activeWorkspaceId,
+        createProject,
+        projectDescriptionInput,
+        projectEnvironmentsInput,
+        projectNameInput,
+    ]);
 
     const handleWorkspaceChange = useCallback((workspaceId: string) => {
         selectWorkspace(workspaceId);
 
         if (matchesRoutePath(pathname, "/:workspaceId/history")) {
             router.replace(`/${workspaceId}/history`);
+        } else if (matchesRoutePath(pathname, "/:workspaceId/projects/:projectId")) {
+            router.replace("/");
         }
     }, [pathname, router, selectWorkspace]);
 
@@ -215,7 +256,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                         open={isCreateDialogOpen}
                         onOpenChange={handleCreateDialogOpenChange}
                     >
-                        <DialogContent className="sm:max-w-md">
+                        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-md">
                             {createTarget === "workspace" ? (
                                 <>
                                     <DialogHeader>
@@ -316,6 +357,52 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                                                     className="mt-2 h-20 w-full resize-none border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
                                                 />
                                             </label>
+
+                                            <fieldset className="space-y-2">
+                                                <legend className="text-xs tracking-wide text-muted-foreground uppercase">
+                                                    Environment files
+                                                </legend>
+                                                <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto border border-border bg-background p-2 sm:grid-cols-2">
+                                                    {environmentTypes.map((environmentType) => {
+                                                        const isChecked = projectEnvironmentsInput.includes(
+                                                            environmentType.key
+                                                        );
+
+                                                        return (
+                                                            <label
+                                                                key={environmentType.key}
+                                                                className="flex min-h-9 items-center gap-2 border border-border bg-card px-2 py-1.5 text-sm text-foreground"
+                                                                title={environmentType.shortDescription}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isChecked}
+                                                                    onChange={(event) => {
+                                                                        handleProjectEnvironmentToggle(
+                                                                            environmentType.key,
+                                                                            event.target.checked
+                                                                        );
+                                                                    }}
+                                                                    className="size-4 shrink-0"
+                                                                    style={{
+                                                                        accentColor: environmentType.color,
+                                                                    }}
+                                                                />
+                                                                <span
+                                                                    className="size-2 shrink-0"
+                                                                    style={{
+                                                                        backgroundColor: environmentType.color,
+                                                                    }}
+                                                                    aria-hidden="true"
+                                                                />
+                                                                <span className="min-w-0 truncate">
+                                                                    {environmentType.label}
+                                                                </span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </fieldset>
 
                                             {createDialogError ? (
                                                 <p className="text-sm text-red-300">{createDialogError}</p>
