@@ -69,10 +69,23 @@ model Project {
   members     ProjectMember[]
   envFiles    EnvFile[]
   envAccesses ProjectEnvAccess[]
+  encryptionKey ProjectEncryptionKey?
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
   @@index([createdById])
+}
+
+model ProjectEncryptionKey {
+  id           String   @id @default(cuid())
+  projectId    String   @unique
+  encryptedKey String
+  iv           String
+  authTag      String
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model WorkspaceMember {
@@ -140,14 +153,16 @@ model EnvFile {
 }
 
 model EnvVariable {
-  id        String   @id @default(cuid())
-  envFileId String
-  key       String
-  value     String
-  note      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  envFile   EnvFile  @relation(fields: [envFileId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  envFileId      String
+  key            String
+  encryptedValue String
+  iv             String
+  authTag        String
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  envFile        EnvFile  @relation(fields: [envFileId], references: [id], onDelete: Cascade)
 
   @@unique([envFileId, key])
   @@index([envFileId])

@@ -1,3 +1,4 @@
+import type { EncryptedValuePayload } from "@/types/encryption";
 import type {
     EnvironmentTypeValue,
     ProjectAccessScopeValue,
@@ -22,6 +23,12 @@ export type ProjectEnvVariableRecord = Omit<
     createdAt: Date;
     updatedAt: Date;
 };
+
+export type ProjectEnvVariableEncryptedRecord = Omit<
+    ProjectEnvVariableRecord,
+    "value"
+> &
+    EncryptedValuePayload;
 
 export type VariableDraftRow = {
     clientId: string;
