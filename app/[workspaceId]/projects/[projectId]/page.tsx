@@ -737,7 +737,7 @@ export default function ProjectDetailPage() {
                 </Button>
             </section>
 
-            <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
+            <div className="grid items-start gap-4 lg:grid-cols-[20rem_1fr]">
                 <section className="space-y-4">
                     <div className="border border-border bg-card">
                         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -1018,7 +1018,7 @@ export default function ProjectDetailPage() {
                                         onClick={() => {
                                             void handleSaveVariables();
                                         }}
-                                        disabled={isSavingVariables}
+                                        disabled={isSavingVariables || !hasVariableDraftChanges}
                                     >
                                         <Save />
                                         {isSavingVariables ? "Saving..." : "Save variables"}
