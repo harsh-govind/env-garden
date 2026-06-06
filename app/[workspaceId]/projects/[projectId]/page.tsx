@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
     ArrowLeft,
+    Copy,
+    Loader2,
     Eye,
     EyeOff,
     FilePlus2,
@@ -32,6 +34,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type FormEvent,
 } from "react";
@@ -47,6 +50,8 @@ import {
 import { formatTimeAgo } from "@/lib/utils";
 import type {
     CreateEnvFileResponse,
+    EnvVariableValueResponse,
+    EnvVariablesValueResponse,
     ParsedEnvRow,
     ProjectDetail,
     ProjectDetailResponse,
@@ -133,8 +138,11 @@ function createDraftClientId() {
 function toVariableDraftRows(variables: ProjectEnvVariable[]): VariableDraftRow[] {
     const rows = variables.map((variable) => ({
         clientId: variable.id,
+        variableId: variable.id,
         key: variable.key,
-        value: variable.value,
+        value: variable.value ?? "",
+        originalValue: variable.value ?? "",
+        isValueLoaded: typeof variable.value === "string",
         note: variable.note ?? "",
         isNoteOpen: Boolean(variable.note),
     }));
@@ -147,6 +155,8 @@ function createEmptyDraftRow(): VariableDraftRow {
         clientId: createDraftClientId(),
         key: "",
         value: "",
+        originalValue: "",
+        isValueLoaded: true,
         note: "",
         isNoteOpen: false,
     };
@@ -204,6 +214,8 @@ function createDraftRowFromParsedEnv(parsedRow: ParsedEnvRow): VariableDraftRow 
         clientId: createDraftClientId(),
         key: parsedRow.key,
         value: parsedRow.value,
+        originalValue: "",
+        isValueLoaded: true,
         note: parsedRow.note,
         isNoteOpen: Boolean(parsedRow.note),
     };
@@ -221,11 +233,71 @@ function areVariableDraftRowsEqual(
         const baselineRow = baselineRows[index];
 
         return (
+            currentRow.variableId === baselineRow.variableId &&
             currentRow.key === baselineRow.key &&
-            currentRow.value === baselineRow.value &&
-            currentRow.note === baselineRow.note
+            currentRow.note === baselineRow.note &&
+            (!currentRow.isValueLoaded ||
+                currentRow.value === currentRow.originalValue)
         );
     });
+}
+
+function formatEnvValueForClipboard(value: string) {
+    if (value.length === 0 || !/[\s#"'\\\r\n]/.test(value)) {
+        return value;
+    }
+
+    return JSON.stringify(value);
+}
+
+function buildEnvClipboardText(
+    rows: {
+        key: string;
+        value: string;
+        note?: string | null;
+    }[]
+): { text: string } | { error: string } {
+    const lines: string[] = [];
+    const seenKeys = new Set<string>();
+
+    for (const row of rows) {
+        const key = row.key.trim();
+        const note = row.note?.trim() ?? "";
+        const hasAnyValue =
+            key.length > 0 ||
+            row.value.length > 0 ||
+            note.length > 0;
+
+        if (!hasAnyValue) {
+            continue;
+        }
+
+        if (!envKeyPattern.test(key)) {
+            return {
+                error:
+                    "Variable keys must start with a letter or underscore and contain only letters, numbers, and underscores.",
+            };
+        }
+
+        if (seenKeys.has(key)) {
+            return {
+                error: `Duplicate variable key: ${key}.`,
+            };
+        }
+
+        seenKeys.add(key);
+        lines.push(`${key}=${formatEnvValueForClipboard(row.value)}`);
+    }
+
+    if (lines.length === 0) {
+        return {
+            error: "Add at least one variable to copy.",
+        };
+    }
+
+    return {
+        text: lines.join("\n"),
+    };
 }
 
 export default function ProjectDetailPage() {
@@ -236,6 +308,9 @@ export default function ProjectDetailPage() {
     const [project, setProject] = useState<ProjectDetail | null>(null);
     const [activeEnvFileId, setActiveEnvFileId] = useState<string | null>(null);
     const [revealedVariableIds, setRevealedVariableIds] = useState<Set<string>>(
+        () => new Set()
+    );
+    const [loadingVariableValueIds, setLoadingVariableValueIds] = useState<Set<string>>(
         () => new Set()
     );
     const [isLoading, setIsLoading] = useState(true);
@@ -255,7 +330,10 @@ export default function ProjectDetailPage() {
         () => new Set()
     );
     const [isSavingVariables, setIsSavingVariables] = useState(false);
+    const [isCopyingVariables, setIsCopyingVariables] = useState(false);
+    const [hasCopiedVariables, setHasCopiedVariables] = useState(false);
     const [variableError, setVariableError] = useState<string | null>(null);
+    const copyFeedbackTimeoutRef = useRef<number | null>(null);
 
     const projectUrl = `/api/workspaces/${workspaceId}/projects/${projectId}`;
 
@@ -285,6 +363,7 @@ export default function ProjectDetailPage() {
                 );
                 setSelectedDraftRowIds(new Set());
                 setRevealedVariableIds(new Set());
+                setLoadingVariableValueIds(new Set());
                 setError(null);
             })
             .catch((loadError) => {
@@ -304,6 +383,14 @@ export default function ProjectDetailPage() {
             controller.abort();
         };
     }, [requestProject]);
+
+    useEffect(() => {
+        return () => {
+            if (copyFeedbackTimeoutRef.current !== null) {
+                window.clearTimeout(copyFeedbackTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const refreshProject = useCallback(async () => {
         setIsRefreshing(true);
@@ -328,6 +415,7 @@ export default function ProjectDetailPage() {
             );
             setSelectedDraftRowIds(new Set());
             setRevealedVariableIds(new Set());
+            setLoadingVariableValueIds(new Set());
             setError(null);
         } catch (refreshError) {
             setError(getErrorMessage(refreshError));
@@ -362,6 +450,11 @@ export default function ProjectDetailPage() {
                 (row) => !selectedDraftRowIds.has(row.clientId)
             ),
         [selectedDraftRowIds, variableDraftRows]
+    );
+
+    const hasCopyableVariables = useMemo(
+        () => (activeEnvFile?.variableCount ?? 0) > 0,
+        [activeEnvFile?.variableCount]
     );
 
     const handleCreateEnvFile = useCallback(
@@ -421,6 +514,7 @@ export default function ProjectDetailPage() {
                 setVariableDraftRows(toVariableDraftRows(response.envFile.variables));
                 setSelectedDraftRowIds(new Set());
                 setRevealedVariableIds(new Set());
+                setLoadingVariableValueIds(new Set());
                 setEnvFileName("");
                 setEnvFileDescription("");
                 setIsCreateEnvFileOpen(false);
@@ -447,14 +541,21 @@ export default function ProjectDetailPage() {
             value: string | boolean
         ) => {
             setVariableDraftRows((currentRows) =>
-                currentRows.map((row) =>
-                    row.clientId === clientId
-                        ? {
-                            ...row,
-                            [field]: value,
-                        }
-                        : row
-                )
+                currentRows.map((row) => {
+                    if (row.clientId !== clientId) {
+                        return row;
+                    }
+
+                    return {
+                        ...row,
+                        [field]: value,
+                        ...(field === "value"
+                            ? {
+                                isValueLoaded: true,
+                            }
+                            : {}),
+                    };
+                })
             );
             setVariableError(null);
         },
@@ -547,8 +648,57 @@ export default function ProjectDetailPage() {
         );
         setSelectedDraftRowIds(new Set());
         setRevealedVariableIds(new Set());
+        setLoadingVariableValueIds(new Set());
         setVariableError(null);
     }, [activeEnvFile]);
+
+    const handleCopyAllVariables = useCallback(async () => {
+        if (!activeEnvFile) {
+            setVariableError("Select an env file first.");
+            return;
+        }
+
+        if (
+            typeof navigator === "undefined" ||
+            !navigator.clipboard?.writeText
+        ) {
+            setVariableError("Clipboard access is not available in this browser.");
+            return;
+        }
+
+        setIsCopyingVariables(true);
+
+        try {
+            const response = await fetchJson<EnvVariablesValueResponse>(
+                `${projectUrl}/env-files/${activeEnvFile.id}/variables`
+            );
+            const clipboardPayload = buildEnvClipboardText(response.variables);
+
+            if ("error" in clipboardPayload) {
+                setVariableError(clipboardPayload.error);
+                return;
+            }
+
+            await navigator.clipboard.writeText(clipboardPayload.text);
+            setVariableError(null);
+            setHasCopiedVariables(true);
+
+            if (copyFeedbackTimeoutRef.current !== null) {
+                window.clearTimeout(copyFeedbackTimeoutRef.current);
+            }
+
+            copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+                setHasCopiedVariables(false);
+                copyFeedbackTimeoutRef.current = null;
+            }, 1600);
+        } catch {
+            setVariableError(
+                "Could not copy variables. Check browser clipboard permissions."
+            );
+        } finally {
+            setIsCopyingVariables(false);
+        }
+    }, [activeEnvFile, projectUrl]);
 
     const handleSaveVariables = useCallback(async () => {
             if (!activeEnvFile) {
@@ -562,7 +712,11 @@ export default function ProjectDetailPage() {
             for (const row of variableDraftRows) {
                 const key = row.key.trim();
                 const note = row.note.trim();
-                const hasAnyValue = key.length > 0 || row.value.length > 0 || note.length > 0;
+                const hasAnyValue =
+                    Boolean(row.variableId) ||
+                    key.length > 0 ||
+                    row.value.length > 0 ||
+                    note.length > 0;
 
                 if (!hasAnyValue) {
                     continue;
@@ -580,7 +734,7 @@ export default function ProjectDetailPage() {
                     return;
                 }
 
-                if (row.value.length > 10000) {
+                if (row.isValueLoaded && row.value.length > 10000) {
                     setVariableError(`Value for ${key} must be 10,000 characters or less.`);
                     return;
                 }
@@ -596,9 +750,22 @@ export default function ProjectDetailPage() {
                 }
 
                 seenKeys.add(key);
+                const shouldSendValue =
+                    !row.variableId || row.value !== row.originalValue;
+
+                if (!row.variableId && !row.isValueLoaded) {
+                    setVariableError(`Value is required for ${key}.`);
+                    return;
+                }
+
                 variables.push({
+                    id: row.variableId,
                     key,
-                    value: row.value,
+                    ...(shouldSendValue
+                        ? {
+                            value: row.value,
+                        }
+                        : {}),
                     note: note || null,
                 });
             }
@@ -642,6 +809,7 @@ export default function ProjectDetailPage() {
                 setVariableDraftRows(toVariableDraftRows(response.variables));
                 setSelectedDraftRowIds(new Set());
                 setRevealedVariableIds(new Set());
+                setLoadingVariableValueIds(new Set());
                 setVariableError(null);
             } catch (createError) {
                 setVariableError(getErrorMessage(createError));
@@ -656,19 +824,73 @@ export default function ProjectDetailPage() {
         ]
     );
 
-    const toggleVariableVisibility = useCallback((variableId: string) => {
-        setRevealedVariableIds((currentIds) => {
-            const nextIds = new Set(currentIds);
-
-            if (nextIds.has(variableId)) {
-                nextIds.delete(variableId);
-            } else {
-                nextIds.add(variableId);
+    const toggleVariableVisibility = useCallback(
+        async (row: VariableDraftRow) => {
+            if (revealedVariableIds.has(row.clientId)) {
+                setRevealedVariableIds((currentIds) => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.delete(row.clientId);
+                    return nextIds;
+                });
+                return;
             }
 
-            return nextIds;
-        });
-    }, []);
+            if (row.isValueLoaded || !row.variableId) {
+                setRevealedVariableIds((currentIds) => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.add(row.clientId);
+                    return nextIds;
+                });
+                return;
+            }
+
+            if (!activeEnvFile) {
+                setVariableError("Select an env file first.");
+                return;
+            }
+
+            setLoadingVariableValueIds((currentIds) => {
+                const nextIds = new Set(currentIds);
+                nextIds.add(row.clientId);
+                return nextIds;
+            });
+
+            try {
+                const response = await fetchJson<EnvVariableValueResponse>(
+                    `${projectUrl}/env-files/${activeEnvFile.id}/variables?variableId=${encodeURIComponent(row.variableId)}`
+                );
+                const value = response.variable.value;
+
+                setVariableDraftRows((currentRows) =>
+                    currentRows.map((currentRow) =>
+                        currentRow.clientId === row.clientId
+                            ? {
+                                ...currentRow,
+                                value,
+                                originalValue: value,
+                                isValueLoaded: true,
+                            }
+                            : currentRow
+                    )
+                );
+                setRevealedVariableIds((currentIds) => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.add(row.clientId);
+                    return nextIds;
+                });
+                setVariableError(null);
+            } catch (loadValueError) {
+                setVariableError(getErrorMessage(loadValueError));
+            } finally {
+                setLoadingVariableValueIds((currentIds) => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.delete(row.clientId);
+                    return nextIds;
+                });
+            }
+        },
+        [activeEnvFile, projectUrl, revealedVariableIds]
+    );
 
     if (isLoading) {
         return (
@@ -783,6 +1005,7 @@ export default function ProjectDetailPage() {
                                                 );
                                                 setSelectedDraftRowIds(new Set());
                                                 setRevealedVariableIds(new Set());
+                                                setLoadingVariableValueIds(new Set());
                                                 setVariableError(null);
                                             }}
                                         >
@@ -1012,17 +1235,39 @@ export default function ProjectDetailPage() {
                                         ) : null}
                                     </div>
 
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={() => {
-                                            void handleSaveVariables();
-                                        }}
-                                        disabled={isSavingVariables || !hasVariableDraftChanges}
-                                    >
-                                        <Save />
-                                        {isSavingVariables ? "Saving..." : "Save variables"}
-                                    </Button>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                void handleCopyAllVariables();
+                                            }}
+                                            disabled={
+                                                isCopyingVariables ||
+                                                !hasCopyableVariables
+                                            }
+                                        >
+                                            <Copy />
+                                            {hasCopiedVariables
+                                                ? "Copied"
+                                                : isCopyingVariables
+                                                    ? "Copying..."
+                                                    : "Copy all"}
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={() => {
+                                                void handleSaveVariables();
+                                            }}
+                                            disabled={isSavingVariables || !hasVariableDraftChanges}
+                                        >
+                                            <Save />
+                                            {isSavingVariables ? "Saving..." : "Save variables"}
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {variableError ? (
@@ -1050,6 +1295,8 @@ export default function ProjectDetailPage() {
                                                 const isVisible = revealedVariableIds.has(
                                                     row.clientId
                                                 );
+                                                const isLoadingValue =
+                                                    loadingVariableValueIds.has(row.clientId);
 
                                                 return (
                                                     <div
@@ -1116,7 +1363,11 @@ export default function ProjectDetailPage() {
                                                                         event.preventDefault();
                                                                     }
                                                                 }}
-                                                                placeholder="postgres://..."
+                                                                placeholder={
+                                                                    row.isValueLoaded
+                                                                        ? "postgres://..."
+                                                                        : "Value hidden"
+                                                                }
                                                                 className="h-8 min-w-0 border border-border bg-card px-2 font-mono text-sm text-foreground outline-none focus:border-ring"
                                                             />
 
@@ -1150,17 +1401,24 @@ export default function ProjectDetailPage() {
                                                                 variant="outline"
                                                                 size="icon-xs"
                                                                 onClick={() => {
-                                                                    toggleVariableVisibility(
-                                                                        row.clientId
-                                                                    );
+                                                                    void toggleVariableVisibility(row);
                                                                 }}
+                                                                disabled={isLoadingValue}
                                                                 aria-label={
                                                                     isVisible
                                                                         ? "Hide variable value"
-                                                                        : "Show variable value"
+                                                                        : row.isValueLoaded
+                                                                            ? "Show variable value"
+                                                                            : "Load and show variable value"
                                                                 }
                                                             >
-                                                                {isVisible ? <EyeOff /> : <Eye />}
+                                                                {isLoadingValue ? (
+                                                                    <Loader2 className="animate-spin" />
+                                                                ) : isVisible ? (
+                                                                    <EyeOff />
+                                                                ) : (
+                                                                    <Eye />
+                                                                )}
                                                             </Button>
                                                         </div>
 

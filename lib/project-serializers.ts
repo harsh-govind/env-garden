@@ -4,16 +4,34 @@ import type {
     ProjectEnvFile,
     ProjectEnvFileRecord,
     ProjectEnvVariable,
+    ProjectEnvVariableMetadataRecord,
     ProjectEnvVariableRecord,
 } from "@/types/project";
 
 export function serializeProjectEnvVariable(
     record: ProjectEnvVariableRecord
 ): ProjectEnvVariable {
+    const variable: ProjectEnvVariable = {
+        id: record.id,
+        key: record.key,
+        note: record.note,
+        createdAt: record.createdAt.toISOString(),
+        updatedAt: record.updatedAt.toISOString(),
+    };
+
+    if (typeof record.value === "string") {
+        variable.value = record.value;
+    }
+
+    return variable;
+}
+
+export function serializeProjectEnvVariableMetadata(
+    record: ProjectEnvVariableMetadataRecord
+): ProjectEnvVariable {
     return {
         id: record.id,
         key: record.key,
-        value: record.value,
         note: record.note,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
@@ -31,7 +49,7 @@ export function serializeProjectEnvFile(
         variableCount: record.variableCount,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
-        variables: record.variables.map(serializeProjectEnvVariable),
+        variables: record.variables.map(serializeProjectEnvVariableMetadata),
     };
 }
 

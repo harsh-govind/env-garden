@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { serializeProjectEnvVariable } from "@/lib/project-serializers";
 import {
     createEnvVariableForFile,
+    getEnvVariableForFile,
+    getEnvVariablesForFile,
     replaceEnvVariablesForFile,
 } from "@/prisma/services/project";
 import type {
@@ -61,8 +63,9 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
 
     const seenKeys = new Set<string>();
     const variables: {
+        id?: string;
         key: string;
-        value: string;
+        value?: string;
         note: string | null;
     }[] = [];
 
@@ -72,8 +75,13 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
         }
 
         const variable = rawVariable as Record<string, unknown>;
+        const id =
+            typeof variable.id === "string" && variable.id.trim().length > 0
+                ? variable.id.trim()
+                : undefined;
         const key = typeof variable.key === "string" ? variable.key.trim() : "";
-        const value = typeof variable.value === "string" ? variable.value : "";
+        const hasValue = typeof variable.value === "string";
+        const value = hasValue ? (variable.value as string) : undefined;
         const note = typeof variable.note === "string" ? variable.note.trim() : "";
 
         if (!envKeyPattern.test(key)) {
@@ -87,11 +95,11 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
             return { error: "Variable keys must be 120 characters or less." };
         }
 
-        if (typeof variable.value !== "string") {
+        if (!id && !hasValue) {
             return { error: `Value is required for ${key}.` };
         }
 
-        if (value.length > 10000) {
+        if (value !== undefined && value.length > 10000) {
             return { error: `Value for ${key} must be 10,000 characters or less.` };
         }
 
@@ -105,6 +113,7 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
 
         seenKeys.add(key);
         variables.push({
+            id,
             key,
             value,
             note: note || null,
@@ -116,6 +125,88 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
             variables,
         },
     };
+}
+
+export async function GET(request: Request, context: ProjectEnvFileRouteContext) {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const { workspaceId, projectId, envFileId } = await context.params;
+
+        if (!workspaceId || !projectId || !envFileId) {
+            return NextResponse.json(
+                { error: "Workspace id, project id, and env file id are required." },
+                { status: 400 }
+            );
+        }
+
+        const variableId = new URL(request.url).searchParams
+            .get("variableId")
+            ?.trim();
+
+        if (variableId) {
+            const result = await getEnvVariableForFile({
+                workspaceId,
+                projectId,
+                envFileId,
+                variableId,
+                userId: session.user.id,
+            });
+
+            if (result.status === "NOT_FOUND") {
+                return NextResponse.json(
+                    { error: "Env variable not found or access denied." },
+                    { status: 404 }
+                );
+            }
+
+            if (result.status === "FORBIDDEN") {
+                return NextResponse.json(
+                    { error: "You do not have access to read this env file." },
+                    { status: 403 }
+                );
+            }
+
+            return NextResponse.json({
+                variable: serializeProjectEnvVariable(result.variable),
+            });
+        }
+
+        const result = await getEnvVariablesForFile({
+            workspaceId,
+            projectId,
+            envFileId,
+            userId: session.user.id,
+        });
+
+        if (result.status === "NOT_FOUND") {
+            return NextResponse.json(
+                { error: "Env file not found or access denied." },
+                { status: 404 }
+            );
+        }
+
+        if (result.status === "FORBIDDEN") {
+            return NextResponse.json(
+                { error: "You do not have access to read this env file." },
+                { status: 403 }
+            );
+        }
+
+        return NextResponse.json({
+            variables: result.variables.map(serializeProjectEnvVariable),
+        });
+    } catch (error) {
+        console.error("Failed to read env variables:", error);
+        return NextResponse.json(
+            { error: "Internal server error." },
+            { status: 500 }
+        );
+    }
 }
 
 export async function POST(request: Request, context: ProjectEnvFileRouteContext) {

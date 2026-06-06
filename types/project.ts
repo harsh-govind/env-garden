@@ -10,7 +10,7 @@ export type ProjectRoleValue = "OWNER" | "ADMIN" | "CONTRIBUTOR" | "VIEWER";
 export type ProjectEnvVariable = {
     id: string;
     key: string;
-    value: string;
+    value?: string;
     note: string | null;
     createdAt: string;
     updatedAt: string;
@@ -24,6 +24,11 @@ export type ProjectEnvVariableRecord = Omit<
     updatedAt: Date;
 };
 
+export type ProjectEnvVariableMetadataRecord = Omit<
+    ProjectEnvVariableRecord,
+    "value"
+>;
+
 export type ProjectEnvVariableEncryptedRecord = Omit<
     ProjectEnvVariableRecord,
     "value"
@@ -32,8 +37,11 @@ export type ProjectEnvVariableEncryptedRecord = Omit<
 
 export type VariableDraftRow = {
     clientId: string;
+    variableId?: string;
     key: string;
     value: string;
+    originalValue: string;
+    isValueLoaded: boolean;
     note: string;
     isNoteOpen: boolean;
 };
@@ -132,14 +140,27 @@ export type CreateEnvVariableResponse = {
 
 export type SaveEnvVariablesRequest = {
     variables: {
+        id?: string;
         key: string;
-        value: string;
+        value?: string;
         note?: string | null;
     }[];
 };
 
 export type SaveEnvVariablesResponse = {
     variables: ProjectEnvVariable[];
+};
+
+export type EnvVariableValueResponse = {
+    variable: ProjectEnvVariable & {
+        value: string;
+    };
+};
+
+export type EnvVariablesValueResponse = {
+    variables: (ProjectEnvVariable & {
+        value: string;
+    })[];
 };
 
 export type CreateEnvVariableBody = {
