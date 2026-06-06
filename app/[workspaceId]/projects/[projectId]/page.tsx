@@ -1455,13 +1455,13 @@ export default function ProjectDetailPage() {
                                                                         updateVariableDraftRow(
                                                                             row.clientId,
                                                                             "isNoteOpen",
-                                                                            true
+                                                                            !row.isNoteOpen
                                                                         );
                                                                     }}
                                                                     aria-controls={`note-${row.clientId}`}
                                                                     aria-expanded={row.isNoteOpen}
-                                                                    aria-label={row.note ? "Edit note" : "Add note"}
-                                                                    title={row.note ? "Edit note" : "Add note"}
+                                                                    aria-label={row.isNoteOpen ? "Hide note" : row.note ? "Edit note" : "Add note"}
+                                                                    title={row.isNoteOpen ? "Hide note" : row.note ? "Edit note" : "Add note"}
                                                                 >
                                                                     {row.note ? (
                                                                         <StickyNote />
@@ -1499,7 +1499,7 @@ export default function ProjectDetailPage() {
 
                                                         {row.isNoteOpen ? (
                                                             <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 px-3 pb-3 text-sm">
-                                                                <div className="col-start-2 col-span-5 flex min-w-0 gap-1">
+                                                                <div className="col-start-2 col-span-5 min-w-0">
                                                                     <input
                                                                         id={`note-${row.clientId}`}
                                                                         value={row.note}
@@ -1511,24 +1511,8 @@ export default function ProjectDetailPage() {
                                                                             );
                                                                         }}
                                                                         placeholder="Note"
-                                                                        className="h-8 min-w-0 flex-1 border border-border bg-card px-2 text-sm text-foreground outline-none focus:border-ring"
+                                                                        className="h-8 w-full min-w-0 border border-border bg-card px-2 text-sm text-foreground outline-none focus:border-ring"
                                                                     />
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="outline"
-                                                                        size="icon-xs"
-                                                                        onClick={() => {
-                                                                            updateVariableDraftRow(
-                                                                                row.clientId,
-                                                                                "isNoteOpen",
-                                                                                false
-                                                                            );
-                                                                        }}
-                                                                        aria-label="Hide note"
-                                                                        title="Hide note"
-                                                                    >
-                                                                        <X />
-                                                                    </Button>
                                                                 </div>
                                                             </div>
                                                         ) : null}
