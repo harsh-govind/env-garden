@@ -139,13 +139,20 @@ export async function createWorkspaceForUser(
             },
         });
 
-        await tx.workspaceMember.create({
+        const createdWorkspaceMember = await tx.workspaceMember.create({
             data: {
                 workspaceId: createdWorkspace.id,
                 userId: input.userId,
                 role: "OWNER",
                 projectAccessScope: "ALL_PROJECTS",
                 addedById: input.userId,
+            },
+            select: {
+                id: true,
+                workspaceId: true,
+                userId: true,
+                role: true,
+                projectAccessScope: true,
             },
         });
 
@@ -155,10 +162,15 @@ export async function createWorkspaceForUser(
                 operation: "WORKSPACE_CREATED",
                 message: `Workspace "${createdWorkspace.name}" was created by ${creatorEmail}.`,
                 data: {
-                    workspaceId: createdWorkspace.id,
-                    createdByUserId: input.userId,
-                    createdByEmail: creatorEmail,
-                    name: createdWorkspace.name,
+                    workspace: {
+                        id: createdWorkspace.id,
+                        name: createdWorkspace.name,
+                    },
+                    actor: {
+                        userId: input.userId,
+                        email: creatorEmail,
+                    },
+                    hasDescription: Boolean(description),
                 },
             },
         });
@@ -171,13 +183,21 @@ export async function createWorkspaceForUser(
                     "ALL_PROJECTS"
                 )}.`,
                 data: {
-                    workspaceId: createdWorkspace.id,
-                    targetUserId: input.userId,
-                    targetEmail: creatorEmail,
+                    workspace: {
+                        id: createdWorkspace.id,
+                        name: createdWorkspace.name,
+                    },
+                    target: {
+                        userId: input.userId,
+                        email: creatorEmail,
+                        workspaceMemberId: createdWorkspaceMember.id,
+                    },
                     role: "OWNER",
                     projectAccessScope: "ALL_PROJECTS",
-                    addedByUserId: input.userId,
-                    addedByEmail: creatorEmail,
+                    actor: {
+                        userId: input.userId,
+                        email: creatorEmail,
+                    },
                 },
             },
         });

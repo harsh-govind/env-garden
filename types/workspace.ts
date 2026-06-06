@@ -48,6 +48,11 @@ export type WorkspaceHistoryEntry = {
     createdAt: string;
 };
 
+export type WorkspaceHistoryDetail = WorkspaceHistoryEntry & {
+    workspaceId: string;
+    data: Prisma.JsonValue;
+};
+
 export type WorkspaceSummary = {
     id: string;
     name: string;
@@ -98,6 +103,10 @@ export type WorkspaceHistoryResponse = {
     history: WorkspaceHistoryEntry[];
 };
 
+export type WorkspaceHistoryDetailResponse = {
+    history: WorkspaceHistoryDetail;
+};
+
 export type WorkspaceContextValue = {
     workspaces: WorkspaceSummary[];
     activeWorkspaceId: string | null;
@@ -140,6 +149,13 @@ export type WorkspaceHistoryPageProps = {
     }>;
 };
 
+export type WorkspaceHistoryEntryRouteContext = {
+    params: Promise<{
+        workspaceId: string;
+        historyId: string;
+    }>;
+};
+
 export type WorkspaceSummaryRecord = {
     id: string;
     name: string;
@@ -179,6 +195,12 @@ export type ListWorkspaceHistoryForUserInput = {
     query?: string;
 };
 
+export type GetWorkspaceHistoryEntryForUserInput = {
+    workspaceId: string;
+    historyId: string;
+    userId: string;
+};
+
 export type ListWorkspaceHistoryForUserResult =
     | {
         status: "NOT_FOUND";
@@ -196,6 +218,11 @@ export type WorkspaceHistoryEntryRecord = {
     operation: string;
     message: string;
     createdAt: Date;
+};
+
+export type WorkspaceHistoryDetailRecord = WorkspaceHistoryEntryRecord & {
+    workspaceId: string;
+    data: Prisma.JsonValue;
 };
 
 export type DashboardSidebarProps = {

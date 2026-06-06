@@ -5,6 +5,15 @@ import { History, Search, ShieldAlert } from "lucide-react";
 import { use, useEffect, useMemo, useState } from "react";
 import UnauthenticatedHome from "@/components/home/UnauthenticatedHome";
 import HistoryListSkeleton from "@/components/history/history-list-skeleton";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
@@ -12,6 +21,8 @@ import { createInMemoryCache } from "@/lib/cache";
 import { canViewHistory } from "@/lib/constants";
 import type {
     ApiErrorPayload,
+    WorkspaceHistoryDetail,
+    WorkspaceHistoryDetailResponse,
     WorkspaceHistoryEntry,
     WorkspaceHistoryPageProps,
     WorkspaceHistoryResponse,
@@ -29,6 +40,85 @@ function getErrorMessage(payload: ApiErrorPayload | null) {
     }
 
     return "Failed to load workspace history.";
+}
+
+function formatHistoryValue(value: unknown) {
+    if (value === null) {
+        return "null";
+    }
+
+    if (typeof value === "boolean") {
+        return value ? "true" : "false";
+    }
+
+    return String(value);
+}
+
+function HistoryDataValue({
+    value,
+    depth = 0,
+}: {
+    value: unknown;
+    depth?: number;
+}) {
+    if (Array.isArray(value)) {
+        if (value.length === 0) {
+            return <span className="text-muted-foreground">[]</span>;
+        }
+
+        return (
+            <div className="space-y-2">
+                {value.map((item, index) => (
+                    <div key={index} className="border border-border bg-background px-2 py-2">
+                        <p className="mb-1 text-[11px] text-muted-foreground">Item {index + 1}</p>
+                        <HistoryDataValue value={item} depth={depth + 1} />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    if (value && typeof value === "object") {
+        const entries = Object.entries(value as Record<string, unknown>);
+
+        if (entries.length === 0) {
+            return <span className="text-muted-foreground">{"{}"}</span>;
+        }
+
+        return (
+            <div className={depth === 0 ? "space-y-2" : "space-y-1"}>
+                {entries.map(([key, entryValue]) => {
+                    const isNested =
+                        entryValue !== null &&
+                        typeof entryValue === "object";
+
+                    return (
+                        <div
+                            key={key}
+                            className={
+                                isNested
+                                    ? "border border-border bg-muted/30 px-2 py-2"
+                                    : "grid gap-1 border border-border bg-background px-2 py-2 sm:grid-cols-[12rem_1fr]"
+                            }
+                        >
+                            <p className="font-mono text-[11px] text-muted-foreground">
+                                {key}
+                            </p>
+                            <div className="min-w-0 text-xs text-foreground">
+                                <HistoryDataValue value={entryValue} depth={depth + 1} />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
+
+    return (
+        <span className="break-all font-mono text-xs text-foreground">
+            {formatHistoryValue(value)}
+        </span>
+    );
 }
 
 export default function HistoryPage({ params }: WorkspaceHistoryPageProps) {
@@ -55,6 +145,11 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
+    const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const [detailError, setDetailError] = useState<string | null>(null);
+    const [selectedHistoryDetail, setSelectedHistoryDetail] =
+        useState<WorkspaceHistoryDetail | null>(null);
 
     const workspace =
         activeWorkspaceId === workspaceId &&
@@ -162,6 +257,41 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
         };
     }, [workspace, workspaceId, hasHistoryAccess, searchQuery]);
 
+    const handleViewHistoryDetail = async (historyId: string) => {
+        setIsDetailDialogOpen(true);
+        setIsDetailLoading(true);
+        setDetailError(null);
+        setSelectedHistoryDetail(null);
+
+        try {
+            const response = await fetch(
+                `/api/workspaces/${workspaceId}/history/${historyId}`
+            );
+            const payload = (await response.json().catch(() => null)) as
+                | WorkspaceHistoryDetailResponse
+                | ApiErrorPayload
+                | null;
+
+            if (!response.ok) {
+                throw new Error(getErrorMessage(payload as ApiErrorPayload | null));
+            }
+
+            if (!payload || !("history" in payload)) {
+                throw new Error("Received an empty history detail response.");
+            }
+
+            setSelectedHistoryDetail(payload.history);
+        } catch (detailLoadError) {
+            setDetailError(
+                detailLoadError instanceof Error
+                    ? detailLoadError.message
+                    : "Failed to load history details."
+            );
+        } finally {
+            setIsDetailLoading(false);
+        }
+    };
+
     if (!workspace) {
         return (
             <section className="border border-border bg-card p-4">
@@ -247,19 +377,93 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
                                 <p className="text-sm font-medium text-foreground">
                                     {entry.message}
                                 </p>
-                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                                     <p className="text-xs text-muted-foreground">
                                         {entry.operation}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {formatDate(entry.createdAt)}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-xs text-muted-foreground">
+                                            {formatDate(entry.createdAt)}
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="xs"
+                                            onClick={() => {
+                                                void handleViewHistoryDetail(entry.id);
+                                            }}
+                                        >
+                                            View details
+                                        </Button>
+                                    </div>
                                 </div>
                             </article>
                         ))}
                     </div>
                 )}
             </section>
+
+            <Dialog
+                open={isDetailDialogOpen}
+                onOpenChange={(isOpen) => {
+                    setIsDetailDialogOpen(isOpen);
+
+                    if (!isOpen) {
+                        setDetailError(null);
+                        setSelectedHistoryDetail(null);
+                    }
+                }}
+            >
+                <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>History details</DialogTitle>
+                        <DialogDescription>
+                            {selectedHistoryDetail
+                                ? `${selectedHistoryDetail.operation} at ${formatDate(selectedHistoryDetail.createdAt)}`
+                                : "Loading stored event data."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {isDetailLoading ? (
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-20 w-full" />
+                            <Skeleton className="h-20 w-full" />
+                        </div>
+                    ) : detailError ? (
+                        <p className="border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
+                            {detailError}
+                        </p>
+                    ) : selectedHistoryDetail ? (
+                        <div className="space-y-4">
+                            <div className="border border-border bg-muted/30 px-3 py-3">
+                                <p className="text-sm font-medium text-foreground">
+                                    {selectedHistoryDetail.message}
+                                </p>
+                                <div className="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                                    <p>
+                                        <span className="font-mono">entryId</span>:{" "}
+                                        {selectedHistoryDetail.id}
+                                    </p>
+                                    <p>
+                                        <span className="font-mono">workspaceId</span>:{" "}
+                                        {selectedHistoryDetail.workspaceId}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h2 className="mb-2 text-sm font-medium text-foreground">
+                                    Stored data
+                                </h2>
+                                <HistoryDataValue value={selectedHistoryDetail.data} />
+                            </div>
+                        </div>
+                    ) : null}
+
+                    <DialogFooter showCloseButton />
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { canViewHistory } from "@/lib/constants";
 import type {
     CreateWorkspaceHistoryEntryInput,
+    GetWorkspaceHistoryEntryForUserInput,
     ListWorkspaceHistoryForUserInput,
     ListWorkspaceHistoryForUserResult,
 } from "@/types/workspace";
@@ -85,5 +86,57 @@ export async function listWorkspaceHistoryForUser(
     return {
         status: "OK",
         entries,
+    };
+}
+
+export async function getWorkspaceHistoryEntryForUser(
+    input: GetWorkspaceHistoryEntryForUserInput
+) {
+    const membership = await prisma.workspaceMember.findFirst({
+        where: {
+            workspaceId: input.workspaceId,
+            userId: input.userId,
+        },
+        select: {
+            role: true,
+        },
+    });
+
+    if (!membership) {
+        return {
+            status: "NOT_FOUND" as const,
+        };
+    }
+
+    if (!canViewHistory(membership.role)) {
+        return {
+            status: "FORBIDDEN" as const,
+        };
+    }
+
+    const entry = await prisma.workspaceHistory.findFirst({
+        where: {
+            id: input.historyId,
+            workspaceId: input.workspaceId,
+        },
+        select: {
+            id: true,
+            workspaceId: true,
+            operation: true,
+            message: true,
+            data: true,
+            createdAt: true,
+        },
+    });
+
+    if (!entry) {
+        return {
+            status: "NOT_FOUND" as const,
+        };
+    }
+
+    return {
+        status: "OK" as const,
+        entry,
     };
 }

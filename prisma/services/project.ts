@@ -300,26 +300,43 @@ export async function createProjectForWorkspace(
             },
         });
 
-        await tx.envFile.createMany({
-            data: environments.map((environment) => ({
-                workspaceId: input.workspaceId,
-                projectId: createdProject.id,
-                name: formatEnvironmentFileName(environment),
-                environment,
-                description: `${environmentTypeLabels[environment]} environment variables for ${createdProject.name}.`,
-                createdById: input.userId,
-            })),
-        });
+        const createdEnvFiles = await Promise.all(
+            environments.map((environment) =>
+                tx.envFile.create({
+                    data: {
+                        workspaceId: input.workspaceId,
+                        projectId: createdProject.id,
+                        name: formatEnvironmentFileName(environment),
+                        environment,
+                        description: `${environmentTypeLabels[environment]} environment variables for ${createdProject.name}.`,
+                        createdById: input.userId,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        environment: true,
+                    },
+                })
+            )
+        );
 
-        await tx.projectEnvAccess.createMany({
-            data: environments.map((environment) => ({
-                workspaceId: input.workspaceId,
-                projectId: createdProject.id,
-                projectMemberId: createdProjectMember.id,
-                environment,
-                grantedById: input.userId,
-            })),
-        });
+        const createdEnvAccesses = await Promise.all(
+            environments.map((environment) =>
+                tx.projectEnvAccess.create({
+                    data: {
+                        workspaceId: input.workspaceId,
+                        projectId: createdProject.id,
+                        projectMemberId: createdProjectMember.id,
+                        environment,
+                        grantedById: input.userId,
+                    },
+                    select: {
+                        id: true,
+                        environment: true,
+                    },
+                })
+            )
+        );
 
         await tx.workspaceHistory.create({
             data: {
@@ -327,10 +344,15 @@ export async function createProjectForWorkspace(
                 operation: "PROJECT_CREATED",
                 message: `Project \"${createdProject.name}\" was created by ${creatorEmail}.`,
                 data: {
-                    projectId: createdProject.id,
-                    createdByUserId: input.userId,
-                    createdByEmail: creatorEmail,
-                    name: createdProject.name,
+                    project: {
+                        id: createdProject.id,
+                        name: createdProject.name,
+                    },
+                    actor: {
+                        userId: input.userId,
+                        email: creatorEmail,
+                    },
+                    hasDescription: Boolean(description),
                 } as CreateWorkspaceHistoryEntryInput["data"],
             },
         });
@@ -343,13 +365,26 @@ export async function createProjectForWorkspace(
                     environments
                 )}) were created for project ${createdProject.name}.`,
                 data: {
-                    workspaceId: input.workspaceId,
-                    projectId: createdProject.id,
-                    createdByUserId: input.userId,
-                    createdByEmail: creatorEmail,
-                    environments,
-                    envFileNames: environments.map(formatEnvironmentFileName),
-                    projectMemberId: createdProjectMember.id,
+                    project: {
+                        id: createdProject.id,
+                        name: createdProject.name,
+                    },
+                    actor: {
+                        userId: input.userId,
+                        email: creatorEmail,
+                    },
+                    envFiles: createdEnvFiles.map((envFile) => ({
+                        id: envFile.id,
+                        name: envFile.name,
+                        environment: envFile.environment,
+                    })),
+                    projectMember: {
+                        id: createdProjectMember.id,
+                    },
+                    projectEnvAccesses: createdEnvAccesses.map((envAccess) => ({
+                        id: envAccess.id,
+                        environment: envAccess.environment,
+                    })),
                 } as CreateWorkspaceHistoryEntryInput["data"],
             },
         });
@@ -360,13 +395,21 @@ export async function createProjectForWorkspace(
                 operation: "PROJECT_MEMBER_ADDED",
                 message: `${creatorEmail} was added by ${creatorEmail} as OWNER for project ${createdProject.name}.`,
                 data: {
-                    workspaceId: input.workspaceId,
-                    projectId: createdProject.id,
-                    targetUserId: input.userId,
-                    targetEmail: creatorEmail,
+                    project: {
+                        id: createdProject.id,
+                        name: createdProject.name,
+                    },
+                    target: {
+                        userId: input.userId,
+                        email: creatorEmail,
+                        workspaceMemberId: member.id,
+                        projectMemberId: createdProjectMember.id,
+                    },
                     role: "OWNER",
-                    addedByUserId: input.userId,
-                    addedByEmail: creatorEmail,
+                    actor: {
+                        userId: input.userId,
+                        email: creatorEmail,
+                    },
                 } as CreateWorkspaceHistoryEntryInput["data"],
             },
         });
@@ -540,8 +583,8 @@ export async function createEnvFileForProject(input: {
                 },
             });
 
-            if (access.projectMember) {
-                await tx.projectEnvAccess.upsert({
+            const envAccess = access.projectMember
+                ? await tx.projectEnvAccess.upsert({
                     where: {
                         projectMemberId_environment: {
                             projectMemberId: access.projectMember.id,
@@ -558,8 +601,13 @@ export async function createEnvFileForProject(input: {
                         environment: input.environment,
                         grantedById: input.userId,
                     },
-                });
-            }
+                    select: {
+                        id: true,
+                        projectMemberId: true,
+                        environment: true,
+                    },
+                })
+                : null;
 
             await tx.workspaceHistory.create({
                 data: {
@@ -567,13 +615,28 @@ export async function createEnvFileForProject(input: {
                     operation: "PROJECT_ENV_FILE_CREATED",
                     message: `${creatorEmail} created ${envFile.name} for project ${access.project.name}.`,
                     data: {
-                        workspaceId: input.workspaceId,
-                        projectId: input.projectId,
-                        envFileId: envFile.id,
-                        envFileName: envFile.name,
-                        environment: input.environment,
-                        createdByUserId: input.userId,
-                        createdByEmail: creatorEmail,
+                        project: {
+                            id: input.projectId,
+                            name: access.project.name,
+                        },
+                        envFile: {
+                            id: envFile.id,
+                            name: envFile.name,
+                            environment: envFile.environment,
+                        },
+                        actor: {
+                            userId: input.userId,
+                            email: creatorEmail,
+                        },
+                        ...(envAccess
+                            ? {
+                                projectEnvAccess: {
+                                    id: envAccess.id,
+                                    projectMemberId: envAccess.projectMemberId,
+                                    environment: envAccess.environment,
+                                },
+                            }
+                            : {}),
                     } as CreateWorkspaceHistoryEntryInput["data"],
                 },
             });
@@ -688,14 +751,24 @@ export async function createEnvVariableForFile(input: {
                         operation: "PROJECT_ENV_VARIABLE_CREATED",
                         message: `${creatorEmail} added ${variable.key} to ${envFile.name} for project ${access.project.name}.`,
                         data: {
-                            workspaceId: input.workspaceId,
-                            projectId: input.projectId,
-                            envFileId: input.envFileId,
-                            envFileName: envFile.name,
-                            variableId: variable.id,
-                            key: variable.key,
-                            createdByUserId: input.userId,
-                            createdByEmail: creatorEmail,
+                            project: {
+                                id: input.projectId,
+                                name: access.project.name,
+                            },
+                            envFile: {
+                                id: input.envFileId,
+                                name: envFile.name,
+                                environment: envFile.environment,
+                            },
+                            variable: {
+                                id: variable.id,
+                                key: variable.key,
+                            },
+                            hasNote: Boolean(note),
+                            actor: {
+                                userId: input.userId,
+                                email: creatorEmail,
+                            },
                         } as CreateWorkspaceHistoryEntryInput["data"],
                     },
                 });
@@ -928,6 +1001,7 @@ export async function replaceEnvVariablesForFile(input: {
                 },
                 select: {
                     id: true,
+                    key: true,
                     encryptedValue: true,
                     iv: true,
                     authTag: true,
@@ -1021,6 +1095,14 @@ export async function replaceEnvVariablesForFile(input: {
                         updatedAt: true,
                     },
                 });
+                const previousVariables = existingVariables.map((variable) => ({
+                    id: variable.id,
+                    key: variable.key,
+                }));
+                const savedVariables = variables.map((variable) => ({
+                    id: variable.id,
+                    key: variable.key,
+                }));
 
                 const actor = await tx.user.findUnique({
                     where: { id: input.userId },
@@ -1034,13 +1116,21 @@ export async function replaceEnvVariablesForFile(input: {
                         operation: "PROJECT_ENV_VARIABLES_SAVED",
                         message: `${actorEmail} saved ${variables.length} variables for ${envFile.name} in project ${access.project.name}.`,
                         data: {
-                            workspaceId: input.workspaceId,
-                            projectId: input.projectId,
-                            envFileId: input.envFileId,
-                            envFileName: envFile.name,
-                            variableCount: variables.length,
-                            savedByUserId: input.userId,
-                            savedByEmail: actorEmail,
+                            project: {
+                                id: input.projectId,
+                                name: access.project.name,
+                            },
+                            envFile: {
+                                id: input.envFileId,
+                                name: envFile.name,
+                                environment: envFile.environment,
+                            },
+                            previousVariables,
+                            variables: savedVariables,
+                            actor: {
+                                userId: input.userId,
+                                email: actorEmail,
+                            },
                         } as CreateWorkspaceHistoryEntryInput["data"],
                     },
                 });
