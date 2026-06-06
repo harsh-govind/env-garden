@@ -14,10 +14,11 @@ import {
 import {
     ArrowLeft,
     Copy,
-    Loader2,
     Eye,
     EyeOff,
     FilePlus2,
+    Loader2,
+    Pencil,
     Plus,
     RefreshCw,
     RotateCcw,
@@ -69,6 +70,7 @@ const environmentOrder = new Map(
     ])
 );
 const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const hiddenValueMask = "*****";
 
 function getRouteParam(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -143,6 +145,7 @@ function toVariableDraftRows(variables: ProjectEnvVariable[]): VariableDraftRow[
         value: variable.value ?? "",
         originalValue: variable.value ?? "",
         isValueLoaded: typeof variable.value === "string",
+        isValueEditable: false,
         note: variable.note ?? "",
         isNoteOpen: Boolean(variable.note),
     }));
@@ -157,6 +160,7 @@ function createEmptyDraftRow(): VariableDraftRow {
         value: "",
         originalValue: "",
         isValueLoaded: true,
+        isValueEditable: true,
         note: "",
         isNoteOpen: false,
     };
@@ -216,6 +220,7 @@ function createDraftRowFromParsedEnv(parsedRow: ParsedEnvRow): VariableDraftRow 
         value: parsedRow.value,
         originalValue: "",
         isValueLoaded: true,
+        isValueEditable: true,
         note: parsedRow.note,
         isNoteOpen: Boolean(parsedRow.note),
     };
@@ -552,6 +557,7 @@ export default function ProjectDetailPage() {
                         ...(field === "value"
                             ? {
                                 isValueLoaded: true,
+                                isValueEditable: true,
                             }
                             : {}),
                     };
@@ -824,29 +830,14 @@ export default function ProjectDetailPage() {
         ]
     );
 
-    const toggleVariableVisibility = useCallback(
+    const loadVariableValue = useCallback(
         async (row: VariableDraftRow) => {
-            if (revealedVariableIds.has(row.clientId)) {
-                setRevealedVariableIds((currentIds) => {
-                    const nextIds = new Set(currentIds);
-                    nextIds.delete(row.clientId);
-                    return nextIds;
-                });
-                return;
-            }
-
             if (row.isValueLoaded || !row.variableId) {
-                setRevealedVariableIds((currentIds) => {
-                    const nextIds = new Set(currentIds);
-                    nextIds.add(row.clientId);
-                    return nextIds;
-                });
-                return;
+                return row.value;
             }
 
             if (!activeEnvFile) {
-                setVariableError("Select an env file first.");
-                return;
+                throw new Error("Select an env file first.");
             }
 
             setLoadingVariableValueIds((currentIds) => {
@@ -873,14 +864,9 @@ export default function ProjectDetailPage() {
                             : currentRow
                     )
                 );
-                setRevealedVariableIds((currentIds) => {
-                    const nextIds = new Set(currentIds);
-                    nextIds.add(row.clientId);
-                    return nextIds;
-                });
                 setVariableError(null);
-            } catch (loadValueError) {
-                setVariableError(getErrorMessage(loadValueError));
+
+                return value;
             } finally {
                 setLoadingVariableValueIds((currentIds) => {
                     const nextIds = new Set(currentIds);
@@ -889,7 +875,59 @@ export default function ProjectDetailPage() {
                 });
             }
         },
-        [activeEnvFile, projectUrl, revealedVariableIds]
+        [activeEnvFile, projectUrl]
+    );
+
+    const toggleVariableVisibility = useCallback(
+        async (row: VariableDraftRow) => {
+            if (revealedVariableIds.has(row.clientId)) {
+                setRevealedVariableIds((currentIds) => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.delete(row.clientId);
+                    return nextIds;
+                });
+                return;
+            }
+
+            try {
+                await loadVariableValue(row);
+                setRevealedVariableIds((currentIds) => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.add(row.clientId);
+                    return nextIds;
+                });
+            } catch (loadValueError) {
+                setVariableError(getErrorMessage(loadValueError));
+            }
+        },
+        [loadVariableValue, revealedVariableIds]
+    );
+
+    const startEditingVariableValue = useCallback(
+        async (row: VariableDraftRow) => {
+            try {
+                await loadVariableValue(row);
+                setVariableDraftRows((currentRows) =>
+                    currentRows.map((currentRow) =>
+                        currentRow.clientId === row.clientId
+                            ? {
+                                ...currentRow,
+                                isValueEditable: true,
+                            }
+                            : currentRow
+                    )
+                );
+                setRevealedVariableIds((currentIds) => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.add(row.clientId);
+                    return nextIds;
+                });
+                setVariableError(null);
+            } catch (loadValueError) {
+                setVariableError(getErrorMessage(loadValueError));
+            }
+        },
+        [loadVariableValue]
     );
 
     if (isLoading) {
@@ -1277,11 +1315,12 @@ export default function ProjectDetailPage() {
                                 ) : null}
 
                                 <div className="overflow-x-auto border border-border">
-                                    <div className="min-w-[44rem] divide-y divide-border">
-                                        <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem] gap-3 bg-muted/40 px-3 py-2 text-xs tracking-wide text-muted-foreground uppercase">
+                                    <div className="min-w-[48rem] divide-y divide-border">
+                                        <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 bg-muted/40 px-3 py-2 text-xs tracking-wide text-muted-foreground uppercase">
                                             <span />
                                             <span>Key</span>
                                             <span>Value</span>
+                                            <span />
                                             <span className="text-center">Note</span>
                                             <span />
                                         </div>
@@ -1297,13 +1336,16 @@ export default function ProjectDetailPage() {
                                                 );
                                                 const isLoadingValue =
                                                     loadingVariableValueIds.has(row.clientId);
+                                                const displayedValue = row.isValueLoaded
+                                                    ? row.value
+                                                    : hiddenValueMask;
 
                                                 return (
                                                     <div
                                                         key={row.clientId}
                                                         className="bg-background"
                                                     >
-                                                        <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem] gap-3 px-3 py-3 text-sm">
+                                                        <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 px-3 py-3 text-sm">
                                                             <label className="grid place-items-center">
                                                                 <input
                                                                     type="checkbox"
@@ -1344,9 +1386,18 @@ export default function ProjectDetailPage() {
                                                             />
 
                                                             <input
-                                                                type={isVisible ? "text" : "password"}
-                                                                value={row.value}
+                                                                type={
+                                                                    row.isValueLoaded && !isVisible
+                                                                        ? "password"
+                                                                        : "text"
+                                                                }
+                                                                value={displayedValue}
+                                                                readOnly={!row.isValueEditable}
                                                                 onChange={(event) => {
+                                                                    if (!row.isValueEditable) {
+                                                                        return;
+                                                                    }
+
                                                                     updateVariableDraftRow(
                                                                         row.clientId,
                                                                         "value",
@@ -1354,6 +1405,11 @@ export default function ProjectDetailPage() {
                                                                     );
                                                                 }}
                                                                 onPaste={(event) => {
+                                                                    if (!row.isValueEditable) {
+                                                                        event.preventDefault();
+                                                                        return;
+                                                                    }
+
                                                                     if (
                                                                         applyPastedVariables(
                                                                             row.clientId,
@@ -1363,13 +1419,32 @@ export default function ProjectDetailPage() {
                                                                         event.preventDefault();
                                                                     }
                                                                 }}
-                                                                placeholder={
-                                                                    row.isValueLoaded
-                                                                        ? "postgres://..."
-                                                                        : "Value hidden"
-                                                                }
-                                                                className="h-8 min-w-0 border border-border bg-card px-2 font-mono text-sm text-foreground outline-none focus:border-ring"
+                                                                placeholder="postgres://..."
+                                                                className="h-8 min-w-0 border border-border bg-card px-2 font-mono text-sm text-foreground outline-none read-only:text-muted-foreground focus:border-ring"
                                                             />
+
+                                                            <div className="grid place-items-center">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="icon-xs"
+                                                                    onClick={() => {
+                                                                        void startEditingVariableValue(row);
+                                                                    }}
+                                                                    disabled={
+                                                                        isLoadingValue ||
+                                                                        row.isValueEditable
+                                                                    }
+                                                                    aria-label="Edit variable value"
+                                                                    title="Edit variable value"
+                                                                >
+                                                                    {isLoadingValue ? (
+                                                                        <Loader2 className="animate-spin" />
+                                                                    ) : (
+                                                                        <Pencil />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
 
                                                             <div className="grid place-items-center">
                                                                 <Button
@@ -1423,8 +1498,8 @@ export default function ProjectDetailPage() {
                                                         </div>
 
                                                         {row.isNoteOpen ? (
-                                                            <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem] gap-3 px-3 pb-3 text-sm">
-                                                                <div className="col-start-2 col-span-4 flex min-w-0 gap-1">
+                                                            <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 px-3 pb-3 text-sm">
+                                                                <div className="col-start-2 col-span-5 flex min-w-0 gap-1">
                                                                     <input
                                                                         id={`note-${row.clientId}`}
                                                                         value={row.note}

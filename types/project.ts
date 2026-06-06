@@ -42,6 +42,7 @@ export type VariableDraftRow = {
     value: string;
     originalValue: string;
     isValueLoaded: boolean;
+    isValueEditable: boolean;
     note: string;
     isNoteOpen: boolean;
 };
