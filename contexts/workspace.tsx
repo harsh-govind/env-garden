@@ -181,7 +181,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             setIsCreatingProject(true);
 
             try {
-                await fetchJson<CreateProjectResponse>(
+                const response = await fetchJson<CreateProjectResponse>(
                     `/api/workspaces/${input.workspaceId}/projects`,
                     {
                         method: "POST",
@@ -196,19 +196,33 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                     }
                 );
 
-                await refreshWorkspaces();
-
-                // If the created project belongs to the active workspace, reload its detail
-                if (activeWorkspaceId === input.workspaceId) {
-                    try {
-                        const workspaceResponse = await fetchJson<WorkspaceResponse>(
-                            `/api/workspaces/${input.workspaceId}`
-                        );
-                        setActiveWorkspace(workspaceResponse.workspace);
-                    } catch {
-                        // ignore; workspace refresh will surface errors elsewhere
+                setActiveWorkspace((currentWorkspace) => {
+                    if (!currentWorkspace || currentWorkspace.id !== input.workspaceId) {
+                        return currentWorkspace;
                     }
-                }
+
+                    const existingProject = currentWorkspace.projects.some(
+                        (project) => project.id === response.project.id
+                    );
+                    const projects = [
+                        response.project,
+                        ...currentWorkspace.projects.filter(
+                            (project) => project.id !== response.project.id
+                        ),
+                    ].sort(
+                        (a, b) =>
+                            new Date(b.updatedAt).getTime() -
+                            new Date(a.updatedAt).getTime()
+                    );
+
+                    return {
+                        ...currentWorkspace,
+                        projectCount: existingProject
+                            ? currentWorkspace.projectCount
+                            : currentWorkspace.projectCount + 1,
+                        projects,
+                    };
+                });
 
                 setError(null);
             } catch (createError) {
@@ -219,7 +233,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 setIsCreatingProject(false);
             }
         },
-        [activeWorkspaceId, refreshWorkspaces]
+        []
     );
 
     useEffect(() => {

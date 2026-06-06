@@ -87,6 +87,11 @@ export async function POST(request: Request, context: WorkspaceRouteContext) {
         return NextResponse.json(
             {
                 envFileCount: project.envFileCount,
+                project: {
+                    id: project.project.id,
+                    name: project.project.name,
+                    updatedAt: project.project.updatedAt.toISOString(),
+                },
                 projectId: project.project.id,
             },
             { status: 201 }

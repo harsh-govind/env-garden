@@ -89,6 +89,7 @@ export type CreateProjectRequest = {
 };
 
 export type CreateProjectResponse = {
+    project: WorkspaceProjectSummary;
     projectId: string;
     envFileCount?: number;
 };
