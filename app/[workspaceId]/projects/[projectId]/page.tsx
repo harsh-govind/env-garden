@@ -23,6 +23,7 @@ import {
     RefreshCw,
     RotateCcw,
     Save,
+    Search,
     SquareCheck,
     StickyNote,
     StickyNotePlus,
@@ -305,6 +306,61 @@ function buildEnvClipboardText(
     };
 }
 
+function escapeRegexSource(value: string) {
+    return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+}
+
+function normalizeRegexFlags(flags: string) {
+    const allowedFlags = new Set(["i", "m", "s", "u"]);
+    const normalizedFlags = new Set<string>();
+
+    flags.split("").forEach((flag) => {
+        if (allowedFlags.has(flag)) {
+            normalizedFlags.add(flag);
+        }
+    });
+
+    normalizedFlags.add("i");
+
+    return [...normalizedFlags].join("");
+}
+
+function createWildcardKeyPattern(query: string) {
+    const source = query
+        .split("*")
+        .map((asteriskPart) =>
+            asteriskPart
+                .split("?")
+                .map(escapeRegexSource)
+                .join(".")
+        )
+        .join(".*");
+
+    return new RegExp(`^${source}$`, "i");
+}
+
+function createVariableKeyPattern(query: string) {
+    const slashPatternMatch = /^\/(.+)\/([a-z]*)$/i.exec(query);
+
+    if (slashPatternMatch) {
+        const [, source, flags] = slashPatternMatch;
+
+        return new RegExp(source, normalizeRegexFlags(flags));
+    }
+
+    const looksLikeRegex = query.includes(".*") || /[\\^$+{}()[\]|]/.test(query);
+
+    if (looksLikeRegex) {
+        return new RegExp(query, "i");
+    }
+
+    if (/[*?]/.test(query)) {
+        return createWildcardKeyPattern(query);
+    }
+
+    return null;
+}
+
 export default function ProjectDetailPage() {
     const params = useParams();
     const workspaceId = getRouteParam(params.workspaceId);
@@ -334,6 +390,7 @@ export default function ProjectDetailPage() {
     const [selectedDraftRowIds, setSelectedDraftRowIds] = useState<Set<string>>(
         () => new Set()
     );
+    const [variableSearchQuery, setVariableSearchQuery] = useState("");
     const [isSavingVariables, setIsSavingVariables] = useState(false);
     const [isCopyingVariables, setIsCopyingVariables] = useState(false);
     const [hasCopiedVariables, setHasCopiedVariables] = useState(false);
@@ -449,12 +506,51 @@ export default function ProjectDetailPage() {
         return !areVariableDraftRowsEqual(variableDraftRows, baselineRows);
     }, [activeEnvFile, variableDraftRows]);
 
+    const variableSearchResult = useMemo(() => {
+        const query = variableSearchQuery.trim();
+
+        if (query.length === 0) {
+            return {
+                rows: variableDraftRows,
+                error: null,
+            };
+        }
+
+        try {
+            const pattern = createVariableKeyPattern(query);
+
+            if (!pattern) {
+                const normalizedQuery = query.toLowerCase();
+
+                return {
+                    rows: variableDraftRows.filter((row) =>
+                        row.key.toLowerCase().includes(normalizedQuery)
+                    ),
+                    error: null,
+                };
+            }
+
+            return {
+                rows: variableDraftRows.filter((row) => pattern.test(row.key)),
+                error: null,
+            };
+        } catch {
+            return {
+                rows: variableDraftRows,
+                error: "Invalid search pattern.",
+            };
+        }
+    }, [variableDraftRows, variableSearchQuery]);
+    const visibleVariableDraftRows = variableSearchResult.rows;
+    const variableSearchError = variableSearchResult.error;
+    const isVariableSearchActive = variableSearchQuery.trim().length > 0;
+
     const hasUnselectedDraftRows = useMemo(
         () =>
-            variableDraftRows.some(
+            visibleVariableDraftRows.some(
                 (row) => !selectedDraftRowIds.has(row.clientId)
             ),
-        [selectedDraftRowIds, variableDraftRows]
+        [selectedDraftRowIds, visibleVariableDraftRows]
     );
 
     const hasCopyableVariables = useMemo(
@@ -627,10 +723,16 @@ export default function ProjectDetailPage() {
     }, []);
 
     const selectAllDraftRows = useCallback(() => {
-        setSelectedDraftRowIds(
-            new Set(variableDraftRows.map((row) => row.clientId))
-        );
-    }, [variableDraftRows]);
+        setSelectedDraftRowIds((currentIds) => {
+            const nextIds = new Set(currentIds);
+
+            visibleVariableDraftRows.forEach((row) => {
+                nextIds.add(row.clientId);
+            });
+
+            return nextIds;
+        });
+    }, [visibleVariableDraftRows]);
 
     const deselectAllDraftRows = useCallback(() => {
         setSelectedDraftRowIds(new Set());
@@ -1273,7 +1375,49 @@ export default function ProjectDetailPage() {
                                         ) : null}
                                     </div>
 
-                                    <div className="flex flex-wrap items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                                        <div
+                                            className="flex h-7 w-44 min-w-0 items-center gap-1.5 border border-border bg-background px-2"
+                                        >
+                                            <label className="sr-only" htmlFor="variable-key-search">
+                                                Search env keys
+                                            </label>
+                                            <Search className="size-3.5 shrink-0 text-muted-foreground" />
+                                            <input
+                                                id="variable-key-search"
+                                                value={variableSearchQuery}
+                                                onChange={(event) => {
+                                                    setVariableSearchQuery(event.target.value);
+                                                }}
+                                                placeholder="Search keys"
+                                                aria-invalid={Boolean(variableSearchError)}
+                                                title={variableSearchError ?? "Search env keys"}
+                                                className="min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-none placeholder:font-sans placeholder:text-muted-foreground"
+                                            />
+                                            {variableSearchError ? (
+                                                <span className="shrink-0 text-[11px] text-red-300">
+                                                    Invalid
+                                                </span>
+                                            ) : isVariableSearchActive ? (
+                                                <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                    {visibleVariableDraftRows.length}/
+                                                    {variableDraftRows.length}
+                                                </span>
+                                            ) : null}
+                                            {variableSearchQuery.length > 0 ? (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon-xs"
+                                                    onClick={() => setVariableSearchQuery("")}
+                                                    aria-label="Clear env key search"
+                                                    title="Clear env key search"
+                                                >
+                                                    <X />
+                                                </Button>
+                                            ) : null}
+                                        </div>
+
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -1329,8 +1473,12 @@ export default function ProjectDetailPage() {
                                             <p className="bg-background px-3 py-4 text-sm text-muted-foreground">
                                                 No draft rows. Add a row, then save.
                                             </p>
+                                        ) : visibleVariableDraftRows.length === 0 ? (
+                                            <p className="bg-background px-3 py-4 text-sm text-muted-foreground">
+                                                No env keys match the current search.
+                                            </p>
                                         ) : (
-                                            variableDraftRows.map((row) => {
+                                            visibleVariableDraftRows.map((row) => {
                                                 const isVisible = revealedVariableIds.has(
                                                     row.clientId
                                                 );
