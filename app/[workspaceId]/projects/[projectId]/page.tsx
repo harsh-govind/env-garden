@@ -49,6 +49,7 @@ import {
     environmentTypes,
     formatEnvironmentFileName,
 } from "@/lib/constants";
+import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 import { formatTimeAgo } from "@/lib/utils";
 import type {
     CreateEnvFileResponse,
@@ -497,6 +498,31 @@ export default function ProjectDetailPage() {
             null
         );
     }, [activeEnvFileId, project]);
+
+    const effectiveProjectUpdatedAt = useMemo(() => {
+        if (!project) {
+            return null;
+        }
+
+        return (
+            findMostRecentUpdatedAt(
+                project,
+                project.envFiles,
+                project.envFiles.map((envFile) => envFile.variables)
+            ) ?? new Date(project.updatedAt)
+        ).toISOString();
+    }, [project]);
+
+    const effectiveActiveEnvFileUpdatedAt = useMemo(() => {
+        if (!activeEnvFile) {
+            return null;
+        }
+
+        return (
+            findMostRecentUpdatedAt(activeEnvFile, activeEnvFile.variables) ??
+            new Date(activeEnvFile.updatedAt)
+        ).toISOString();
+    }, [activeEnvFile]);
 
     const hasVariableDraftChanges = useMemo(() => {
         const baselineRows = activeEnvFile
@@ -1080,7 +1106,12 @@ export default function ProjectDetailPage() {
                     </h1>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span>{project.envFiles.length} env files</span>
-                        <span>Updated {formatTimeAgo(project.updatedAt)}</span>
+                        <span>
+                            Updated{" "}
+                            {formatTimeAgo(
+                                effectiveProjectUpdatedAt ?? project.updatedAt
+                            )}
+                        </span>
                         {project.role ? <Badge variant="outline">{project.role}</Badge> : null}
                     </div>
                 </div>
@@ -1277,7 +1308,11 @@ export default function ProjectDetailPage() {
                                                 {activeEnvFile.variableCount} variables
                                             </span>
                                             <span>
-                                                Updated {formatTimeAgo(activeEnvFile.updatedAt)}
+                                                Updated{" "}
+                                                {formatTimeAgo(
+                                                    effectiveActiveEnvFileUpdatedAt ??
+                                                    activeEnvFile.updatedAt
+                                                )}
                                             </span>
                                         </div>
                                     </div>

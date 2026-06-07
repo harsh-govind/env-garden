@@ -41,6 +41,16 @@ export type WorkspaceProjectSummary = {
     updatedAt: string;
 };
 
+export type WorkspaceProjectUpdatedAtRecord = {
+    updatedAt: Date;
+    envFiles: {
+        updatedAt: Date;
+        variables: {
+            updatedAt: Date;
+        }[];
+    }[];
+};
+
 export type WorkspaceHistoryEntry = {
     id: string;
     operation: string;
@@ -177,11 +187,10 @@ export type WorkspaceDetailRecord = {
     projectCount: number;
     memberCount: number;
     historyCount: number;
-    projects: {
+    projects: (WorkspaceProjectUpdatedAtRecord & {
         id: string;
         name: string;
-        updatedAt: Date;
-    }[];
+    })[];
 };
 
 export type CreateWorkspaceForUserInput = {

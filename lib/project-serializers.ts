@@ -7,6 +7,7 @@ import type {
     ProjectEnvVariableMetadataRecord,
     ProjectEnvVariableRecord,
 } from "@/types/project";
+import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 
 export function serializeProjectEnvVariable(
     record: ProjectEnvVariableRecord
@@ -41,6 +42,9 @@ export function serializeProjectEnvVariableMetadata(
 export function serializeProjectEnvFile(
     record: ProjectEnvFileRecord
 ): ProjectEnvFile {
+    const updatedAt =
+        findMostRecentUpdatedAt(record, record.variables) ?? record.updatedAt;
+
     return {
         id: record.id,
         name: record.name,
@@ -48,12 +52,16 @@ export function serializeProjectEnvFile(
         description: record.description,
         variableCount: record.variableCount,
         createdAt: record.createdAt.toISOString(),
-        updatedAt: record.updatedAt.toISOString(),
+        updatedAt: updatedAt.toISOString(),
         variables: record.variables.map(serializeProjectEnvVariableMetadata),
     };
 }
 
 export function serializeProjectDetail(record: ProjectDetailRecord): ProjectDetail {
+    const envFiles = record.envFiles.map(serializeProjectEnvFile);
+    const updatedAt =
+        findMostRecentUpdatedAt(record, envFiles) ?? record.updatedAt;
+
     return {
         id: record.id,
         workspaceId: record.workspaceId,
@@ -62,7 +70,7 @@ export function serializeProjectDetail(record: ProjectDetailRecord): ProjectDeta
         role: record.role,
         canManage: record.canManage,
         createdAt: record.createdAt.toISOString(),
-        updatedAt: record.updatedAt.toISOString(),
-        envFiles: record.envFiles.map(serializeProjectEnvFile),
+        updatedAt: updatedAt.toISOString(),
+        envFiles,
     };
 }

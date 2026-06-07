@@ -6,6 +6,7 @@ import type {
     WorkspaceDetail,
     WorkspaceSummary,
 } from "@/types/workspace";
+import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 
 export function serializeWorkspaceSummary(
     record: WorkspaceSummaryRecord
@@ -30,7 +31,13 @@ export function serializeWorkspaceDetail(
         projects: record.projects.map((project) => ({
             id: project.id,
             name: project.name,
-            updatedAt: project.updatedAt.toISOString(),
+            updatedAt: (
+                findMostRecentUpdatedAt(
+                    project,
+                    project.envFiles,
+                    project.envFiles.map((envFile) => envFile.variables)
+                ) ?? project.updatedAt
+            ).toISOString(),
         })),
     };
 }

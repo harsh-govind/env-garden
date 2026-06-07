@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { canViewHistory } from "@/lib/constants";
+import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 import type {
     CreateWorkspaceForUserInput,
     WorkspaceDetailRecord,
+    WorkspaceProjectUpdatedAtRecord,
     WorkspaceSummaryRecord,
 } from "@/types/workspace";
 
@@ -12,6 +14,28 @@ function formatUserEmail(email: string | null | undefined, userId: string) {
 
 function formatProjectAccessScope(scope: "ALL_PROJECTS" | "SELECTED_PROJECTS") {
     return scope === "ALL_PROJECTS" ? "all projects" : "selected projects";
+}
+
+function getMostRecentProjectUpdatedAtTime(
+    project: WorkspaceProjectUpdatedAtRecord
+) {
+    return (
+        findMostRecentUpdatedAt(
+            project,
+            project.envFiles,
+            project.envFiles.map((envFile) => envFile.variables)
+        ) ?? project.updatedAt
+    ).getTime();
+}
+
+function sortProjectsByMostRecentUpdatedAt<
+    TProject extends WorkspaceProjectUpdatedAtRecord,
+>(projects: TProject[]) {
+    return [...projects].sort(
+        (a, b) =>
+            getMostRecentProjectUpdatedAtTime(b) -
+            getMostRecentProjectUpdatedAtTime(a)
+    );
 }
 
 export async function listWorkspacesForUser(userId: string): Promise<WorkspaceSummaryRecord[]> {
@@ -79,9 +103,20 @@ export async function getWorkspaceDetailForUser(
                       id: true,
                       name: true,
                       updatedAt: true,
-                  },
-                  orderBy: {
-                      updatedAt: "desc",
+                      envFiles: {
+                          select: {
+                              updatedAt: true,
+                              variables: {
+                                  orderBy: {
+                                      updatedAt: "desc",
+                                  },
+                                  take: 1,
+                                  select: {
+                                      updatedAt: true,
+                                  },
+                              },
+                          },
+                      },
                   },
               })
             : (
@@ -91,16 +126,66 @@ export async function getWorkspaceDetailForUser(
                           workspaceMemberId: membership.id,
                       },
                       select: {
+                          role: true,
+                          envAccesses: {
+                              select: {
+                                  environment: true,
+                              },
+                          },
                           project: {
                               select: {
                                   id: true,
                                   name: true,
                                   updatedAt: true,
+                                  envFiles: {
+                                      select: {
+                                          environment: true,
+                                          updatedAt: true,
+                                          variables: {
+                                              orderBy: {
+                                                  updatedAt: "desc",
+                                              },
+                                              take: 1,
+                                              select: {
+                                                  updatedAt: true,
+                                              },
+                                          },
+                                      },
+                                  },
                               },
                           },
                       },
                   })
-              ).map((projectMember) => projectMember.project);
+              ).map((projectMember) => {
+                  const canViewAllEnvFiles =
+                      membership.role === "OWNER" ||
+                      membership.role === "ADMIN" ||
+                      projectMember.role === "OWNER" ||
+                      projectMember.role === "ADMIN";
+                  const accessibleEnvironments = new Set(
+                      projectMember.envAccesses.map(
+                          (envAccess) => envAccess.environment
+                      )
+                  );
+                  const envFiles = projectMember.project.envFiles
+                      .filter(
+                          (envFile) =>
+                              canViewAllEnvFiles ||
+                              accessibleEnvironments.has(envFile.environment)
+                      )
+                      .map((envFile) => ({
+                          updatedAt: envFile.updatedAt,
+                          variables: envFile.variables,
+                      }));
+
+                  return {
+                      id: projectMember.project.id,
+                      name: projectMember.project.name,
+                      updatedAt: projectMember.project.updatedAt,
+                      envFiles,
+                  };
+              });
+    const projects = sortProjectsByMostRecentUpdatedAt(uniqueProjects);
 
     return {
         id: membership.workspace.id,
@@ -110,12 +195,12 @@ export async function getWorkspaceDetailForUser(
         projectCount:
             membership.projectAccessScope === "ALL_PROJECTS"
                 ? membership.workspace._count.projects
-                : uniqueProjects.length,
+                : projects.length,
         memberCount: membership.workspace._count.members,
         historyCount: canViewHistory(membership.role)
             ? membership.workspace._count.history
             : 0,
-        projects: uniqueProjects,
+        projects,
     };
 }
 
