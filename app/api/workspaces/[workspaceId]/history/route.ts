@@ -20,7 +20,9 @@ export async function GET(request: Request, context: WorkspaceRouteContext) {
             );
         }
 
-        const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+        const searchParams = new URL(request.url).searchParams;
+        const query = searchParams.get("q")?.trim() ?? "";
+        const cursor = searchParams.get("cursor")?.trim() ?? "";
 
         if (query.length > 120) {
             return NextResponse.json(
@@ -29,10 +31,18 @@ export async function GET(request: Request, context: WorkspaceRouteContext) {
             );
         }
 
+        if (cursor.length > 100) {
+            return NextResponse.json(
+                { error: "History cursor is invalid." },
+                { status: 400 }
+            );
+        }
+
         const result = await listWorkspaceHistoryForUser({
             workspaceId,
             userId: session.user.id,
             query,
+            cursor: cursor || undefined,
         });
 
         if (result.status === "NOT_FOUND") {
@@ -49,6 +59,13 @@ export async function GET(request: Request, context: WorkspaceRouteContext) {
             );
         }
 
+        if (result.status === "INVALID_CURSOR") {
+            return NextResponse.json(
+                { error: "History cursor is invalid." },
+                { status: 400 }
+            );
+        }
+
         return NextResponse.json({
             history: result.entries.map((entry) => ({
                 id: entry.id,
@@ -56,6 +73,8 @@ export async function GET(request: Request, context: WorkspaceRouteContext) {
                 message: entry.message,
                 createdAt: entry.createdAt.toISOString(),
             })),
+            hasMore: result.hasMore,
+            nextCursor: result.nextCursor,
         });
     } catch (error) {
         console.error("Failed to load workspace history:", error);

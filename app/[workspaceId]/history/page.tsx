@@ -2,7 +2,7 @@
 
 import debounce from "lodash/debounce";
 import { History, Search, ShieldAlert } from "lucide-react";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import UnauthenticatedHome from "@/components/home/UnauthenticatedHome";
 import HistoryListSkeleton from "@/components/history/history-list-skeleton";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { createInMemoryCache } from "@/lib/cache";
 import { canViewHistory } from "@/lib/constants";
 import type {
     ApiErrorPayload,
+    WorkspaceHistoryCacheEntry,
     WorkspaceHistoryDetail,
     WorkspaceHistoryDetailResponse,
     WorkspaceHistoryEntry,
@@ -28,7 +29,7 @@ import type {
     WorkspaceHistoryResponse,
 } from "@/types/workspace";
 
-const historyCache = createInMemoryCache<WorkspaceHistoryEntry[]>(5 * 60 * 1000);
+const historyCache = createInMemoryCache<WorkspaceHistoryCacheEntry>(5 * 60 * 1000);
 
 function formatDate(value: string) {
     return new Date(value).toLocaleString();
@@ -144,12 +145,18 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
     const [searchInput, setSearchInput] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+    const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
+    const [hasMoreHistory, setHasMoreHistory] = useState(false);
+    const [nextHistoryCursor, setNextHistoryCursor] = useState<string | null>(null);
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState<string | null>(null);
     const [selectedHistoryDetail, setSelectedHistoryDetail] =
         useState<WorkspaceHistoryDetail | null>(null);
+    const historyScrollRootRef = useRef<HTMLDivElement | null>(null);
+    const historyLoadMoreRef = useRef<HTMLDivElement | null>(null);
+    const isLoadingMoreHistoryRef = useRef(false);
 
     const workspace =
         activeWorkspaceId === workspaceId &&
@@ -157,6 +164,11 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
             ? activeWorkspace
             : null;
     const hasHistoryAccess = workspace ? canViewHistory(workspace.role) : false;
+    const historyCacheKey = useMemo(
+        () => `${workspaceId}::${searchQuery}`,
+        [workspaceId, searchQuery]
+    );
+    const activeHistoryCacheKeyRef = useRef(historyCacheKey);
 
     const debounceSearch = useMemo(
         () =>
@@ -166,11 +178,36 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
         []
     );
 
+    const buildHistoryEndpoint = useCallback(
+        (cursor?: string | null) => {
+            const params = new URLSearchParams();
+
+            if (searchQuery.length > 0) {
+                params.set("q", searchQuery);
+            }
+
+            if (cursor) {
+                params.set("cursor", cursor);
+            }
+
+            const queryString = params.toString();
+
+            return queryString
+                ? `/api/workspaces/${workspaceId}/history?${queryString}`
+                : `/api/workspaces/${workspaceId}/history`;
+        },
+        [searchQuery, workspaceId]
+    );
+
     useEffect(() => {
         if (workspaceId !== activeWorkspaceId) {
             selectWorkspace(workspaceId);
         }
     }, [workspaceId, activeWorkspaceId, selectWorkspace]);
+
+    useEffect(() => {
+        activeHistoryCacheKeyRef.current = historyCacheKey;
+    }, [historyCacheKey]);
 
     useEffect(() => {
         debounceSearch(searchInput);
@@ -188,32 +225,27 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
         }
 
         const controller = new AbortController();
-        const params = new URLSearchParams();
-
-        if (searchQuery.length > 0) {
-            params.set("q", searchQuery);
-        }
-
-        const queryString = params.toString();
-        const cacheKey = `${workspaceId}::${queryString}`;
-        const endpoint = queryString
-            ? `/api/workspaces/${workspaceId}/history?${queryString}`
-            : `/api/workspaces/${workspaceId}/history`;
-
-        const cached = historyCache.get(cacheKey);
+        const cached = historyCache.get(historyCacheKey);
 
         if (cached) {
-            setHistory(cached);
+            setHistory(cached.history);
+            setHasMoreHistory(cached.hasMore);
+            setNextHistoryCursor(cached.nextCursor);
             setHistoryError(null);
             setIsHistoryLoading(false);
+            setIsLoadingMoreHistory(false);
+            isLoadingMoreHistoryRef.current = false;
             return;
         }
 
         const loadWorkspaceHistory = async () => {
             setIsHistoryLoading(true);
+            setIsLoadingMoreHistory(false);
+            setHistoryError(null);
+            isLoadingMoreHistoryRef.current = false;
 
             try {
-                const response = await fetch(endpoint, {
+                const response = await fetch(buildHistoryEndpoint(), {
                     signal: controller.signal,
                 });
                 const payload = (await response.json().catch(() => null)) as
@@ -230,7 +262,13 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
                 }
 
                 setHistory(payload.history);
-                historyCache.set(cacheKey, payload.history);
+                setHasMoreHistory(payload.hasMore);
+                setNextHistoryCursor(payload.nextCursor);
+                historyCache.set(historyCacheKey, {
+                    history: payload.history,
+                    hasMore: payload.hasMore,
+                    nextCursor: payload.nextCursor,
+                });
                 setHistoryError(null);
             } catch (historyLoadError) {
                 if (controller.signal.aborted) {
@@ -243,6 +281,8 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
                         : "Failed to load workspace history."
                 );
                 setHistory([]);
+                setHasMoreHistory(false);
+                setNextHistoryCursor(null);
             } finally {
                 if (!controller.signal.aborted) {
                     setIsHistoryLoading(false);
@@ -255,7 +295,136 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
         return () => {
             controller.abort();
         };
-    }, [workspace, workspaceId, hasHistoryAccess, searchQuery]);
+    }, [
+        buildHistoryEndpoint,
+        hasHistoryAccess,
+        historyCacheKey,
+        workspace,
+    ]);
+
+    const handleLoadMoreHistory = useCallback(async () => {
+        if (
+            !hasMoreHistory ||
+            !nextHistoryCursor ||
+            isHistoryLoading ||
+            isLoadingMoreHistoryRef.current
+        ) {
+            return;
+        }
+
+        const cursor = nextHistoryCursor;
+        const cacheKey = historyCacheKey;
+
+        isLoadingMoreHistoryRef.current = true;
+        setIsLoadingMoreHistory(true);
+        setHistoryError(null);
+
+        try {
+            const response = await fetch(buildHistoryEndpoint(cursor));
+            const payload = (await response.json().catch(() => null)) as
+                | WorkspaceHistoryResponse
+                | ApiErrorPayload
+                | null;
+
+            if (!response.ok) {
+                throw new Error(getErrorMessage(payload as ApiErrorPayload | null));
+            }
+
+            if (!payload || !("history" in payload)) {
+                throw new Error("Received an empty history response.");
+            }
+
+            if (activeHistoryCacheKeyRef.current !== cacheKey) {
+                return;
+            }
+
+            setHistory((currentHistory) => {
+                const seenEntryIds = new Set(
+                    currentHistory.map((entry) => entry.id)
+                );
+                const mergedHistory = [...currentHistory];
+
+                payload.history.forEach((entry) => {
+                    if (!seenEntryIds.has(entry.id)) {
+                        seenEntryIds.add(entry.id);
+                        mergedHistory.push(entry);
+                    }
+                });
+
+                historyCache.set(cacheKey, {
+                    history: mergedHistory,
+                    hasMore: payload.hasMore,
+                    nextCursor: payload.nextCursor,
+                });
+
+                return mergedHistory;
+            });
+            setHasMoreHistory(payload.hasMore);
+            setNextHistoryCursor(payload.nextCursor);
+            setHistoryError(null);
+        } catch (historyLoadError) {
+            if (activeHistoryCacheKeyRef.current !== cacheKey) {
+                return;
+            }
+
+            setHistoryError(
+                historyLoadError instanceof Error
+                    ? historyLoadError.message
+                    : "Failed to load more workspace history."
+            );
+            setHasMoreHistory(false);
+            setNextHistoryCursor(null);
+        } finally {
+            isLoadingMoreHistoryRef.current = false;
+
+            if (activeHistoryCacheKeyRef.current === cacheKey) {
+                setIsLoadingMoreHistory(false);
+            }
+        }
+    }, [
+        buildHistoryEndpoint,
+        hasMoreHistory,
+        historyCacheKey,
+        isHistoryLoading,
+        nextHistoryCursor,
+    ]);
+
+    useEffect(() => {
+        if (!hasMoreHistory || !nextHistoryCursor || isHistoryLoading) {
+            return;
+        }
+
+        const root = historyScrollRootRef.current;
+        const target = historyLoadMoreRef.current;
+
+        if (!root || !target) {
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    void handleLoadMoreHistory();
+                }
+            },
+            {
+                root,
+                rootMargin: "160px 0px",
+                threshold: 0,
+            }
+        );
+
+        observer.observe(target);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [
+        handleLoadMoreHistory,
+        hasMoreHistory,
+        isHistoryLoading,
+        nextHistoryCursor,
+    ]);
 
     const handleViewHistoryDetail = async (historyId: string) => {
         setIsDetailDialogOpen(true);
@@ -324,8 +493,8 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
     }
 
     return (
-        <div className="space-y-4">
-            <section className="border border-border bg-card">
+        <div className="flex h-[calc(100dvh-6rem)] min-h-0 flex-col gap-4 overflow-hidden">
+            <section className="shrink-0 border border-border bg-card">
                 <div className="border-b border-border px-4 py-3">
                     <h1 className="inline-flex items-center gap-2 text-xl font-semibold text-foreground">
                         <History className="size-4" />
@@ -352,55 +521,92 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
                 </div>
             </section>
 
-            <section className="border border-border bg-card px-4 py-4">
+            <section className="flex min-h-0 flex-1 flex-col border border-border bg-card">
                 {historyError ? (
-                    <p className="mb-3 border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
-                        {historyError}
-                    </p>
+                    <div className="shrink-0 px-4 pt-4">
+                        <p className="border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
+                            {historyError}
+                        </p>
+                    </div>
                 ) : null}
 
-                {isHistoryLoading ? (
-                    <HistoryListSkeleton />
-                ) : history.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        {searchQuery
-                            ? "No history entries matched your search."
-                            : "No history entries yet."}
-                    </p>
-                ) : (
-                    <div className="space-y-2">
-                        {history.map((entry) => (
-                            <article
-                                key={entry.id}
-                                className="border border-border bg-muted/30 px-3 py-2"
-                            >
-                                <p className="text-sm font-medium text-foreground">
-                                    {entry.message}
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-xs text-muted-foreground">
-                                        {entry.operation}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-xs text-muted-foreground">
-                                            {formatDate(entry.createdAt)}
+                <div
+                    ref={historyScrollRootRef}
+                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+                >
+                    {isHistoryLoading ? (
+                        <HistoryListSkeleton />
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            {searchQuery
+                                ? "No history entries matched your search."
+                                : "No history entries yet."}
+                        </p>
+                    ) : (
+                        <>
+                            <div className="space-y-2">
+                                {history.map((entry) => (
+                                    <article
+                                        key={entry.id}
+                                        className="border border-border bg-muted/30 px-3 py-2"
+                                    >
+                                        <p className="text-sm font-medium text-foreground">
+                                            {entry.message}
                                         </p>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="xs"
-                                            onClick={() => {
-                                                void handleViewHistoryDetail(entry.id);
-                                            }}
-                                        >
-                                            View details
-                                        </Button>
-                                    </div>
+                                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {entry.operation}
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    {formatDate(entry.createdAt)}
+                                                </p>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="xs"
+                                                    onClick={() => {
+                                                        void handleViewHistoryDetail(entry.id);
+                                                    }}
+                                                >
+                                                    View details
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+
+                            {hasMoreHistory ? (
+                                <div
+                                    ref={historyLoadMoreRef}
+                                    className="flex justify-center py-4"
+                                >
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isLoadingMoreHistory}
+                                        onClick={() => {
+                                            void handleLoadMoreHistory();
+                                        }}
+                                    >
+                                        {isLoadingMoreHistory
+                                            ? "Loading history..."
+                                            : "Load more"}
+                                    </Button>
                                 </div>
-                            </article>
-                        ))}
-                    </div>
-                )}
+                            ) : null}
+
+                            {isLoadingMoreHistory ? (
+                                <div className="space-y-2 pt-1">
+                                    <Skeleton className="h-14 w-full" />
+                                    <Skeleton className="h-14 w-full" />
+                                </div>
+                            ) : null}
+                        </>
+                    )}
+                </div>
             </section>
 
             <Dialog

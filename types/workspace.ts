@@ -53,6 +53,12 @@ export type WorkspaceHistoryDetail = WorkspaceHistoryEntry & {
     data: Prisma.JsonValue;
 };
 
+export type WorkspaceHistoryCacheEntry = {
+    history: WorkspaceHistoryEntry[];
+    hasMore: boolean;
+    nextCursor: string | null;
+};
+
 export type WorkspaceSummary = {
     id: string;
     name: string;
@@ -101,6 +107,8 @@ export type CreateProjectResponse = {
 
 export type WorkspaceHistoryResponse = {
     history: WorkspaceHistoryEntry[];
+    hasMore: boolean;
+    nextCursor: string | null;
 };
 
 export type WorkspaceHistoryDetailResponse = {
@@ -193,6 +201,7 @@ export type ListWorkspaceHistoryForUserInput = {
     workspaceId: string;
     userId: string;
     query?: string;
+    cursor?: string;
 };
 
 export type GetWorkspaceHistoryEntryForUserInput = {
@@ -209,8 +218,13 @@ export type ListWorkspaceHistoryForUserResult =
         status: "FORBIDDEN";
     }
     | {
+        status: "INVALID_CURSOR";
+    }
+    | {
         status: "OK";
         entries: WorkspaceHistoryEntryRecord[];
+        hasMore: boolean;
+        nextCursor: string | null;
     };
 
 export type WorkspaceHistoryEntryRecord = {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { canViewHistory } from "@/lib/constants";
+import type { Prisma } from "@/prisma/generated/client";
 import type {
     CreateWorkspaceHistoryEntryInput,
     GetWorkspaceHistoryEntryForUserInput,
@@ -7,7 +8,7 @@ import type {
     ListWorkspaceHistoryForUserResult,
 } from "@/types/workspace";
 
-const HISTORY_LIMIT = 100;
+const HISTORY_PAGE_SIZE = 20;
 
 export async function createWorkspaceHistoryEntry(
     input: CreateWorkspaceHistoryEntryInput
@@ -48,44 +49,81 @@ export async function listWorkspaceHistoryForUser(
     }
 
     const query = input.query?.trim();
+    const cursor = input.cursor?.trim();
+    const historyWhere: Prisma.WorkspaceHistoryWhereInput = {
+        workspaceId: input.workspaceId,
+        ...(query
+            ? {
+                  OR: [
+                      {
+                          message: {
+                              contains: query,
+                              mode: "insensitive",
+                          },
+                      },
+                      {
+                          operation: {
+                              contains: query,
+                              mode: "insensitive",
+                          },
+                      },
+                  ],
+              }
+            : {}),
+    };
+
+    if (cursor) {
+        const cursorEntry = await prisma.workspaceHistory.findFirst({
+            where: {
+                ...historyWhere,
+                id: cursor,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (!cursorEntry) {
+            return {
+                status: "INVALID_CURSOR",
+            };
+        }
+    }
 
     const entries = await prisma.workspaceHistory.findMany({
-        where: {
-            workspaceId: input.workspaceId,
-            ...(query
-                ? {
-                      OR: [
-                          {
-                              message: {
-                                  contains: query,
-                                  mode: "insensitive",
-                              },
-                          },
-                          {
-                              operation: {
-                                  contains: query,
-                                  mode: "insensitive",
-                              },
-                          },
-                      ],
-                  }
-                : {}),
-        },
+        where: historyWhere,
         select: {
             id: true,
             operation: true,
             message: true,
             createdAt: true,
         },
-        orderBy: {
-            createdAt: "desc",
-        },
-        take: HISTORY_LIMIT,
+        orderBy: [
+            {
+                createdAt: "desc",
+            },
+            {
+                id: "desc",
+            },
+        ],
+        ...(cursor
+            ? {
+                  cursor: {
+                      id: cursor,
+                  },
+                  skip: 1,
+              }
+            : {}),
+        take: HISTORY_PAGE_SIZE + 1,
     });
+    const pageEntries = entries.slice(0, HISTORY_PAGE_SIZE);
+    const hasMore = entries.length > HISTORY_PAGE_SIZE;
 
     return {
         status: "OK",
-        entries,
+        entries: pageEntries,
+        hasMore,
+        nextCursor: hasMore ? pageEntries.at(-1)?.id ?? null : null,
     };
 }
 
