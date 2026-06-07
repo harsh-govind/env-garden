@@ -493,7 +493,7 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
     }
 
     return (
-        <div className="flex h-[calc(100dvh-6rem)] min-h-0 flex-col gap-4 overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
             <section className="shrink-0 border border-border bg-card">
                 <div className="border-b border-border px-4 py-3">
                     <h1 className="inline-flex items-center gap-2 text-xl font-semibold text-foreground">
@@ -620,7 +620,7 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
                     }
                 }}
             >
-                <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+                <DialogContent className="max-h-dvh overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>History details</DialogTitle>
                         <DialogDescription>

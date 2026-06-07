@@ -213,7 +213,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
 
     if (showFullPageLoading) {
         return (
-            <div className="grid min-h-screen place-items-center bg-background text-foreground">
+            <div className="grid h-dvh place-items-center overflow-hidden bg-background text-foreground">
                 <div className="flex flex-col items-center gap-3">
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
                     <p className="text-sm text-muted-foreground">Loading workspace...</p>
@@ -223,8 +223,8 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <div className="flex min-h-screen">
+        <div className="h-dvh overflow-hidden bg-background text-foreground">
+            <div className="flex h-full min-h-0">
                 <DashboardSidebar
                     activeWorkspaceId={activeWorkspaceId}
                     projectCount={activeWorkspace?.projectCount ?? 0}
@@ -235,7 +235,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                     onClose={() => setIsSidebarOpen(false)}
                 />
 
-                <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                     <DashboardTopNav
                         workspaces={workspaces}
                         activeWorkspaceId={activeWorkspaceId}
@@ -248,7 +248,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                         onOpenSidebar={() => setIsSidebarOpen((prev) => !prev)}
                     />
 
-                    <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+                    <main className="min-h-0 flex-1 overflow-hidden px-4 py-6 sm:px-8">
                         {children}
                     </main>
 
@@ -256,7 +256,7 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                         open={isCreateDialogOpen}
                         onOpenChange={handleCreateDialogOpenChange}
                     >
-                        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-md">
+                        <DialogContent className="max-h-dvh overflow-y-auto sm:max-w-md">
                             {createTarget === "workspace" ? (
                                 <>
                                     <DialogHeader>

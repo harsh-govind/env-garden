@@ -163,123 +163,125 @@ export default function ProfilePage() {
     };
 
     return (
-        <section className="mx-auto max-w-2xl border border-border bg-card">
-            <div className="border-b border-border px-4 py-3">
-                <h1 className="text-2xl font-semibold text-foreground">Profile</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Account information for your current session.
-                </p>
-            </div>
+        <div className="h-full overflow-y-auto">
+            <section className="mx-auto max-w-2xl border border-border bg-card">
+                <div className="border-b border-border px-4 py-3">
+                    <h1 className="text-2xl font-semibold text-foreground">Profile</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Account information for your current session.
+                    </p>
+                </div>
 
-            <div className="space-y-3 px-4 py-4">
-                <div className="border border-border bg-muted/30 px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                        <div>
-                            <p className="text-xs tracking-wide text-muted-foreground uppercase">Avatar</p>
-                            <p className="mt-1 text-sm text-foreground">{getAvatarLabel(avatar)}</p>
+                <div className="space-y-3 px-4 py-4">
+                    <div className="border border-border bg-muted/30 px-3 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-xs tracking-wide text-muted-foreground uppercase">Avatar</p>
+                                <p className="mt-1 text-sm text-foreground">{getAvatarLabel(avatar)}</p>
+                            </div>
+
+                            <AvatarPresetBadge presetId={avatar} size="md" />
                         </div>
 
-                        <AvatarPresetBadge presetId={avatar} size="md" />
+                        {isEditingProfile ? (
+                            <div className="mt-3">
+                                <AvatarPresetPicker
+                                    value={draftAvatar}
+                                    onChange={(nextAvatar) => {
+                                        setDraftAvatar(nextAvatar);
+                                    }}
+                                />
+                            </div>
+                        ) : (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                Switch to edit mode to change your avatar preset.
+                            </p>
+                        )}
                     </div>
 
-                    {isEditingProfile ? (
-                        <div className="mt-3">
-                            <AvatarPresetPicker
-                                value={draftAvatar}
-                                onChange={(nextAvatar) => {
-                                    setDraftAvatar(nextAvatar);
+                    <div className="border border-border bg-muted/30 px-3 py-2">
+                        <p className="inline-flex items-center gap-2 text-xs tracking-wide text-muted-foreground uppercase">
+                            <UserRound className="size-3.5" />
+                            Name
+                        </p>
+
+                        {isEditingProfile ? (
+                            <input
+                                value={draftName}
+                                onChange={(event) => {
+                                    setDraftName(event.target.value);
                                 }}
+                                className="mt-2 w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                                placeholder="Your name"
                             />
-                        </div>
-                    ) : (
-                        <p className="mt-3 text-xs text-muted-foreground">
-                            Switch to edit mode to change your avatar preset.
+                        ) : (
+                            <p className="mt-1 text-sm text-foreground">
+                                {profileName || "Not available"}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="border border-border bg-muted/30 px-3 py-2">
+                        <p className="inline-flex items-center gap-2 text-xs tracking-wide text-muted-foreground uppercase">
+                            <Mail className="size-3.5" />
+                            Email
                         </p>
-                    )}
-                </div>
-
-                <div className="border border-border bg-muted/30 px-3 py-2">
-                    <p className="inline-flex items-center gap-2 text-xs tracking-wide text-muted-foreground uppercase">
-                        <UserRound className="size-3.5" />
-                        Name
-                    </p>
-
-                    {isEditingProfile ? (
-                        <input
-                            value={draftName}
-                            onChange={(event) => {
-                                setDraftName(event.target.value);
-                            }}
-                            className="mt-2 w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-                            placeholder="Your name"
-                        />
-                    ) : (
                         <p className="mt-1 text-sm text-foreground">
-                            {profileName || "Not available"}
+                            {profileEmail || "Not available"}
                         </p>
-                    )}
-                </div>
+                    </div>
 
-                <div className="border border-border bg-muted/30 px-3 py-2">
-                    <p className="inline-flex items-center gap-2 text-xs tracking-wide text-muted-foreground uppercase">
-                        <Mail className="size-3.5" />
-                        Email
-                    </p>
-                    <p className="mt-1 text-sm text-foreground">
-                        {profileEmail || "Not available"}
-                    </p>
-                </div>
+                    {profileError ? (
+                        <p className="text-sm text-red-300">{profileError}</p>
+                    ) : null}
 
-                {profileError ? (
-                    <p className="text-sm text-red-300">{profileError}</p>
-                ) : null}
+                    {profileNotice ? (
+                        <p className="text-xs text-emerald-400">{profileNotice}</p>
+                    ) : null}
 
-                {profileNotice ? (
-                    <p className="text-xs text-emerald-400">{profileNotice}</p>
-                ) : null}
-
-                <div className="flex flex-wrap items-center gap-2">
-                    {isEditingProfile ? (
-                        <>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {isEditingProfile ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={cancelEditingProfile}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        void saveProfile();
+                                    }}
+                                    disabled={isSavingProfile}
+                                >
+                                    {isSavingProfile ? "Saving..." : "Save profile"}
+                                </Button>
+                            </>
+                        ) : (
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={cancelEditingProfile}
+                                onClick={beginEditingProfile}
                             >
-                                Cancel
+                                Edit profile
                             </Button>
-                            <Button
-                                type="button"
-                                onClick={() => {
-                                    void saveProfile();
-                                }}
-                                disabled={isSavingProfile}
-                            >
-                                {isSavingProfile ? "Saving..." : "Save profile"}
-                            </Button>
-                        </>
-                    ) : (
+                        )}
+
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={beginEditingProfile}
+                            className="border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
+                            onClick={() => {
+                                void signOut({ callbackUrl: "/" });
+                            }}
                         >
-                            Edit profile
+                            Logout
                         </Button>
-                    )}
-
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
-                        onClick={() => {
-                            void signOut({ callbackUrl: "/" });
-                        }}
-                    >
-                        Logout
-                    </Button>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        </div>
     );
 }

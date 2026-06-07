@@ -93,7 +93,8 @@ export default function AuthenticatedHome() {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="h-full overflow-y-auto">
+            <div className="space-y-8">
             <section className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
@@ -248,6 +249,7 @@ export default function AuthenticatedHome() {
 
                 </>
             ) : null}
+            </div>
         </div>
     );
 }

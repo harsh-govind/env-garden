@@ -79,7 +79,7 @@ export default function DashboardTopNav({
             : DEFAULT_AVATAR_PRESET_ID;
 
     return (
-        <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-sm">
+        <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/95 backdrop-blur-sm">
             <div className="flex h-12 items-center gap-2 px-3 sm:px-6">
                 <Button
                     type="button"

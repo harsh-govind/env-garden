@@ -959,8 +959,8 @@ export default function ProjectDetailPage() {
     }
 
     return (
-        <div className="space-y-6">
-            <section className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
+            <section className="shrink-0 flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="mb-3">
                         <Button asChild variant="outline" size="sm">
@@ -997,8 +997,8 @@ export default function ProjectDetailPage() {
                 </Button>
             </section>
 
-            <div className="grid items-start gap-4 lg:grid-cols-[20rem_1fr]">
-                <section className="space-y-4">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(10rem,16rem)_minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[20rem_minmax(0,1fr)] lg:grid-rows-none">
+                <section className="min-h-0 space-y-4 overflow-y-auto pr-1">
                     <div className="border border-border bg-card">
                         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                             <h2 className="text-base font-semibold text-foreground">
@@ -1158,10 +1158,10 @@ export default function ProjectDetailPage() {
                     ) : null}
                 </section>
 
-                <section className="min-w-0 border border-border bg-card">
+                <section className="flex min-h-0 min-w-0 flex-col border border-border bg-card">
                     {activeEnvFile ? (
                         <>
-                            <div className="border-b border-border px-4 py-3">
+                            <div className="shrink-0 border-b border-border px-4 py-3">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <h2 className="truncate text-xl font-semibold text-foreground">
@@ -1187,8 +1187,8 @@ export default function ProjectDetailPage() {
                                 ) : null}
                             </div>
 
-                            <div className="space-y-4 p-4">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+                                <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Button
                                             type="button"
@@ -1309,14 +1309,14 @@ export default function ProjectDetailPage() {
                                 </div>
 
                                 {variableError ? (
-                                    <p className="border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
+                                    <p className="shrink-0 border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
                                         {variableError}
                                     </p>
                                 ) : null}
 
-                                <div className="overflow-x-auto border border-border">
+                                <div className="min-h-0 flex-1 overflow-auto border border-border">
                                     <div className="min-w-[48rem] divide-y divide-border">
-                                        <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 bg-muted/40 px-3 py-2 text-xs tracking-wide text-muted-foreground uppercase">
+                                        <div className="sticky top-0 z-10 grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 bg-muted px-3 py-2 text-xs tracking-wide text-muted-foreground uppercase">
                                             <span />
                                             <span>Key</span>
                                             <span>Value</span>
