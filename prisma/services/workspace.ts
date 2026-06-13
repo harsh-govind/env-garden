@@ -93,8 +93,13 @@ export async function getWorkspaceDetailForUser(
         return null;
     }
 
+    const effectiveProjectAccessScope =
+        membership.role === "OWNER" || membership.role === "ADMIN"
+            ? "ALL_PROJECTS"
+            : membership.projectAccessScope;
+
     const uniqueProjects =
-        membership.projectAccessScope === "ALL_PROJECTS"
+        effectiveProjectAccessScope === "ALL_PROJECTS"
             ? await prisma.project.findMany({
                   where: {
                       workspaceId,
@@ -191,9 +196,9 @@ export async function getWorkspaceDetailForUser(
         id: membership.workspace.id,
         name: membership.workspace.name,
         role: membership.role,
-        projectAccessScope: membership.projectAccessScope,
+        projectAccessScope: effectiveProjectAccessScope,
         projectCount:
-            membership.projectAccessScope === "ALL_PROJECTS"
+            effectiveProjectAccessScope === "ALL_PROJECTS"
                 ? membership.workspace._count.projects
                 : projects.length,
         memberCount: membership.workspace._count.members,

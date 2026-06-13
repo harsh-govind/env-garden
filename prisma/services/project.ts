@@ -99,6 +99,11 @@ async function getProjectAccessContext(
         return null;
     }
 
+    const effectiveProjectAccessScope =
+        workspaceMember.role === "OWNER" || workspaceMember.role === "ADMIN"
+            ? "ALL_PROJECTS"
+            : workspaceMember.projectAccessScope;
+
     const project = await tx.project.findFirst({
         where: {
             id: input.projectId,
@@ -132,7 +137,7 @@ async function getProjectAccessContext(
     });
 
     if (
-        workspaceMember.projectAccessScope !== "ALL_PROJECTS" &&
+        effectiveProjectAccessScope !== "ALL_PROJECTS" &&
         !projectMember
     ) {
         return null;
@@ -147,7 +152,10 @@ async function getProjectAccessContext(
                 envAccesses: projectMember.envAccesses,
             }
             : null,
-        workspaceMember,
+        workspaceMember: {
+            ...workspaceMember,
+            projectAccessScope: effectiveProjectAccessScope,
+        },
     };
 }
 
