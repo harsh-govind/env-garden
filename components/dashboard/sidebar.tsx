@@ -79,7 +79,6 @@ export default function DashboardSidebar({
 }: DashboardSidebarProps) {
     const pathname = usePathname();
     const isHistoryRoute = matchesRoutePath(pathname, "/:workspaceId/history");
-    const isMembersRoute = matchesRoutePath(pathname, "/:workspaceId/members");
     const canOpenHistory =
         workspaceRole !== null
             ? canViewHistory(workspaceRole)
@@ -92,15 +91,13 @@ export default function DashboardSidebar({
             icon: FolderKanban,
             href: "/",
             count: projectCount,
-            active: !isHistoryRoute && !isMembersRoute,
+            active: !isHistoryRoute,
         },
         {
             id: "members",
             label: "Members",
             icon: Users,
-            href: activeWorkspaceId ? `/${activeWorkspaceId}/members` : undefined,
             count: memberCount,
-            active: isMembersRoute,
         },
     ];
 

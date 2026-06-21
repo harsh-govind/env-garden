@@ -162,10 +162,6 @@ export const protectedRoutes: ProtectedRoute[] = [
         redirectTo: "/",
     },
     {
-        path: "/:workspaceId/members",
-        redirectTo: "/",
-    },
-    {
         path: "/:workspaceId/projects/:projectId",
         redirectTo: "/",
     },
@@ -206,5 +202,3 @@ export function getMatchingProtectedRoute(pathname: string) {
 export function canViewHistory(role: WorkspaceRoleValue) {
     return role === "OWNER" || role === "ADMIN";
 }
-
-export const ASSIGNABLE_WORKSPACE_ROLES: WorkspaceRoleValue[] = ["ADMIN", "MEMBER"];
