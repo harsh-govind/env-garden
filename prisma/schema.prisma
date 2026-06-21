@@ -18,6 +18,11 @@ enum ProjectAccessScope {
   SELECTED_PROJECTS
 }
 
+enum EnvironmentAccessScope {
+  ALL_ENVIRONMENTS
+  SELECTED_ENVIRONMENTS
+}
+
 enum ProjectRole {
   OWNER
   ADMIN
@@ -25,20 +30,29 @@ enum ProjectRole {
   VIEWER
 }
 
+enum WorkspaceInviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
 model User {
-  id                   String            @id @default(cuid())
-  email                String            @unique
-  name                 String?
-  avatar               String            @default("sprout")
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  createdWorkspaces    Workspace[]       @relation("WorkspaceCreator")
-  createdProjects      Project[]         @relation("ProjectCreator")
-  createdEnvFiles      EnvFile[]         @relation("EnvFileCreator")
-  workspaceMemberships WorkspaceMember[] @relation("WorkspaceMemberUser")
-  workspaceMembers     WorkspaceMember[] @relation("WorkspaceMemberAdder")
-  projectMembers       ProjectMember[]   @relation("ProjectMemberAdder")
-  envAccesses          ProjectEnvAccess[] @relation("ProjectEnvAccessGrantor")
+  id                       String             @id @default(cuid())
+  email                    String             @unique
+  name                     String?
+  avatar                   String             @default("sprout")
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  createdWorkspaces        Workspace[]        @relation("WorkspaceCreator")
+  createdProjects          Project[]          @relation("ProjectCreator")
+  createdEnvFiles          EnvFile[]          @relation("EnvFileCreator")
+  workspaceMemberships     WorkspaceMember[]  @relation("WorkspaceMemberUser")
+  workspaceMembers         WorkspaceMember[]  @relation("WorkspaceMemberAdder")
+  projectMembers           ProjectMember[]    @relation("ProjectMemberAdder")
+  envAccesses              ProjectEnvAccess[] @relation("ProjectEnvAccessGrantor")
+  workspaceInvitesSent     WorkspaceInvite[]  @relation("WorkspaceInviteSender")
+  workspaceInvitesAccepted WorkspaceInvite[]  @relation("WorkspaceInviteAccepter")
+  workspaceInvitesRevoked  WorkspaceInvite[]  @relation("WorkspaceInviteRevoker")
 }
 
 model Workspace {
@@ -51,25 +65,27 @@ model Workspace {
   createdBy   User               @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
   projects    Project[]
   members     WorkspaceMember[]
+  invites     WorkspaceInvite[]
   history     WorkspaceHistory[]
 
   @@index([createdById])
 }
 
 model Project {
-  id          String          @id @default(cuid())
-  workspaceId String
-  name        String
-  description String?
-  createdById String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy   User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  members     ProjectMember[]
-  envFiles    EnvFile[]
-  envAccesses ProjectEnvAccess[]
-  encryptionKey ProjectEncryptionKey?
+  id             String                   @id @default(cuid())
+  workspaceId    String
+  name           String
+  description    String?
+  createdById    String
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  workspace      Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy      User                     @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members        ProjectMember[]
+  envFiles       EnvFile[]
+  envAccesses    ProjectEnvAccess[]
+  inviteAccesses WorkspaceInviteProject[]
+  encryptionKey  ProjectEncryptionKey?
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -89,18 +105,20 @@ model ProjectEncryptionKey {
 }
 
 model WorkspaceMember {
-  id                 String             @id @default(cuid())
-  workspaceId        String
-  userId             String
-  role               WorkspaceRole      @default(MEMBER)
-  projectAccessScope ProjectAccessScope @default(SELECTED_PROJECTS)
-  addedById          String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user               User               @relation("WorkspaceMemberUser", fields: [userId], references: [id], onDelete: Cascade)
-  addedBy            User?              @relation("WorkspaceMemberAdder", fields: [addedById], references: [id], onDelete: SetNull)
-  projectMembers     ProjectMember[]
+  id                            String                 @id @default(cuid())
+  workspaceId                   String
+  userId                        String
+  role                          WorkspaceRole          @default(MEMBER)
+  projectAccessScope            ProjectAccessScope     @default(SELECTED_PROJECTS)
+  defaultProjectRole            ProjectRole            @default(VIEWER)
+  defaultEnvironmentAccessScope EnvironmentAccessScope @default(ALL_ENVIRONMENTS)
+  addedById                     String?
+  createdAt                     DateTime               @default(now())
+  updatedAt                     DateTime               @updatedAt
+  workspace                     Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user                          User                   @relation("WorkspaceMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy                       User?                  @relation("WorkspaceMemberAdder", fields: [addedById], references: [id], onDelete: SetNull)
+  projectMembers                ProjectMember[]
 
   @@unique([workspaceId, userId])
   @@unique([id, workspaceId])
@@ -110,18 +128,19 @@ model WorkspaceMember {
 }
 
 model ProjectMember {
-  id                String          @id @default(cuid())
-  workspaceId       String
-  projectId         String
-  workspaceMemberId String
-  role              ProjectRole     @default(CONTRIBUTOR)
-  addedById         String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  project           Project         @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  workspaceMember   WorkspaceMember @relation(fields: [workspaceMemberId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  addedBy           User?           @relation("ProjectMemberAdder", fields: [addedById], references: [id], onDelete: SetNull)
-  envAccesses       ProjectEnvAccess[]
+  id                     String                 @id @default(cuid())
+  workspaceId            String
+  projectId              String
+  workspaceMemberId      String
+  role                   ProjectRole            @default(CONTRIBUTOR)
+  environmentAccessScope EnvironmentAccessScope @default(SELECTED_ENVIRONMENTS)
+  addedById              String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  project                Project                @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  workspaceMember        WorkspaceMember        @relation(fields: [workspaceMemberId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  addedBy                User?                  @relation("ProjectMemberAdder", fields: [addedById], references: [id], onDelete: SetNull)
+  envAccesses            ProjectEnvAccess[]
 
   @@unique([projectId, workspaceMemberId])
   @@unique([id, projectId])
@@ -131,18 +150,83 @@ model ProjectMember {
   @@index([addedById])
 }
 
+model WorkspaceInvite {
+  id                            String                   @id @default(cuid())
+  workspaceId                   String
+  email                         String
+  role                          WorkspaceRole            @default(MEMBER)
+  projectAccessScope            ProjectAccessScope       @default(SELECTED_PROJECTS)
+  defaultProjectRole            ProjectRole              @default(VIEWER)
+  defaultEnvironmentAccessScope EnvironmentAccessScope   @default(ALL_ENVIRONMENTS)
+  status                        WorkspaceInviteStatus    @default(PENDING)
+  tokenHash                     String                   @unique
+  invitedById                   String?
+  acceptedById                  String?
+  revokedById                   String?
+  emailSentAt                   DateTime?
+  expiresAt                     DateTime
+  acceptedAt                    DateTime?
+  revokedAt                     DateTime?
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @updatedAt
+  workspace                     Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy                     User?                    @relation("WorkspaceInviteSender", fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedBy                    User?                    @relation("WorkspaceInviteAccepter", fields: [acceptedById], references: [id], onDelete: SetNull)
+  revokedBy                     User?                    @relation("WorkspaceInviteRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+  projectAccesses               WorkspaceInviteProject[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+  @@index([workspaceId, email])
+  @@index([workspaceId, status])
+  @@index([invitedById])
+  @@index([acceptedById])
+  @@index([revokedById])
+}
+
+model WorkspaceInviteProject {
+  id                     String                       @id @default(cuid())
+  workspaceInviteId      String
+  workspaceId            String
+  projectId              String
+  role                   ProjectRole                  @default(VIEWER)
+  environmentAccessScope EnvironmentAccessScope       @default(SELECTED_ENVIRONMENTS)
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+  workspaceInvite        WorkspaceInvite              @relation(fields: [workspaceInviteId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  project                Project                      @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  environments           WorkspaceInviteEnvironment[]
+
+  @@unique([workspaceInviteId, projectId])
+  @@index([workspaceInviteId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([projectId, workspaceId])
+}
+
+model WorkspaceInviteEnvironment {
+  id                       String                 @id @default(cuid())
+  workspaceInviteProjectId String
+  environment              String
+  createdAt                DateTime               @default(now())
+  workspaceInviteProject   WorkspaceInviteProject @relation(fields: [workspaceInviteProjectId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceInviteProjectId, environment])
+  @@index([workspaceInviteProjectId])
+}
+
 model EnvFile {
-  id          String            @id @default(cuid())
+  id          String        @id @default(cuid())
   workspaceId String
   projectId   String
   name        String
   environment String
   description String?
   createdById String
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  project     Project           @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  createdBy   User              @relation("EnvFileCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  project     Project       @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  createdBy   User          @relation("EnvFileCreator", fields: [createdById], references: [id], onDelete: Restrict)
   variables   EnvVariable[]
 
   @@unique([projectId, name])
@@ -169,17 +253,17 @@ model EnvVariable {
 }
 
 model ProjectEnvAccess {
-  id              String          @id @default(cuid())
+  id              String        @id @default(cuid())
   workspaceId     String
   projectId       String
   projectMemberId String
   environment     String
   grantedById     String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  project         Project         @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  projectMember   ProjectMember   @relation(fields: [projectMemberId, projectId], references: [id, projectId], onDelete: Cascade)
-  grantedBy       User?           @relation("ProjectEnvAccessGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  project         Project       @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  projectMember   ProjectMember @relation(fields: [projectMemberId, projectId], references: [id, projectId], onDelete: Cascade)
+  grantedBy       User?         @relation("ProjectEnvAccessGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
 
   @@unique([projectMemberId, environment])
   @@index([workspaceId])
