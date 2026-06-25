@@ -110,6 +110,24 @@ function isUniqueConstraintError(error: unknown) {
     );
 }
 
+function isMissingRelatedRecordError(error: unknown) {
+    return (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+    );
+}
+
+function isForeignKeyConstraintError(error: unknown) {
+    return (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2003"
+    );
+}
+
+function isPrismaValidationError(error: unknown) {
+    return error instanceof Prisma.PrismaClientValidationError;
+}
+
 async function getActor(
     tx: Prisma.TransactionClient,
     input: {
@@ -225,6 +243,11 @@ async function validateProjectAccess(
         },
         select: {
             id: true,
+            envFiles: {
+                select: {
+                    environment: true,
+                },
+            },
         },
     });
 
@@ -234,8 +257,20 @@ async function validateProjectAccess(
         };
     }
 
+    const projectEnvironmentMap = new Map(
+        projects.map((project) => [
+            project.id,
+            new Set(
+                project.envFiles
+                    .map((envFile) => envFile.environment)
+                    .filter(isEnvironmentTypeValue)
+            ),
+        ])
+    );
+
     const normalizedProjects = access.projects.map((project) => {
         const environments = [...new Set(project.environments)];
+        const projectEnvironments = projectEnvironmentMap.get(project.projectId);
 
         if (
             project.environmentAccessScope === "SELECTED_ENVIRONMENTS" &&
@@ -246,7 +281,14 @@ async function validateProjectAccess(
 
         if (
             project.environmentAccessScope === "SELECTED_ENVIRONMENTS" &&
-            environments.some((environment) => !isEnvironmentTypeValue(environment))
+            (
+                !projectEnvironments ||
+                environments.some(
+                    (environment) =>
+                        !isEnvironmentTypeValue(environment) ||
+                        !projectEnvironments.has(environment)
+                )
+            )
         ) {
             return null;
         }
@@ -282,22 +324,45 @@ async function createProjectMembers(
     }
 ) {
     for (const project of input.projects) {
+        const projectWhere = {
+            id_workspaceId: {
+                id: project.projectId,
+                workspaceId: input.workspaceId,
+            },
+        };
+        const addedBy = input.addedById
+            ? {
+                connect: {
+                    id: input.addedById,
+                },
+            }
+            : undefined;
+
         await tx.projectMember.create({
             data: {
-                workspaceId: input.workspaceId,
-                projectId: project.projectId,
-                workspaceMemberId: input.workspaceMemberId,
                 role: project.role,
                 environmentAccessScope: project.environmentAccessScope,
-                addedById: input.addedById,
+                project: {
+                    connect: projectWhere,
+                },
+                workspaceMember: {
+                    connect: {
+                        id_workspaceId: {
+                            id: input.workspaceMemberId,
+                            workspaceId: input.workspaceId,
+                        },
+                    },
+                },
+                addedBy,
                 envAccesses: {
                     create:
                         project.environmentAccessScope === "SELECTED_ENVIRONMENTS"
                             ? project.environments.map((environment) => ({
-                                workspaceId: input.workspaceId,
-                                projectId: project.projectId,
                                 environment,
-                                grantedById: input.addedById,
+                                project: {
+                                    connect: projectWhere,
+                                },
+                                grantedBy: addedBy,
                             }))
                             : [],
                 },
@@ -663,21 +728,35 @@ export async function inviteWorkspaceMember(input: {
 
             const invite = await tx.workspaceInvite.create({
                 data: {
-                    workspaceId: input.workspaceId,
                     email,
                     role: access.role,
                     projectAccessScope: access.projectAccessScope,
                     defaultProjectRole: access.defaultProjectRole,
                     defaultEnvironmentAccessScope: access.defaultEnvironmentAccessScope,
                     tokenHash,
-                    invitedById: input.actorUserId,
+                    workspace: {
+                        connect: {
+                            id: input.workspaceId,
+                        },
+                    },
+                    invitedBy: {
+                        connect: {
+                            id: input.actorUserId,
+                        },
+                    },
                     expiresAt: getInviteExpiryDate(),
                     projectAccesses: {
                         create: projectAccess.projects.map((project) => ({
-                            workspaceId: input.workspaceId,
-                            projectId: project.projectId,
                             role: project.role,
                             environmentAccessScope: project.environmentAccessScope,
+                            project: {
+                                connect: {
+                                    id_workspaceId: {
+                                        id: project.projectId,
+                                        workspaceId: input.workspaceId,
+                                    },
+                                },
+                            },
                             environments: {
                                 create:
                                     project.environmentAccessScope === "SELECTED_ENVIRONMENTS"
@@ -790,6 +869,16 @@ export async function inviteWorkspaceMember(input: {
         if (isUniqueConstraintError(error)) {
             return {
                 status: "INVITE_EXISTS",
+            };
+        }
+
+        if (
+            isMissingRelatedRecordError(error) ||
+            isForeignKeyConstraintError(error) ||
+            isPrismaValidationError(error)
+        ) {
+            return {
+                status: "INVALID_ACCESS",
             };
         }
 

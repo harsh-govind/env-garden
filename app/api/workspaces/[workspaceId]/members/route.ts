@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sendWorkspaceInviteEmail } from "@/lib/email";
+import type { InviteEmailInput } from "@/lib/email";
 import {
     parseInviteEmail,
     parseMemberAccessBody,
@@ -15,6 +16,7 @@ import {
     markWorkspaceInviteEmailSent,
 } from "@/prisma/services/member";
 import type {
+    InviteEmailStatus,
     InviteWorkspaceMemberBody,
     InviteWorkspaceMemberResponse,
 } from "@/types/member";
@@ -27,6 +29,38 @@ function buildInviteUrl(request: Request, token: string) {
         new URL(request.url).origin;
 
     return new URL(`/invites/${token}`, appUrl).toString();
+}
+
+async function sendWorkspaceInviteEmailSafely(
+    input: InviteEmailInput
+): Promise<InviteEmailStatus> {
+    try {
+        const emailResult = await sendWorkspaceInviteEmail(input);
+
+        if (emailResult.status === "FAILED") {
+            console.error("Failed to send workspace invite email:", emailResult.error);
+        }
+
+        return emailResult.status;
+    } catch (emailError) {
+        console.error("Failed to send workspace invite email:", emailError);
+        return "FAILED";
+    }
+}
+
+async function markWorkspaceInviteEmailSentSafely(inviteId: string) {
+    const emailSentAt = new Date();
+
+    try {
+        await markWorkspaceInviteEmailSent(inviteId);
+    } catch (markEmailSentError) {
+        console.error(
+            "Failed to mark workspace invite email as sent:",
+            markEmailSentError
+        );
+    }
+
+    return emailSentAt;
 }
 
 export async function GET(_: Request, context: WorkspaceRouteContext) {
@@ -150,23 +184,22 @@ export async function POST(request: Request, context: WorkspaceRouteContext) {
             );
         }
 
-        const emailResult = await sendWorkspaceInviteEmail({
+        const emailStatus = await sendWorkspaceInviteEmailSafely({
             to: result.invite.email,
             workspaceName: result.workspaceName,
             invitedByEmail: result.actorEmail,
             inviteUrl: buildInviteUrl(request, result.token),
         });
 
-        if (emailResult.status === "SENT") {
-            await markWorkspaceInviteEmailSent(result.invite.id);
-            result.invite.emailSentAt = new Date();
-        } else if (emailResult.status === "FAILED") {
-            console.error("Failed to send workspace invite email:", emailResult.error);
+        if (emailStatus === "SENT") {
+            result.invite.emailSentAt = await markWorkspaceInviteEmailSentSafely(
+                result.invite.id
+            );
         }
 
         const payload: InviteWorkspaceMemberResponse = {
             invite: serializeWorkspaceInvite(result.invite),
-            emailStatus: emailResult.status,
+            emailStatus,
         };
 
         return NextResponse.json(payload, { status: 201 });

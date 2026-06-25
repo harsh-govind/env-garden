@@ -64,6 +64,7 @@ import type {
     FilterOption,
     InviteActionFilterValue,
     InviteDeliveryFilterValue,
+    InviteEmailStatus,
     InviteExpiryFilterValue,
     InviteSortValue,
     InviteStatusFilterValue,
@@ -252,6 +253,18 @@ function getErrorMessage(payload: ApiErrorPayload | null, fallback: string) {
     return payload?.error && typeof payload.error === "string"
         ? payload.error
         : fallback;
+}
+
+function getInviteNotice(emailStatus: InviteEmailStatus) {
+    if (emailStatus === "SENT") {
+        return "Invite sent.";
+    }
+
+    if (emailStatus === "NOT_CONFIGURED") {
+        return "Invite created. Email delivery is not configured.";
+    }
+
+    return "Invite created, but email delivery failed.";
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number) {
@@ -701,6 +714,19 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
             return;
         }
 
+        if (
+            draft.role === "MEMBER" &&
+            draft.projectAccessScope === "SELECTED_PROJECTS" &&
+            draft.projects.some(
+                (project) =>
+                    project.environmentAccessScope === "SELECTED_ENVIRONMENTS" &&
+                    project.environments.length === 0
+            )
+        ) {
+            setFormError("Select at least one environment for each selected project.");
+            return;
+        }
+
         setIsSubmitting(true);
         setFormError(null);
 
@@ -725,11 +751,7 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
                         }
                         : current
                 );
-                setNotice(
-                    response.emailStatus === "SENT"
-                        ? "Invite sent."
-                        : "Invite created, but email delivery is not configured."
-                );
+                setNotice(getInviteNotice(response.emailStatus));
             } else {
                 const response = await fetchJson<UpdateWorkspaceMemberResponse>(
                     `/api/workspaces/${workspaceId}/members/${dialogState.member.id}`,
@@ -1985,6 +2007,7 @@ function MemberAccessDialog({
                             <label className="block text-xs tracking-wide text-muted-foreground uppercase">
                                 Email
                                 <input
+                                    type="email"
                                     value={draft.email}
                                     onChange={(event) =>
                                         onDraftChange({
@@ -1993,6 +2016,7 @@ function MemberAccessDialog({
                                         })
                                     }
                                     placeholder="teammate@example.com"
+                                    maxLength={254}
                                     className="mt-2 w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
                                     required
                                 />

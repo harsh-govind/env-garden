@@ -211,9 +211,11 @@ export type UpdateWorkspaceMemberBody = Omit<
     "email"
 >;
 
+export type InviteEmailStatus = "SENT" | "NOT_CONFIGURED" | "FAILED";
+
 export type InviteWorkspaceMemberResponse = {
     invite: WorkspaceInvite;
-    emailStatus: "SENT" | "NOT_CONFIGURED" | "FAILED";
+    emailStatus: InviteEmailStatus;
 };
 
 export type UpdateWorkspaceMemberResponse = {
