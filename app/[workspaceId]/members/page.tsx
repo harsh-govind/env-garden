@@ -16,6 +16,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type FormEvent,
     type ReactNode,
@@ -55,6 +56,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
+import { createInMemoryCache } from "@/lib/cache";
 import { environmentTypeLabels } from "@/lib/constants";
 import { cn, formatTimeAgo } from "@/lib/utils";
 import type {
@@ -109,6 +111,7 @@ const environmentAccessLabels: Record<EnvironmentAccessScopeValue, string> = {
 };
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const membersCache = createInMemoryCache<WorkspaceMembersResponse>(5 * 60 * 1000);
 
 const workspaceRoleRank: Record<WorkspaceRoleValue, number> = {
     OWNER: 0,
@@ -581,19 +584,66 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
     const [filterNow] = useState(() => Date.now());
     const debouncedMemberSearch = useDebouncedValue(memberSearch, 300);
     const debouncedInviteSearch = useDebouncedValue(inviteSearch, 300);
+    const dataRef = useRef<WorkspaceMembersResponse | null>(null);
 
     const workspace =
         activeWorkspaceId === workspaceId && activeWorkspace?.id === workspaceId
             ? activeWorkspace
             : null;
+    const commitMembersData = useCallback(
+        (nextData: WorkspaceMembersResponse | null) => {
+            dataRef.current = nextData;
+            setData(nextData);
+
+            if (nextData) {
+                membersCache.set(workspaceId, nextData);
+            } else {
+                membersCache.delete(workspaceId);
+            }
+        },
+        [workspaceId]
+    );
+    const updateMembersData = useCallback(
+        (
+            updater: (
+                currentData: WorkspaceMembersResponse
+            ) => WorkspaceMembersResponse
+        ) => {
+            const currentData = dataRef.current;
+
+            if (!currentData) {
+                return;
+            }
+
+            commitMembersData(updater(currentData));
+        },
+        [commitMembersData]
+    );
     const loadMembers = useCallback(
-        async (signal?: AbortSignal) => {
+        async (
+            signal?: AbortSignal,
+            options: { force?: boolean; keepCurrentData?: boolean } = {}
+        ) => {
+            const cached = options.force ? undefined : membersCache.get(workspaceId);
+
+            if (cached) {
+                commitMembersData(cached);
+                setError(null);
+                setIsLoading(false);
+                return;
+            }
+
+            if (!options.keepCurrentData) {
+                setIsLoading(true);
+                commitMembersData(null);
+            }
+
             try {
                 const response = await fetchJson<WorkspaceMembersResponse>(
                     `/api/workspaces/${workspaceId}/members`,
                     { signal }
                 );
-                setData(response);
+                commitMembersData(response);
                 setError(null);
             } catch (loadError) {
                 if (signal?.aborted) {
@@ -605,14 +655,17 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
                         ? loadError.message
                         : "Failed to load workspace members."
                 );
-                setData(null);
+
+                if (!options.keepCurrentData) {
+                    commitMembersData(null);
+                }
             } finally {
                 if (!signal?.aborted) {
                     setIsLoading(false);
                 }
             }
         },
-        [workspaceId]
+        [commitMembersData, workspaceId]
     );
 
     useEffect(() => {
@@ -743,14 +796,10 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
                     }
                 );
 
-                setData((current) =>
-                    current
-                        ? {
-                            ...current,
-                            invites: [response.invite, ...current.invites],
-                        }
-                        : current
-                );
+                updateMembersData((current) => ({
+                    ...current,
+                    invites: [response.invite, ...current.invites],
+                }));
                 setNotice(getInviteNotice(response.emailStatus));
             } else {
                 const response = await fetchJson<UpdateWorkspaceMemberResponse>(
@@ -764,18 +813,14 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
                     }
                 );
 
-                setData((current) =>
-                    current
-                        ? {
-                            ...current,
-                            members: current.members.map((member) =>
-                                member.id === response.member.id
-                                    ? response.member
-                                    : member
-                            ),
-                        }
-                        : current
-                );
+                updateMembersData((current) => ({
+                    ...current,
+                    members: current.members.map((member) =>
+                        member.id === response.member.id
+                            ? response.member
+                            : member
+                    ),
+                }));
                 setNotice("Member access updated.");
                 await refreshWorkspaces();
             }
@@ -802,16 +847,12 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
                 `/api/workspaces/${workspaceId}/members/${member.id}`,
                 { method: "DELETE" }
             );
-            setData((current) =>
-                current
-                    ? {
-                        ...current,
-                        members: current.members.filter(
-                            (currentMember) => currentMember.id !== member.id
-                        ),
-                    }
-                    : current
-            );
+            updateMembersData((current) => ({
+                ...current,
+                members: current.members.filter(
+                    (currentMember) => currentMember.id !== member.id
+                ),
+            }));
             setNotice("Member removed.");
             await refreshWorkspaces();
         } catch (removeError) {
@@ -833,7 +874,8 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
                 `/api/workspaces/${workspaceId}/invites/${invite.id}`,
                 { method: "DELETE" }
             );
-            await loadMembers();
+            membersCache.delete(workspaceId);
+            await loadMembers(undefined, { force: true, keepCurrentData: true });
             setNotice("Invite revoked.");
         } catch (revokeError) {
             setNotice(
