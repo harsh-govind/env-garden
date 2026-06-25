@@ -1060,11 +1060,11 @@ export default function ProjectDetailPage() {
 
     if (isLoading) {
         return (
-            <div className="space-y-4">
-                <Skeleton className="h-8 w-64" />
-                <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
-                    <Skeleton className="h-96" />
-                    <Skeleton className="h-96" />
+            <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
+                <Skeleton className="h-8 w-64 shrink-0" />
+                <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden lg:grid lg:grid-cols-[20rem_minmax(0,1fr)]">
+                    <Skeleton className="min-h-0 flex-1 lg:h-full" />
+                    <Skeleton className="min-h-0 flex-1 lg:h-full" />
                 </div>
             </div>
         );
@@ -1130,8 +1130,8 @@ export default function ProjectDetailPage() {
                 </Button>
             </section>
 
-            <div className="grid min-h-0 flex-1 grid-rows-[minmax(10rem,16rem)_minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[20rem_minmax(0,1fr)] lg:grid-rows-none">
-                <section className="min-h-0 space-y-4 overflow-y-auto pr-1">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden lg:grid lg:grid-cols-[20rem_minmax(0,1fr)]">
+                <section className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                     <div className="border border-border bg-card">
                         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                             <h2 className="text-base font-semibold text-foreground">
@@ -1291,7 +1291,7 @@ export default function ProjectDetailPage() {
                     ) : null}
                 </section>
 
-                <section className="flex min-h-0 min-w-0 flex-col border border-border bg-card">
+                <section className="flex min-h-0 min-w-0 flex-1 flex-col border border-border bg-card">
                     {activeEnvFile ? (
                         <>
                             <div className="shrink-0 border-b border-border px-4 py-3">

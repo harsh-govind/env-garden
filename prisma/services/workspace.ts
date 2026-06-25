@@ -127,6 +127,7 @@ export async function getWorkspaceDetailForUser(
                       },
                       select: {
                           role: true,
+                          environmentAccessScope: true,
                           envAccesses: {
                               select: {
                                   environment: true,
@@ -161,7 +162,7 @@ export async function getWorkspaceDetailForUser(
                       membership.role === "OWNER" ||
                       membership.role === "ADMIN" ||
                       projectMember.role === "OWNER" ||
-                      projectMember.role === "ADMIN";
+                      projectMember.environmentAccessScope === "ALL_ENVIRONMENTS";
                   const accessibleEnvironments = new Set(
                       projectMember.envAccesses.map(
                           (envAccess) => envAccess.environment
@@ -230,6 +231,8 @@ export async function createWorkspaceForUser(
                 userId: input.userId,
                 role: "OWNER",
                 projectAccessScope: "ALL_PROJECTS",
+                defaultProjectRole: "OWNER",
+                defaultEnvironmentAccessScope: "ALL_ENVIRONMENTS",
                 addedById: input.userId,
             },
             select: {

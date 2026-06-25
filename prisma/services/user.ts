@@ -46,6 +46,32 @@ export async function createUserFromAuth(
     });
 }
 
+export async function upsertUserFromAuth(
+    input: CreateUserFromAuthInput
+): Promise<AuthUserRecord> {
+    return prisma.user.upsert({
+        where: {
+            email: input.email,
+        },
+        create: {
+            email: input.email,
+            name: input.name ?? null,
+            avatar: getRandomAvatarPresetId(),
+        },
+        update: input.name
+            ? {
+                name: input.name,
+            }
+            : {},
+        select: {
+            id: true,
+            email: true,
+            name: true,
+            avatar: true,
+        },
+    });
+}
+
 export async function updateUserName(userId: string, name: string) {
     return prisma.user.update({
         where: { id: userId },

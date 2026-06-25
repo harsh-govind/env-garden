@@ -202,6 +202,8 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
 
         if (matchesRoutePath(pathname, "/:workspaceId/history")) {
             router.replace(`/${workspaceId}/history`);
+        } else if (matchesRoutePath(pathname, "/:workspaceId/members")) {
+            router.replace(`/${workspaceId}/members`);
         } else if (matchesRoutePath(pathname, "/:workspaceId/projects/:projectId")) {
             router.replace("/");
         }

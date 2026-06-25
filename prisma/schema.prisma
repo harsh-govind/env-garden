@@ -25,7 +25,6 @@ enum EnvironmentAccessScope {
 
 enum ProjectRole {
   OWNER
-  ADMIN
   CONTRIBUTOR
   VIEWER
 }
@@ -40,9 +39,13 @@ model User {
   id                       String             @id @default(cuid())
   email                    String             @unique
   name                     String?
+  emailVerified            DateTime?
+  image                    String?
   avatar                   String             @default("sprout")
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
+  accounts                 Account[]
+  sessions                 Session[]
   createdWorkspaces        Workspace[]        @relation("WorkspaceCreator")
   createdProjects          Project[]          @relation("ProjectCreator")
   createdEnvFiles          EnvFile[]          @relation("EnvFileCreator")
@@ -53,6 +56,43 @@ model User {
   workspaceInvitesSent     WorkspaceInvite[]  @relation("WorkspaceInviteSender")
   workspaceInvitesAccepted WorkspaceInvite[]  @relation("WorkspaceInviteAccepter")
   workspaceInvitesRevoked  WorkspaceInvite[]  @relation("WorkspaceInviteRevoker")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model Workspace {

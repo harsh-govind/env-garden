@@ -2,7 +2,15 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { publicRoutePathPrefixes, publicRoutePaths } from "@/lib/constants";
 import type { ProtectedRouteProviderProps } from "@/types/auth";
+
+function isPublicRoute(pathname: string) {
+    return (
+        publicRoutePaths.includes(pathname as typeof publicRoutePaths[number])
+        || publicRoutePathPrefixes.some((routePrefix) => pathname.startsWith(routePrefix))
+    );
+}
 
 export default function ProtectedRouteProvider({
     isAuthenticated,
@@ -10,7 +18,7 @@ export default function ProtectedRouteProvider({
 }: ProtectedRouteProviderProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const isProtectedRoute = pathname !== "/";
+    const isProtectedRoute = !isPublicRoute(pathname);
 
     useEffect(() => {
         if (!isAuthenticated && isProtectedRoute) {

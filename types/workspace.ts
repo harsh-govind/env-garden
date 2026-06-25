@@ -5,6 +5,10 @@ export type WorkspaceRoleValue = "OWNER" | "ADMIN" | "MEMBER";
 
 export type ProjectAccessScopeValue = "ALL_PROJECTS" | "SELECTED_PROJECTS";
 
+export type EnvironmentAccessScopeValue =
+    | "ALL_ENVIRONMENTS"
+    | "SELECTED_ENVIRONMENTS";
+
 export type EnvironmentTypeValue =
     | "PRODUCTION"
     | "STAGING"
@@ -171,6 +175,12 @@ export type WorkspaceHistoryEntryRouteContext = {
     params: Promise<{
         workspaceId: string;
         historyId: string;
+    }>;
+};
+
+export type WorkspaceMembersPageProps = {
+    params: Promise<{
+        workspaceId: string;
     }>;
 };
 

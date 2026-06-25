@@ -49,8 +49,7 @@ function canManageProject(context: ProjectAccessContext) {
     return (
         context.workspaceMember.role === "OWNER" ||
         context.workspaceMember.role === "ADMIN" ||
-        context.projectMember?.role === "OWNER" ||
-        context.projectMember?.role === "ADMIN"
+        context.projectRole === "OWNER"
     );
 }
 
@@ -61,6 +60,7 @@ function hasEnvironmentAccess(
     return (
         canManageProject(context) ||
         context.workspaceMember.projectAccessScope === "ALL_PROJECTS" ||
+        context.projectMember?.environmentAccessScope === "ALL_ENVIRONMENTS" ||
         context.projectMember?.envAccesses.some(
             (envAccess) => envAccess.environment === environment
         ) === true
@@ -70,7 +70,7 @@ function hasEnvironmentAccess(
 function canEditEnvironment(context: ProjectAccessContext, environment: string) {
     return (
         canManageProject(context) ||
-        (context.projectMember?.role === "CONTRIBUTOR" &&
+        (context.projectRole === "CONTRIBUTOR" &&
             hasEnvironmentAccess(context, environment))
     );
 }
@@ -91,6 +91,7 @@ async function getProjectAccessContext(
         select: {
             id: true,
             role: true,
+            defaultProjectRole: true,
             projectAccessScope: true,
         },
     });
@@ -123,6 +124,7 @@ async function getProjectAccessContext(
         select: {
             id: true,
             role: true,
+            environmentAccessScope: true,
             envAccesses: {
                 select: {
                     environment: true,
@@ -144,9 +146,11 @@ async function getProjectAccessContext(
             ? {
                 id: projectMember.id,
                 role: projectMember.role,
+                environmentAccessScope: projectMember.environmentAccessScope,
                 envAccesses: projectMember.envAccesses,
             }
             : null,
+        projectRole: projectMember?.role ?? workspaceMember.defaultProjectRole,
         workspaceMember,
     };
 }
@@ -296,6 +300,7 @@ export async function createProjectForWorkspace(
                 projectId: createdProject.id,
                 workspaceMemberId: member.id,
                 role: "OWNER",
+                environmentAccessScope: "ALL_ENVIRONMENTS",
                 addedById: input.userId,
             },
         });
@@ -493,7 +498,7 @@ export async function getProjectDetailForUser(input: {
             workspaceId: project.workspaceId,
             name: project.name,
             description: project.description,
-            role: access.projectMember?.role ?? null,
+            role: access.projectRole,
             canManage: canManageProject(access),
             createdAt: project.createdAt,
             updatedAt: project.updatedAt,

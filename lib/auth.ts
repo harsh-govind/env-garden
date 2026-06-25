@@ -1,64 +1,97 @@
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
+import EmailProvider from "next-auth/providers/email";
 import GitHubProvider from "next-auth/providers/github";
+import GoogleProvider from "next-auth/providers/google";
 import {
     DEFAULT_AVATAR_PRESET_ID,
     isAvatarPresetId,
 } from "@/lib/avatar-presets";
 import {
-    createUserFromAuth,
-    findUserByEmail,
-    updateUserName,
-} from "@/prisma/services/user";
+    getEmailFromAddress,
+    sendSignInEmail,
+} from "@/lib/email";
+import { prisma } from "@/lib/prisma";
+import { upsertUserFromAuth } from "@/prisma/services/user";
 
 function normalizeEmail(email: string) {
     return email.trim().toLowerCase();
 }
 
 export const authOptions: NextAuthOptions = {
+    adapter: PrismaAdapter(prisma),
     providers: [
+        EmailProvider({
+            from: getEmailFromAddress("auth") ?? "auth@example.com",
+            maxAge: 15 * 60,
+            normalizeIdentifier(identifier) {
+                return normalizeEmail(identifier.split(",")[0] ?? "");
+            },
+            async sendVerificationRequest({ identifier, url, expires }) {
+                const result = await sendSignInEmail({
+                    to: identifier,
+                    magicLinkUrl: url,
+                    expiresAt: expires,
+                });
+
+                if (result.status === "NOT_CONFIGURED") {
+                    throw new Error("Sign-in email is not configured.");
+                }
+
+                if (result.status === "FAILED") {
+                    throw new Error(result.error);
+                }
+            },
+        }),
+        GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+            allowDangerousEmailAccountLinking: true,
+        }),
         GitHubProvider({
             clientId: process.env.GITHUB_CLIENT_ID ?? "",
             clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+            allowDangerousEmailAccountLinking: true,
         }),
     ],
     session: {
         strategy: "jwt",
     },
     callbacks: {
+        async signIn({ user }) {
+            return typeof user.email === "string" && Boolean(user.email.trim());
+        },
         async jwt({ token, user }) {
-            const email =
-                typeof token.email === "string"
-                    ? normalizeEmail(token.email)
-                    : null;
-            const name = typeof user?.name === "string" ? user.name.trim() : null;
+            const rawEmail =
+                typeof user?.email === "string"
+                    ? user.email
+                    : typeof token.email === "string"
+                        ? token.email
+                        : null;
+            const email = rawEmail ? normalizeEmail(rawEmail) : null;
+            const rawName =
+                typeof user?.name === "string"
+                    ? user.name
+                    : typeof token.name === "string"
+                        ? token.name
+                        : null;
+            const name = rawName?.trim() || null;
 
             if (!email) {
                 return token;
             }
 
-            const existing = await findUserByEmail(email);
+            const authUser = await upsertUserFromAuth({
+                email,
+                name,
+            });
 
-            if (!existing) {
-                const created = await createUserFromAuth({
-                    email,
-                    name: name || null,
-                });
-
-                token.sub = created.id;
-                token.avatar = isAvatarPresetId(created.avatar)
-                    ? created.avatar
-                    : DEFAULT_AVATAR_PRESET_ID;
-                return token;
-            }
-
-            if (name && name !== existing.name) {
-                await updateUserName(existing.id, name);
-            }
-
-            token.sub = existing.id;
-            token.avatar = isAvatarPresetId(existing.avatar)
-                ? existing.avatar
+            token.email = authUser.email;
+            token.name = authUser.name ?? token.name;
+            token.sub = authUser.id;
+            token.avatar = isAvatarPresetId(authUser.avatar)
+                ? authUser.avatar
                 : DEFAULT_AVATAR_PRESET_ID;
             return token;
         },
@@ -75,6 +108,23 @@ export const authOptions: NextAuthOptions = {
             }
 
             return session;
+        },
+        async redirect({ url, baseUrl }) {
+            if (url.startsWith("/")) {
+                return `${baseUrl}${url}`;
+            }
+
+            try {
+                const parsedUrl = new URL(url);
+
+                if (parsedUrl.origin === baseUrl) {
+                    return url;
+                }
+            } catch {
+                return baseUrl;
+            }
+
+            return baseUrl;
         },
     },
     secret: process.env.NEXTAUTH_SECRET,

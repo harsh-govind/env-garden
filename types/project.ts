@@ -2,10 +2,11 @@ import type { EncryptedValuePayload } from "@/types/encryption";
 import type {
     EnvironmentTypeValue,
     ProjectAccessScopeValue,
+    EnvironmentAccessScopeValue,
     WorkspaceRoleValue,
 } from "@/types/workspace";
 
-export type ProjectRoleValue = "OWNER" | "ADMIN" | "CONTRIBUTOR" | "VIEWER";
+export type ProjectRoleValue = "OWNER" | "CONTRIBUTOR" | "VIEWER";
 
 export type ProjectEnvVariable = {
     id: string;
@@ -98,14 +99,17 @@ export type ProjectAccessContext = {
     projectMember: {
         id: string;
         role: ProjectRoleValue;
+        environmentAccessScope: EnvironmentAccessScopeValue;
         envAccesses: {
             environment: string;
         }[];
     } | null;
+    projectRole: ProjectRoleValue;
     workspaceMember: {
         id: string;
         role: WorkspaceRoleValue;
         projectAccessScope: ProjectAccessScopeValue;
+        defaultProjectRole: ProjectRoleValue;
     };
 };
 
