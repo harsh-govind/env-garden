@@ -1,65 +1,18 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { parseMemberAccessBody } from "@/lib/member-access";
+import { serializeWorkspaceMember } from "@/lib/member-serializers";
 import {
     removeWorkspaceMember,
     updateWorkspaceMember,
-} from "@/prisma/services/workspace-member";
+} from "@/prisma/services/member";
 import type {
     UpdateWorkspaceMemberBody,
+    UpdateWorkspaceMemberResponse,
     WorkspaceMemberRouteContext,
-} from "@/types/workspace";
-import { ASSIGNABLE_WORKSPACE_ROLES } from "@/lib/constants";
-import type {
-    ProjectAccessScopeValue,
-    WorkspaceRoleValue,
-} from "@/types/workspace";
-const VALID_SCOPES: ProjectAccessScopeValue[] = [
-    "ALL_PROJECTS",
-    "SELECTED_PROJECTS",
-];
+} from "@/types/member";
 
-function parseUpdateMemberBody(body: UpdateWorkspaceMemberBody) {
-    const updates: {
-        role?: WorkspaceRoleValue;
-        projectAccessScope?: ProjectAccessScopeValue;
-    } = {};
-
-    if (body.role !== undefined) {
-        if (
-            typeof body.role !== "string" ||
-            !ASSIGNABLE_WORKSPACE_ROLES.includes(body.role as WorkspaceRoleValue)
-        ) {
-            return { error: "Invalid role. Must be ADMIN or MEMBER." };
-        }
-        updates.role = body.role as WorkspaceRoleValue;
-    }
-
-    if (body.projectAccessScope !== undefined) {
-        if (
-            typeof body.projectAccessScope !== "string" ||
-            !VALID_SCOPES.includes(
-                body.projectAccessScope as ProjectAccessScopeValue
-            )
-        ) {
-            return {
-                error: "Invalid project access scope. Must be ALL_PROJECTS or SELECTED_PROJECTS.",
-            };
-        }
-        updates.projectAccessScope =
-            body.projectAccessScope as ProjectAccessScopeValue;
-    }
-
-    if (!updates.role && !updates.projectAccessScope) {
-        return { error: "No valid fields to update." };
-    }
-
-    return { value: updates };
-}
-
-export async function PATCH(
-    request: Request,
-    context: WorkspaceMemberRouteContext
-) {
+export async function PATCH(request: Request, context: WorkspaceMemberRouteContext) {
     try {
         const session = await auth();
 
@@ -76,49 +29,56 @@ export async function PATCH(
             );
         }
 
-        const body = (await request.json().catch(() => null)) as
-            | UpdateWorkspaceMemberBody
-            | null;
+        const body = (await request
+            .json()
+            .catch(() => null)) as UpdateWorkspaceMemberBody | null;
 
         if (!body) {
             return NextResponse.json(
-                { error: "Invalid request body." },
+                { error: "Invalid JSON payload." },
                 { status: 400 }
             );
         }
 
-        const parsed = parseUpdateMemberBody(body);
+        const access = parseMemberAccessBody(body);
 
-        if ("error" in parsed) {
-            return NextResponse.json(
-                { error: parsed.error },
-                { status: 400 }
-            );
+        if ("error" in access) {
+            return NextResponse.json({ error: access.error }, { status: 400 });
         }
 
         const result = await updateWorkspaceMember({
             workspaceId,
             memberId,
-            updaterUserId: session.user.id,
-            role: parsed.value.role,
-            projectAccessScope: parsed.value.projectAccessScope,
+            actorUserId: session.user.id,
+            access: access.value,
         });
 
         if (result.status === "NOT_FOUND") {
             return NextResponse.json(
-                { error: "Workspace or member not found." },
+                { error: "Workspace member not found or access denied." },
                 { status: 404 }
             );
         }
 
         if (result.status === "FORBIDDEN") {
             return NextResponse.json(
-                { error: "You do not have permission to update this member." },
+                { error: "You cannot update that member." },
                 { status: 403 }
             );
         }
 
-        return NextResponse.json({ member: result.member });
+        if (result.status === "INVALID_ACCESS") {
+            return NextResponse.json(
+                { error: "Member project access is invalid." },
+                { status: 400 }
+            );
+        }
+
+        const payload: UpdateWorkspaceMemberResponse = {
+            member: serializeWorkspaceMember(result.member),
+        };
+
+        return NextResponse.json(payload);
     } catch (error) {
         console.error("Failed to update workspace member:", error);
         return NextResponse.json(
@@ -128,10 +88,7 @@ export async function PATCH(
     }
 }
 
-export async function DELETE(
-    _: Request,
-    context: WorkspaceMemberRouteContext
-) {
+export async function DELETE(_: Request, context: WorkspaceMemberRouteContext) {
     try {
         const session = await auth();
 
@@ -151,24 +108,24 @@ export async function DELETE(
         const result = await removeWorkspaceMember({
             workspaceId,
             memberId,
-            removerUserId: session.user.id,
+            actorUserId: session.user.id,
         });
 
         if (result.status === "NOT_FOUND") {
             return NextResponse.json(
-                { error: "Workspace or member not found." },
+                { error: "Workspace member not found or access denied." },
                 { status: 404 }
             );
         }
 
         if (result.status === "FORBIDDEN") {
             return NextResponse.json(
-                { error: "You do not have permission to remove this member." },
+                { error: "You cannot remove that member." },
                 { status: 403 }
             );
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ ok: true });
     } catch (error) {
         console.error("Failed to remove workspace member:", error);
         return NextResponse.json(

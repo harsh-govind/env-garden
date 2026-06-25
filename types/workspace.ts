@@ -5,7 +5,7 @@ export type WorkspaceRoleValue = "OWNER" | "ADMIN" | "MEMBER";
 
 export type ProjectAccessScopeValue = "ALL_PROJECTS" | "SELECTED_PROJECTS";
 
-export type InviteEnvironmentScopeValue =
+export type EnvironmentAccessScopeValue =
     | "ALL_ENVIRONMENTS"
     | "SELECTED_ENVIRONMENTS";
 
@@ -43,12 +43,6 @@ export type WorkspaceProjectSummary = {
     id: string;
     name: string;
     updatedAt: string;
-};
-
-export type WorkspaceInviteProjectOption = {
-    id: string;
-    name: string;
-    environments: EnvironmentTypeValue[];
 };
 
 export type WorkspaceProjectUpdatedAtRecord = {
@@ -184,6 +178,12 @@ export type WorkspaceHistoryEntryRouteContext = {
     }>;
 };
 
+export type WorkspaceMembersPageProps = {
+    params: Promise<{
+        workspaceId: string;
+    }>;
+};
+
 export type WorkspaceSummaryRecord = {
     id: string;
     name: string;
@@ -207,132 +207,6 @@ export type CreateWorkspaceForUserInput = {
     userId: string;
     name: string;
     description?: string | null;
-};
-
-export type WorkspaceMemberRecord = {
-    id: string;
-    workspaceId: string;
-    userId: string;
-    role: WorkspaceRoleValue;
-    projectAccessScope: ProjectAccessScopeValue;
-    addedById: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    user: {
-        id: string;
-        email: string | null;
-        name: string | null;
-        avatar: string;
-    };
-    addedBy: {
-        id: string;
-        email: string | null;
-        name: string | null;
-        avatar: string;
-    } | null;
-};
-
-export type WorkspaceMemberSummary = {
-    id: string;
-    userId: string;
-    email: string | null;
-    name: string | null;
-    avatar: string;
-    role: WorkspaceRoleValue;
-    projectAccessScope: ProjectAccessScopeValue;
-    addedBy: {
-        id: string;
-        name: string | null;
-        email: string | null;
-    } | null;
-    createdAt: string;
-};
-
-export type WorkspaceInviteProjectAccessInput = {
-    projectId: string;
-    environmentScope: InviteEnvironmentScopeValue;
-    environments?: EnvironmentTypeValue[];
-};
-
-export type WorkspaceInviteProjectAccessSummary = {
-    projectId: string;
-    projectName: string;
-    environmentScope: InviteEnvironmentScopeValue;
-    environments: EnvironmentTypeValue[];
-};
-
-export type WorkspaceInviteRecord = {
-    id: string;
-    workspaceId: string;
-    email: string;
-    role: WorkspaceRoleValue;
-    expiresAt: Date;
-    createdAt: Date;
-    invitedBy: {
-        id: string;
-        email: string | null;
-        name: string | null;
-    };
-    projectAccesses: {
-        projectId: string;
-        environmentScope: InviteEnvironmentScopeValue;
-        project: {
-            name: string;
-        };
-        environments: {
-            environment: string;
-        }[];
-    }[];
-};
-
-export type WorkspaceInviteSummary = {
-    id: string;
-    email: string;
-    role: WorkspaceRoleValue;
-    invitedBy: {
-        id: string;
-        name: string | null;
-        email: string | null;
-    };
-    projectAccesses: WorkspaceInviteProjectAccessSummary[];
-    expiresAt: string;
-    createdAt: string;
-};
-
-export type WorkspaceMembersResponse = {
-    members: WorkspaceMemberSummary[];
-    invites: WorkspaceInviteSummary[];
-    projects: WorkspaceInviteProjectOption[];
-};
-
-export type AddWorkspaceMemberBody = {
-    email?: unknown;
-    role?: unknown;
-    projectAccesses?: unknown;
-};
-
-export type UpdateWorkspaceMemberBody = {
-    role?: unknown;
-    projectAccessScope?: unknown;
-};
-
-export type WorkspaceMemberRouteContext = {
-    params: Promise<{
-        workspaceId: string;
-        memberId: string;
-    }>;
-};
-
-export type WorkspaceMembersPageProps = {
-    params: Promise<{
-        workspaceId: string;
-    }>;
-};
-
-export type WorkspaceInviteAcceptRouteContext = {
-    params: Promise<{
-        token: string;
-    }>;
 };
 
 export type CreateWorkspaceHistoryEntryInput = {

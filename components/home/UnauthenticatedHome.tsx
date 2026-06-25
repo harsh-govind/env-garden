@@ -14,7 +14,7 @@ export default function UnauthenticatedHome() {
                 env-garden
             </h1>
             <p className="text-muted-foreground">
-                Please sign in with GitHub to access your home page.
+                Sign in with email, Google, or GitHub to access your home page.
             </p>
 
             <Separator />

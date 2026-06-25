@@ -1,111 +1,66 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { inviteWorkspaceMember, listWorkspaceMembersForUser } from "@/prisma/services/workspace-member";
-import { isEnvironmentTypeValue } from "@/lib/constants";
+import { sendWorkspaceInviteEmail } from "@/lib/email";
+import type { InviteEmailInput } from "@/lib/email";
+import {
+    parseInviteEmail,
+    parseMemberAccessBody,
+} from "@/lib/member-access";
+import {
+    serializeWorkspaceInvite,
+    serializeWorkspaceMembers,
+} from "@/lib/member-serializers";
+import {
+    inviteWorkspaceMember,
+    listWorkspaceMembersForUser,
+    markWorkspaceInviteEmailSent,
+} from "@/prisma/services/member";
 import type {
-    AddWorkspaceMemberBody,
-    InviteEnvironmentScopeValue,
-    WorkspaceInviteProjectAccessInput,
-    WorkspaceRouteContext,
-} from "@/types/workspace";
-import { ASSIGNABLE_WORKSPACE_ROLES } from "@/lib/constants";
-import type { WorkspaceRoleValue } from "@/types/workspace";
+    InviteEmailStatus,
+    InviteWorkspaceMemberBody,
+    InviteWorkspaceMemberResponse,
+} from "@/types/member";
+import type { WorkspaceRouteContext } from "@/types/workspace";
 
-const VALID_ENVIRONMENT_SCOPES: InviteEnvironmentScopeValue[] = [
-    "ALL_ENVIRONMENTS",
-    "SELECTED_ENVIRONMENTS",
-];
+function buildInviteUrl(request: Request, token: string) {
+    const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.APP_URL ||
+        new URL(request.url).origin;
 
-function parseProjectAccesses(
-    value: unknown
-): { value: WorkspaceInviteProjectAccessInput[] } | { error: string } {
-    if (value === undefined) {
-        return { value: [] };
-    }
-
-    if (!Array.isArray(value)) {
-        return { error: "Project access selections must be an array." };
-    }
-
-    const projectAccesses: WorkspaceInviteProjectAccessInput[] = [];
-
-    for (const item of value) {
-        if (!item || typeof item !== "object") {
-            return { error: "Invalid project access selection." };
-        }
-
-        const record = item as Record<string, unknown>;
-        const projectId =
-            typeof record.projectId === "string" ? record.projectId.trim() : "";
-        const environmentScope =
-            typeof record.environmentScope === "string" &&
-                VALID_ENVIRONMENT_SCOPES.includes(
-                    record.environmentScope as InviteEnvironmentScopeValue
-                )
-                ? (record.environmentScope as InviteEnvironmentScopeValue)
-                : null;
-
-        if (!projectId || !environmentScope) {
-            return { error: "Project and environment scope are required." };
-        }
-
-        if (
-            record.environments !== undefined &&
-            !Array.isArray(record.environments)
-        ) {
-            return { error: "Environment selections must be an array." };
-        }
-
-        const environmentValues = Array.isArray(record.environments)
-            ? record.environments
-            : [];
-        const environments = Array.from(
-            new Set(environmentValues.filter(isEnvironmentTypeValue))
-        );
-
-        if (
-            Array.isArray(record.environments) &&
-            environments.length !== record.environments.length
-        ) {
-            return { error: "Invalid environment selection." };
-        }
-
-        projectAccesses.push({
-            projectId,
-            environmentScope,
-            environments,
-        });
-    }
-
-    return { value: projectAccesses };
+    return new URL(`/invites/${token}`, appUrl).toString();
 }
 
-function parseAddMemberBody(body: AddWorkspaceMemberBody) {
-    const email =
-        typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    const role =
-        typeof body.role === "string" &&
-            ASSIGNABLE_WORKSPACE_ROLES.includes(body.role as WorkspaceRoleValue)
-            ? (body.role as WorkspaceRoleValue)
-            : "MEMBER";
+async function sendWorkspaceInviteEmailSafely(
+    input: InviteEmailInput
+): Promise<InviteEmailStatus> {
+    try {
+        const emailResult = await sendWorkspaceInviteEmail(input);
 
-    if (!email || !email.includes("@") || email.length > 320) {
-        return { error: "A valid email address is required." };
+        if (emailResult.status === "FAILED") {
+            console.error("Failed to send workspace invite email:", emailResult.error);
+        }
+
+        return emailResult.status;
+    } catch (emailError) {
+        console.error("Failed to send workspace invite email:", emailError);
+        return "FAILED";
+    }
+}
+
+async function markWorkspaceInviteEmailSentSafely(inviteId: string) {
+    const emailSentAt = new Date();
+
+    try {
+        await markWorkspaceInviteEmailSent(inviteId);
+    } catch (markEmailSentError) {
+        console.error(
+            "Failed to mark workspace invite email as sent:",
+            markEmailSentError
+        );
     }
 
-    const parsedProjectAccesses = parseProjectAccesses(body.projectAccesses);
-
-    if ("error" in parsedProjectAccesses) {
-        return parsedProjectAccesses;
-    }
-
-    return {
-        value: {
-            email,
-            role,
-            projectAccesses: parsedProjectAccesses.value,
-        },
-    };
+    return emailSentAt;
 }
 
 export async function GET(_: Request, context: WorkspaceRouteContext) {
@@ -125,10 +80,10 @@ export async function GET(_: Request, context: WorkspaceRouteContext) {
             );
         }
 
-        const result = await listWorkspaceMembersForUser(
+        const result = await listWorkspaceMembersForUser({
             workspaceId,
-            session.user.id
-        );
+            userId: session.user.id,
+        });
 
         if (result.status === "NOT_FOUND") {
             return NextResponse.json(
@@ -137,11 +92,7 @@ export async function GET(_: Request, context: WorkspaceRouteContext) {
             );
         }
 
-        return NextResponse.json({
-            members: result.members,
-            invites: result.invites,
-            projects: result.projects,
-        });
+        return NextResponse.json(serializeWorkspaceMembers(result.record));
     } catch (error) {
         console.error("Failed to list workspace members:", error);
         return NextResponse.json(
@@ -168,32 +119,34 @@ export async function POST(request: Request, context: WorkspaceRouteContext) {
             );
         }
 
-        const body = (await request.json().catch(() => null)) as
-            | AddWorkspaceMemberBody
-            | null;
+        const body = (await request
+            .json()
+            .catch(() => null)) as InviteWorkspaceMemberBody | null;
 
         if (!body) {
             return NextResponse.json(
-                { error: "Invalid request body." },
+                { error: "Invalid JSON payload." },
                 { status: 400 }
             );
         }
 
-        const parsed = parseAddMemberBody(body);
+        const email = parseInviteEmail(body.email);
 
-        if ("error" in parsed) {
-            return NextResponse.json(
-                { error: parsed.error },
-                { status: 400 }
-            );
+        if ("error" in email) {
+            return NextResponse.json({ error: email.error }, { status: 400 });
+        }
+
+        const access = parseMemberAccessBody(body);
+
+        if ("error" in access) {
+            return NextResponse.json({ error: access.error }, { status: 400 });
         }
 
         const result = await inviteWorkspaceMember({
             workspaceId,
-            email: parsed.value.email,
-            role: parsed.value.role,
-            projectAccesses: parsed.value.projectAccesses,
-            invitedById: session.user.id,
+            actorUserId: session.user.id,
+            email: email.value,
+            access: access.value,
         });
 
         if (result.status === "NOT_FOUND") {
@@ -212,22 +165,44 @@ export async function POST(request: Request, context: WorkspaceRouteContext) {
 
         if (result.status === "INVALID_ACCESS") {
             return NextResponse.json(
-                { error: result.message },
+                { error: "Member project access is invalid." },
                 { status: 400 }
             );
         }
 
-        if (result.status === "ALREADY_MEMBER") {
+        if (result.status === "MEMBER_EXISTS") {
             return NextResponse.json(
-                { error: "This user is already a member of the workspace." },
+                { error: "That user is already a workspace member." },
                 { status: 409 }
             );
         }
 
-        return NextResponse.json(
-            { invite: result.invite },
-            { status: 201 }
-        );
+        if (result.status === "INVITE_EXISTS") {
+            return NextResponse.json(
+                { error: "A pending invite already exists for that email." },
+                { status: 409 }
+            );
+        }
+
+        const emailStatus = await sendWorkspaceInviteEmailSafely({
+            to: result.invite.email,
+            workspaceName: result.workspaceName,
+            invitedByEmail: result.actorEmail,
+            inviteUrl: buildInviteUrl(request, result.token),
+        });
+
+        if (emailStatus === "SENT") {
+            result.invite.emailSentAt = await markWorkspaceInviteEmailSentSafely(
+                result.invite.id
+            );
+        }
+
+        const payload: InviteWorkspaceMemberResponse = {
+            invite: serializeWorkspaceInvite(result.invite),
+            emailStatus,
+        };
+
+        return NextResponse.json(payload, { status: 201 });
     } catch (error) {
         console.error("Failed to invite workspace member:", error);
         return NextResponse.json(

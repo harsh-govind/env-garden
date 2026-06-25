@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { acceptWorkspaceInvite } from "@/prisma/services/workspace-member";
-import type { WorkspaceInviteAcceptRouteContext } from "@/types/workspace";
+import { acceptWorkspaceInvite } from "@/prisma/services/member";
+import type {
+    AcceptWorkspaceInviteResponse,
+    WorkspaceInviteAcceptRouteContext,
+} from "@/types/member";
 
-export async function POST(
-    _: Request,
-    context: WorkspaceInviteAcceptRouteContext
-) {
+export async function POST(_: Request, context: WorkspaceInviteAcceptRouteContext) {
     try {
         const session = await auth();
 
@@ -35,28 +35,40 @@ export async function POST(
             );
         }
 
+        if (result.status === "UNAVAILABLE") {
+            return NextResponse.json(
+                { error: "This invite is no longer available." },
+                { status: 409 }
+            );
+        }
+
         if (result.status === "EXPIRED") {
             return NextResponse.json(
-                { error: "Invite has expired." },
+                { error: "This invite has expired." },
                 { status: 410 }
             );
         }
 
-        if (result.status === "FORBIDDEN") {
+        if (result.status === "EMAIL_MISMATCH") {
             return NextResponse.json(
-                { error: "This invite is for a different account." },
+                { error: "Sign in with the email address this invite was sent to." },
                 { status: 403 }
             );
         }
 
-        if (result.status === "ALREADY_MEMBER") {
+        if (result.status === "MEMBER_EXISTS") {
             return NextResponse.json(
                 { error: "You are already a member of this workspace." },
                 { status: 409 }
             );
         }
 
-        return NextResponse.json({ member: result.member });
+        const payload: AcceptWorkspaceInviteResponse = {
+            workspaceId: result.workspaceId,
+            workspaceName: result.workspaceName,
+        };
+
+        return NextResponse.json(payload);
     } catch (error) {
         console.error("Failed to accept workspace invite:", error);
         return NextResponse.json(
