@@ -49,6 +49,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     defaultProjectEnvironmentTypes,
@@ -1547,24 +1554,26 @@ export default function ProjectDetailPage() {
 
                             <label className="block text-xs tracking-wide text-muted-foreground uppercase">
                                 Environment
-                                <select
+                                <Select
                                     value={envFileEnvironment}
-                                    onChange={(event) => {
-                                        setEnvFileEnvironment(
-                                            event.target.value as EnvironmentTypeValue
-                                        );
+                                    onValueChange={(value) => {
+                                        setEnvFileEnvironment(value as EnvironmentTypeValue);
                                     }}
-                                    className="mt-2 h-8 w-full border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring"
                                 >
-                                    {environmentTypes.map((environmentType) => (
-                                        <option
-                                            key={environmentType.key}
-                                            value={environmentType.key}
-                                        >
-                                            {environmentType.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="mt-2">
+                                        <SelectValue placeholder="Select environment" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {environmentTypes.map((environmentType) => (
+                                            <SelectItem
+                                                key={environmentType.key}
+                                                value={environmentType.key}
+                                            >
+                                                {environmentType.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </label>
 
                             <label className="block text-xs tracking-wide text-muted-foreground uppercase">
