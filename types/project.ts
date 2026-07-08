@@ -145,6 +145,10 @@ export type RenameEnvFileResponse = {
     envFile: ProjectEnvFile;
 };
 
+export type DeleteEnvFileResponse = {
+    success: true;
+};
+
 export type CreateEnvVariableRequest = {
     key: string;
     value: string;
@@ -204,6 +208,10 @@ export type RenameProjectResponse = {
         name: string;
         updatedAt: string;
     };
+};
+
+export type DeleteProjectResponse = {
+    success: true;
 };
 
 export type ProjectRouteContext = {

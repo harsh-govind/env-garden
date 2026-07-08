@@ -67,6 +67,8 @@ import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 import { formatTimeAgo } from "@/lib/utils";
 import type {
     CreateEnvFileResponse,
+    DeleteEnvFileResponse,
+    DeleteProjectResponse,
     EnvVariableValueResponse,
     EnvVariablesValueResponse,
     ParsedEnvRow,
@@ -399,6 +401,8 @@ export default function ProjectDetailPage() {
     const [projectDraftName, setProjectDraftName] = useState("");
     const [isSavingProjectName, setIsSavingProjectName] = useState(false);
     const [projectNameError, setProjectNameError] = useState<string | null>(null);
+    const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
+    const [isDeletingProject, setIsDeletingProject] = useState(false);
 
     const [envFileEnvironment, setEnvFileEnvironment] =
         useState<EnvironmentTypeValue>(defaultProjectEnvironmentTypes[0]);
@@ -414,6 +418,11 @@ export default function ProjectDetailPage() {
     const [envFileNameRenameError, setEnvFileNameRenameError] = useState<string | null>(
         null
     );
+    const [envFileIdPendingDelete, setEnvFileIdPendingDelete] = useState<string | null>(
+        null
+    );
+    const [isDeletingEnvFile, setIsDeletingEnvFile] = useState(false);
+    const [envFileDeleteError, setEnvFileDeleteError] = useState<string | null>(null);
 
     const [variableDraftRows, setVariableDraftRows] = useState<VariableDraftRow[]>([]);
     const [selectedDraftRowIds, setSelectedDraftRowIds] = useState<Set<string>>(
@@ -666,6 +675,102 @@ export default function ProjectDetailPage() {
         },
         [activeEnvFileId, envFileDraftName, project?.canManage, projectUrl]
     );
+
+    const handleDeleteProject = useCallback(async () => {
+        if (!project?.canManage) {
+            setProjectNameError("Only project or workspace admins can delete this project.");
+            return;
+        }
+
+        setIsDeletingProject(true);
+
+        try {
+            await fetchJson<DeleteProjectResponse>(projectUrl, {
+                method: "DELETE",
+            });
+
+            setIsDeleteProjectDialogOpen(false);
+            window.location.assign("/");
+        } catch (deleteError) {
+            setProjectNameError(getErrorMessage(deleteError));
+        } finally {
+            setIsDeletingProject(false);
+        }
+    }, [project?.canManage, projectUrl]);
+
+    const handleDeleteEnvFile = useCallback(async () => {
+        const envFileId = envFileIdPendingDelete;
+
+        if (!envFileId) {
+            return;
+        }
+
+        if (!project?.canManage) {
+            setEnvFileDeleteError(
+                "Only project or workspace admins can delete env files."
+            );
+            return;
+        }
+
+        setIsDeletingEnvFile(true);
+
+        try {
+            await fetchJson<DeleteEnvFileResponse>(
+                `${projectUrl}/env-files/${envFileId}`,
+                {
+                    method: "DELETE",
+                }
+            );
+
+            setProject((currentProject) => {
+                if (!currentProject) {
+                    return currentProject;
+                }
+
+                const remainingEnvFiles = currentProject.envFiles.filter(
+                    (envFile) => envFile.id !== envFileId
+                );
+
+                if (remainingEnvFiles.length === 0) {
+                    setActiveEnvFileId(null);
+                    setVariableDraftRows([]);
+                    setSelectedDraftRowIds(new Set());
+                    setRevealedVariableIds(new Set());
+                    setLoadingVariableValueIds(new Set());
+                } else if (activeEnvFileId === envFileId) {
+                    const fallbackEnvFile = remainingEnvFiles[0];
+                    setActiveEnvFileId(fallbackEnvFile.id);
+                    setVariableDraftRows(toVariableDraftRows(fallbackEnvFile.variables));
+                    setSelectedDraftRowIds(new Set());
+                    setRevealedVariableIds(new Set());
+                    setLoadingVariableValueIds(new Set());
+                }
+
+                return {
+                    ...currentProject,
+                    envFiles: remainingEnvFiles,
+                };
+            });
+
+            if (renamingEnvFileId === envFileId) {
+                cancelRenamingEnvFile();
+            }
+
+            setEnvFileDeleteError(null);
+            setEnvFileIdPendingDelete(null);
+        } catch (deleteError) {
+            setEnvFileDeleteError(getErrorMessage(deleteError));
+        } finally {
+            setIsDeletingEnvFile(false);
+        }
+    }, [
+        activeEnvFileId,
+        cancelRenamingEnvFile,
+        envFileIdPendingDelete,
+        project?.canManage,
+        projectUrl,
+        renamingEnvFileId,
+    ]);
 
     const activeEnvFile = useMemo(() => {
         if (!project) {
@@ -1268,6 +1373,70 @@ export default function ProjectDetailPage() {
 
     return (
         <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
+            <AlertDialog
+                open={isDeleteProjectDialogOpen}
+                onOpenChange={setIsDeleteProjectDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete project?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete <strong>{project.name}</strong> and
+                            all of its env files and variables.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingProject}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                void handleDeleteProject();
+                            }}
+                            disabled={isDeletingProject}
+                        >
+                            {isDeletingProject ? "Deleting..." : "Delete project"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={Boolean(envFileIdPendingDelete)}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        setEnvFileIdPendingDelete(null);
+                        setEnvFileDeleteError(null);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete env file?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the env file and all variables inside
+                            it.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {envFileDeleteError ? (
+                        <p className="text-sm text-red-300">{envFileDeleteError}</p>
+                    ) : null}
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingEnvFile}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                void handleDeleteEnvFile();
+                            }}
+                            disabled={isDeletingEnvFile}
+                        >
+                            {isDeletingEnvFile ? "Deleting..." : "Delete env file"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             <section className="shrink-0 flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="mb-3">
@@ -1343,6 +1512,14 @@ export default function ProjectDetailPage() {
                                             }}
                                         >
                                             Edit
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            className="text-red-300 focus:text-red-200"
+                                            onSelect={() => {
+                                                setIsDeleteProjectDialogOpen(true);
+                                            }}
+                                        >
+                                            Delete
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -1528,6 +1705,17 @@ export default function ProjectDetailPage() {
                                                                 }}
                                                             >
                                                                 Edit
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                className="text-red-300 focus:text-red-200"
+                                                                onSelect={() => {
+                                                                    setEnvFileIdPendingDelete(
+                                                                        envFile.id
+                                                                    );
+                                                                    setEnvFileDeleteError(null);
+                                                                }}
+                                                            >
+                                                                Delete
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>

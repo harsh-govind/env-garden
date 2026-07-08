@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { serializeProjectEnvFile } from "@/lib/project-serializers";
-import { renameEnvFile } from "@/prisma/services/project";
+import { deleteEnvFile, renameEnvFile } from "@/prisma/services/project";
 import type {
+    DeleteEnvFileResponse,
     ProjectEnvFileRouteContext,
     RenameEnvFileBody,
     RenameEnvFileResponse,
@@ -91,6 +92,61 @@ export async function PATCH(
         return NextResponse.json(payload);
     } catch (error) {
         console.error("Failed to rename env file:", error);
+        return NextResponse.json(
+            { error: "Internal server error." },
+            { status: 500 }
+        );
+    }
+}
+
+export async function DELETE(
+    _: Request,
+    context: ProjectEnvFileRouteContext
+) {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const { workspaceId, projectId, envFileId } = await context.params;
+
+        if (!workspaceId || !projectId || !envFileId) {
+            return NextResponse.json(
+                { error: "Workspace id, project id, and env file id are required." },
+                { status: 400 }
+            );
+        }
+
+        const result = await deleteEnvFile({
+            workspaceId,
+            projectId,
+            envFileId,
+            userId: session.user.id,
+        });
+
+        if (result.status === "NOT_FOUND") {
+            return NextResponse.json(
+                { error: "Env file not found or access denied." },
+                { status: 404 }
+            );
+        }
+
+        if (result.status === "FORBIDDEN") {
+            return NextResponse.json(
+                { error: "Only project or workspace admins can delete env files." },
+                { status: 403 }
+            );
+        }
+
+        const payload: DeleteEnvFileResponse = {
+            success: true,
+        };
+
+        return NextResponse.json(payload);
+    } catch (error) {
+        console.error("Failed to delete env file:", error);
         return NextResponse.json(
             { error: "Internal server error." },
             { status: 500 }

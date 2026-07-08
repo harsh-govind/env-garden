@@ -614,6 +614,76 @@ export async function renameProject(input: {
     });
 }
 
+export async function deleteProject(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string;
+}): Promise<
+    | { status: "NOT_FOUND" }
+    | { status: "FORBIDDEN" }
+    | { status: "OK" }
+> {
+    return prisma.$transaction(async (tx) => {
+        const access = await getProjectAccessContext(tx, input);
+
+        if (!access) {
+            return {
+                status: "NOT_FOUND" as const,
+            };
+        }
+
+        if (!canManageProject(access)) {
+            return {
+                status: "FORBIDDEN" as const,
+            };
+        }
+
+        const actorEmail = await getActorEmail(tx, input.userId);
+        const envFileCount = await tx.envFile.count({
+            where: {
+                workspaceId: input.workspaceId,
+                projectId: input.projectId,
+            },
+        });
+
+        const deleted = await tx.project.deleteMany({
+            where: {
+                id: input.projectId,
+                workspaceId: input.workspaceId,
+            },
+        });
+
+        if (deleted.count === 0) {
+            return {
+                status: "NOT_FOUND" as const,
+            };
+        }
+
+        await tx.workspaceHistory.create({
+            data: {
+                workspaceId: input.workspaceId,
+                operation: "PROJECT_DELETED",
+                message: `${actorEmail} deleted project "${access.project.name}".`,
+                data: {
+                    project: {
+                        id: input.projectId,
+                        name: access.project.name,
+                    },
+                    deletedEnvFileCount: envFileCount,
+                    actor: {
+                        userId: input.userId,
+                        email: actorEmail,
+                    },
+                } as CreateWorkspaceHistoryEntryInput["data"],
+            },
+        });
+
+        return {
+            status: "OK" as const,
+        };
+    });
+}
+
 export async function createEnvFileForProject(input: {
     workspaceId: string;
     projectId: string;
@@ -940,6 +1010,93 @@ export async function renameEnvFile(input: {
 
         throw error;
     }
+}
+
+export async function deleteEnvFile(input: {
+    workspaceId: string;
+    projectId: string;
+    envFileId: string;
+    userId: string;
+}): Promise<
+    | { status: "NOT_FOUND" }
+    | { status: "FORBIDDEN" }
+    | { status: "OK" }
+> {
+    return prisma.$transaction(async (tx) => {
+        const access = await getProjectAccessContext(tx, input);
+
+        if (!access) {
+            return {
+                status: "NOT_FOUND" as const,
+            };
+        }
+
+        if (!canManageProject(access)) {
+            return {
+                status: "FORBIDDEN" as const,
+            };
+        }
+
+        const envFile = await tx.envFile.findFirst({
+            where: {
+                id: input.envFileId,
+                workspaceId: input.workspaceId,
+                projectId: input.projectId,
+            },
+            select: {
+                id: true,
+                name: true,
+                environment: true,
+                _count: {
+                    select: {
+                        variables: true,
+                    },
+                },
+            },
+        });
+
+        if (!envFile) {
+            return {
+                status: "NOT_FOUND" as const,
+            };
+        }
+
+        const actorEmail = await getActorEmail(tx, input.userId);
+
+        await tx.envFile.delete({
+            where: {
+                id: input.envFileId,
+            },
+        });
+
+        await tx.workspaceHistory.create({
+            data: {
+                workspaceId: input.workspaceId,
+                operation: "PROJECT_ENV_FILE_DELETED",
+                message: `${actorEmail} deleted env file "${envFile.name}" from project ${access.project.name}.`,
+                data: {
+                    project: {
+                        id: input.projectId,
+                        name: access.project.name,
+                    },
+                    envFile: {
+                        id: envFile.id,
+                        name: envFile.name,
+                        environment: envFile.environment,
+                    },
+                    deletedVariableCount: envFile._count.variables,
+                    actor: {
+                        userId: input.userId,
+                        email: actorEmail,
+                    },
+                } as CreateWorkspaceHistoryEntryInput["data"],
+            },
+        });
+
+        return {
+            status: "OK" as const,
+        };
+    });
 }
 
 export async function createEnvVariableForFile(input: {

@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { serializeProjectDetail } from "@/lib/project-serializers";
-import { getProjectDetailForUser, renameProject } from "@/prisma/services/project";
+import {
+    deleteProject,
+    getProjectDetailForUser,
+    renameProject,
+} from "@/prisma/services/project";
 import type {
+    DeleteProjectResponse,
     ProjectRouteContext,
     RenameProjectBody,
     RenameProjectResponse,
@@ -126,6 +131,57 @@ export async function PATCH(request: Request, context: ProjectRouteContext) {
         return NextResponse.json(payload);
     } catch (error) {
         console.error("Failed to rename project:", error);
+        return NextResponse.json(
+            { error: "Internal server error." },
+            { status: 500 }
+        );
+    }
+}
+
+export async function DELETE(_: Request, context: ProjectRouteContext) {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const { workspaceId, projectId } = await context.params;
+
+        if (!workspaceId || !projectId) {
+            return NextResponse.json(
+                { error: "Workspace id and project id are required." },
+                { status: 400 }
+            );
+        }
+
+        const result = await deleteProject({
+            workspaceId,
+            projectId,
+            userId: session.user.id,
+        });
+
+        if (result.status === "NOT_FOUND") {
+            return NextResponse.json(
+                { error: "Project not found or access denied." },
+                { status: 404 }
+            );
+        }
+
+        if (result.status === "FORBIDDEN") {
+            return NextResponse.json(
+                { error: "Only project or workspace admins can delete this project." },
+                { status: 403 }
+            );
+        }
+
+        const payload: DeleteProjectResponse = {
+            success: true,
+        };
+
+        return NextResponse.json(payload);
+    } catch (error) {
+        console.error("Failed to delete project:", error);
         return NextResponse.json(
             { error: "Internal server error." },
             { status: 500 }
