@@ -32,6 +32,15 @@ function formatUserEmail(email: string | null | undefined, userId: string) {
     return email ?? `user:${userId}`;
 }
 
+async function getActorEmail(tx: Prisma.TransactionClient, userId: string) {
+    const actor = await tx.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+    });
+
+    return formatUserEmail(actor?.email, userId);
+}
+
 function formatEnvironmentLabels(environments: EnvironmentTypeValue[]) {
     return environments
         .map((environment) => environmentTypeLabels[environment])
@@ -820,6 +829,7 @@ export async function getEnvVariablesForFile(input: {
             },
             select: {
                 id: true,
+                name: true,
                 environment: true,
             },
         });
@@ -836,6 +846,8 @@ export async function getEnvVariablesForFile(input: {
             };
         }
 
+        const project = access.project;
+        const readableEnvFile = envFile;
         const variables = await tx.envVariable.findMany({
             where: {
                 envFileId: input.envFileId,
@@ -854,8 +866,42 @@ export async function getEnvVariablesForFile(input: {
                 updatedAt: true,
             },
         });
+        const actorEmail = await getActorEmail(tx, input.userId);
+        const variableMetadata = variables.map((variable) => ({
+            id: variable.id,
+            key: variable.key,
+        }));
+
+        async function createCopyHistoryEntry() {
+            await tx.workspaceHistory.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    operation: "PROJECT_ENV_VARIABLES_COPIED",
+                    message: `${actorEmail} copied all variables from ${readableEnvFile.name} for project ${project.name}.`,
+                    data: {
+                        project: {
+                            id: input.projectId,
+                            name: project.name,
+                        },
+                        envFile: {
+                            id: input.envFileId,
+                            name: readableEnvFile.name,
+                            environment: readableEnvFile.environment,
+                        },
+                        variables: variableMetadata,
+                        variableCount: variableMetadata.length,
+                        actor: {
+                            userId: input.userId,
+                            email: actorEmail,
+                        },
+                    } as CreateWorkspaceHistoryEntryInput["data"],
+                },
+            });
+        }
 
         if (variables.length === 0) {
+            await createCopyHistoryEntry();
+
             return {
                 status: "OK" as const,
                 variables: [],
@@ -865,11 +911,15 @@ export async function getEnvVariablesForFile(input: {
         const projectKey = await getProjectKeyForProject(tx, input.projectId);
 
         try {
+            const decryptedVariables = variables.map((variable) =>
+                mapEncryptedEnvVariableRecord(variable, projectKey)
+            );
+
+            await createCopyHistoryEntry();
+
             return {
                 status: "OK" as const,
-                variables: variables.map((variable) =>
-                    mapEncryptedEnvVariableRecord(variable, projectKey)
-                ),
+                variables: decryptedVariables,
             };
         } finally {
             destroyBuffer(projectKey);
@@ -901,6 +951,7 @@ export async function getEnvVariableForFile(input: {
             },
             select: {
                 id: true,
+                name: true,
                 environment: true,
             },
         });
@@ -943,9 +994,42 @@ export async function getEnvVariableForFile(input: {
         const projectKey = await getProjectKeyForProject(tx, input.projectId);
 
         try {
+            const decryptedVariable = mapEncryptedEnvVariableRecord(
+                variable,
+                projectKey
+            );
+            const actorEmail = await getActorEmail(tx, input.userId);
+
+            await tx.workspaceHistory.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    operation: "PROJECT_ENV_VARIABLE_VIEWED",
+                    message: `${actorEmail} viewed ${variable.key} in ${envFile.name} for project ${access.project.name}.`,
+                    data: {
+                        project: {
+                            id: input.projectId,
+                            name: access.project.name,
+                        },
+                        envFile: {
+                            id: input.envFileId,
+                            name: envFile.name,
+                            environment: envFile.environment,
+                        },
+                        variable: {
+                            id: variable.id,
+                            key: variable.key,
+                        },
+                        actor: {
+                            userId: input.userId,
+                            email: actorEmail,
+                        },
+                    } as CreateWorkspaceHistoryEntryInput["data"],
+                },
+            });
+
             return {
                 status: "OK" as const,
-                variable: mapEncryptedEnvVariableRecord(variable, projectKey),
+                variable: decryptedVariable,
             };
         } finally {
             destroyBuffer(projectKey);
