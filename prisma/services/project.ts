@@ -769,6 +769,179 @@ export async function createEnvFileForProject(input: {
     }
 }
 
+export async function renameEnvFile(input: {
+    workspaceId: string;
+    projectId: string;
+    envFileId: string;
+    userId: string;
+    name: string;
+}): Promise<
+    | { status: "NOT_FOUND" }
+    | { status: "FORBIDDEN" }
+    | { status: "INVALID_NAME" }
+    | { status: "CONFLICT" }
+    | { status: "OK"; envFile: ProjectEnvFileRecord }
+> {
+    const name = input.name.trim();
+
+    if (name.length === 0 || name.length > 120) {
+        return {
+            status: "INVALID_NAME" as const,
+        };
+    }
+
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const access = await getProjectAccessContext(tx, input);
+
+            if (!access) {
+                return {
+                    status: "NOT_FOUND" as const,
+                };
+            }
+
+            if (!canManageProject(access)) {
+                return {
+                    status: "FORBIDDEN" as const,
+                };
+            }
+
+            const envFile = await tx.envFile.findFirst({
+                where: {
+                    id: input.envFileId,
+                    workspaceId: input.workspaceId,
+                    projectId: input.projectId,
+                },
+                select: {
+                    id: true,
+                    name: true,
+                },
+            });
+
+            if (!envFile) {
+                return {
+                    status: "NOT_FOUND" as const,
+                };
+            }
+
+            const previousName = envFile.name;
+
+            if (previousName === name) {
+                const current = await tx.envFile.findFirstOrThrow({
+                    where: {
+                        id: input.envFileId,
+                        workspaceId: input.workspaceId,
+                        projectId: input.projectId,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        environment: true,
+                        description: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        variables: {
+                            select: {
+                                id: true,
+                                key: true,
+                                note: true,
+                                createdAt: true,
+                                updatedAt: true,
+                            },
+                        },
+                    },
+                });
+
+                return {
+                    status: "OK" as const,
+                    envFile: mapEnvFileRecord(current),
+                };
+            }
+
+            const conflictingEnvFile = await tx.envFile.findFirst({
+                where: {
+                    projectId: input.projectId,
+                    name,
+                },
+                select: {
+                    id: true,
+                },
+            });
+
+            if (conflictingEnvFile) {
+                return {
+                    status: "CONFLICT" as const,
+                };
+            }
+
+            const actorEmail = await getActorEmail(tx, input.userId);
+
+            const updatedEnvFile = await tx.envFile.update({
+                where: {
+                    id: input.envFileId,
+                },
+                data: {
+                    name,
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    environment: true,
+                    description: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    variables: {
+                        select: {
+                            id: true,
+                            key: true,
+                            note: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        },
+                    },
+                },
+            });
+
+            await tx.workspaceHistory.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    operation: "PROJECT_ENV_FILE_RENAMED",
+                    message: `${actorEmail} renamed env file "${previousName}" to "${updatedEnvFile.name}" for project ${access.project.name}.`,
+                    data: {
+                        project: {
+                            id: input.projectId,
+                            name: access.project.name,
+                        },
+                        envFile: {
+                            id: updatedEnvFile.id,
+                            name: updatedEnvFile.name,
+                            environment: updatedEnvFile.environment,
+                        },
+                        previousName,
+                        actor: {
+                            userId: input.userId,
+                            email: actorEmail,
+                        },
+                    } as CreateWorkspaceHistoryEntryInput["data"],
+                },
+            });
+
+            return {
+                status: "OK" as const,
+                envFile: mapEnvFileRecord(updatedEnvFile),
+            };
+        });
+    } catch (error) {
+        if (isUniqueConstraintError(error)) {
+            return {
+                status: "CONFLICT" as const,
+            };
+        }
+
+        throw error;
+    }
+}
+
 export async function createEnvVariableForFile(input: {
     workspaceId: string;
     projectId: string;

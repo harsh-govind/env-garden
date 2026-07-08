@@ -133,6 +133,18 @@ export type CreateEnvFileBody = {
     description?: unknown;
 };
 
+export type RenameEnvFileRequest = {
+    name: string;
+};
+
+export type RenameEnvFileBody = {
+    name?: unknown;
+};
+
+export type RenameEnvFileResponse = {
+    envFile: ProjectEnvFile;
+};
+
 export type CreateEnvVariableRequest = {
     key: string;
     value: string;

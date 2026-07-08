@@ -60,6 +60,7 @@ import type {
     ProjectDetailResponse,
     ProjectEnvFile,
     ProjectEnvVariable,
+    RenameEnvFileResponse,
     RenameProjectResponse,
     SaveEnvVariablesResponse,
     VariableDraftRow,
@@ -393,6 +394,13 @@ export default function ProjectDetailPage() {
     const [isCreatingEnvFile, setIsCreatingEnvFile] = useState(false);
     const [envFileError, setEnvFileError] = useState<string | null>(null);
 
+    const [renamingEnvFileId, setRenamingEnvFileId] = useState<string | null>(null);
+    const [envFileDraftName, setEnvFileDraftName] = useState("");
+    const [isSavingEnvFileName, setIsSavingEnvFileName] = useState(false);
+    const [envFileNameRenameError, setEnvFileNameRenameError] = useState<string | null>(
+        null
+    );
+
     const [variableDraftRows, setVariableDraftRows] = useState<VariableDraftRow[]>([]);
     const [selectedDraftRowIds, setSelectedDraftRowIds] = useState<Set<string>>(
         () => new Set()
@@ -559,6 +567,90 @@ export default function ProjectDetailPage() {
             }
         },
         [project?.canManage, projectDraftName, projectUrl]
+    );
+
+    const startRenamingEnvFile = useCallback(
+        (envFile: ProjectEnvFile) => {
+            if (!project?.canManage) {
+                return;
+            }
+
+            setRenamingEnvFileId(envFile.id);
+            setEnvFileDraftName(envFile.name);
+            setEnvFileNameRenameError(null);
+        },
+        [project?.canManage]
+    );
+
+    const cancelRenamingEnvFile = useCallback(() => {
+        setRenamingEnvFileId(null);
+        setEnvFileDraftName("");
+        setEnvFileNameRenameError(null);
+    }, []);
+
+    const handleRenameEnvFile = useCallback(
+        async (event: FormEvent<HTMLFormElement>, envFileId: string) => {
+            event.preventDefault();
+
+            if (!project?.canManage) {
+                setEnvFileNameRenameError(
+                    "Only project or workspace admins can rename env files."
+                );
+                return;
+            }
+
+            const name = envFileDraftName.trim();
+
+            if (name.length === 0 || name.length > 120) {
+                setEnvFileNameRenameError("Env file name must be 120 characters or less.");
+                return;
+            }
+
+            setIsSavingEnvFileName(true);
+
+            try {
+                const response = await fetchJson<RenameEnvFileResponse>(
+                    `${projectUrl}/env-files/${envFileId}`,
+                    {
+                        method: "PATCH",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            name,
+                        }),
+                    }
+                );
+
+                setProject((currentProject) => {
+                    if (!currentProject) {
+                        return currentProject;
+                    }
+
+                    return {
+                        ...currentProject,
+                        envFiles: currentProject.envFiles.map((currentEnvFile) =>
+                            currentEnvFile.id === envFileId
+                                ? response.envFile
+                                : currentEnvFile
+                        ),
+                    };
+                });
+
+                if (activeEnvFileId === envFileId) {
+                    setActiveEnvFileId(envFileId);
+                }
+
+                setRenamingEnvFileId(null);
+                setEnvFileDraftName("");
+                setEnvFileNameRenameError(null);
+            } catch (renameError) {
+                setEnvFileNameRenameError(getErrorMessage(renameError));
+            } finally {
+                setIsSavingEnvFileName(false);
+            }
+        },
+        [activeEnvFileId, envFileDraftName, project?.canManage, projectUrl]
     );
 
     const activeEnvFile = useMemo(() => {
@@ -909,122 +1001,122 @@ export default function ProjectDetailPage() {
     }, [activeEnvFile, projectUrl]);
 
     const handleSaveVariables = useCallback(async () => {
-            if (!activeEnvFile) {
-                setVariableError("Select an env file first.");
+        if (!activeEnvFile) {
+            setVariableError("Select an env file first.");
+            return;
+        }
+
+        const variables = [];
+        const seenKeys = new Set<string>();
+
+        for (const row of variableDraftRows) {
+            const key = row.key.trim();
+            const note = row.note.trim();
+            const hasAnyValue =
+                Boolean(row.variableId) ||
+                key.length > 0 ||
+                row.value.length > 0 ||
+                note.length > 0;
+
+            if (!hasAnyValue) {
+                continue;
+            }
+
+            if (!envKeyPattern.test(key)) {
+                setVariableError(
+                    "Variable keys must start with a letter or underscore and contain only letters, numbers, and underscores."
+                );
                 return;
             }
 
-            const variables = [];
-            const seenKeys = new Set<string>();
+            if (key.length > 120) {
+                setVariableError("Variable keys must be 120 characters or less.");
+                return;
+            }
 
-            for (const row of variableDraftRows) {
-                const key = row.key.trim();
-                const note = row.note.trim();
-                const hasAnyValue =
-                    Boolean(row.variableId) ||
-                    key.length > 0 ||
-                    row.value.length > 0 ||
-                    note.length > 0;
+            if (row.isValueLoaded && row.value.length > 10000) {
+                setVariableError(`Value for ${key} must be 10,000 characters or less.`);
+                return;
+            }
 
-                if (!hasAnyValue) {
-                    continue;
+            if (note.length > 280) {
+                setVariableError(`Note for ${key} must be 280 characters or less.`);
+                return;
+            }
+
+            if (seenKeys.has(key)) {
+                setVariableError(`Duplicate variable key: ${key}.`);
+                return;
+            }
+
+            seenKeys.add(key);
+            const shouldSendValue =
+                !row.variableId || row.value !== row.originalValue;
+
+            if (!row.variableId && !row.isValueLoaded) {
+                setVariableError(`Value is required for ${key}.`);
+                return;
+            }
+
+            variables.push({
+                id: row.variableId,
+                key,
+                ...(shouldSendValue
+                    ? {
+                        value: row.value,
+                    }
+                    : {}),
+                note: note || null,
+            });
+        }
+
+        setIsSavingVariables(true);
+
+        try {
+            const response = await fetchJson<SaveEnvVariablesResponse>(
+                `${projectUrl}/env-files/${activeEnvFile.id}/variables`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        variables,
+                    }),
+                }
+            );
+
+            setProject((currentProject) => {
+                if (!currentProject) {
+                    return currentProject;
                 }
 
-                if (!envKeyPattern.test(key)) {
-                    setVariableError(
-                        "Variable keys must start with a letter or underscore and contain only letters, numbers, and underscores."
-                    );
-                    return;
-                }
-
-                if (key.length > 120) {
-                    setVariableError("Variable keys must be 120 characters or less.");
-                    return;
-                }
-
-                if (row.isValueLoaded && row.value.length > 10000) {
-                    setVariableError(`Value for ${key} must be 10,000 characters or less.`);
-                    return;
-                }
-
-                if (note.length > 280) {
-                    setVariableError(`Note for ${key} must be 280 characters or less.`);
-                    return;
-                }
-
-                if (seenKeys.has(key)) {
-                    setVariableError(`Duplicate variable key: ${key}.`);
-                    return;
-                }
-
-                seenKeys.add(key);
-                const shouldSendValue =
-                    !row.variableId || row.value !== row.originalValue;
-
-                if (!row.variableId && !row.isValueLoaded) {
-                    setVariableError(`Value is required for ${key}.`);
-                    return;
-                }
-
-                variables.push({
-                    id: row.variableId,
-                    key,
-                    ...(shouldSendValue
-                        ? {
-                            value: row.value,
+                return {
+                    ...currentProject,
+                    envFiles: currentProject.envFiles.map((envFile) => {
+                        if (envFile.id !== activeEnvFile.id) {
+                            return envFile;
                         }
-                        : {}),
-                    note: note || null,
-                });
-            }
 
-            setIsSavingVariables(true);
-
-            try {
-                const response = await fetchJson<SaveEnvVariablesResponse>(
-                    `${projectUrl}/env-files/${activeEnvFile.id}/variables`,
-                    {
-                        method: "PUT",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            variables,
-                        }),
-                    }
-                );
-
-                setProject((currentProject) => {
-                    if (!currentProject) {
-                        return currentProject;
-                    }
-
-                    return {
-                        ...currentProject,
-                        envFiles: currentProject.envFiles.map((envFile) => {
-                            if (envFile.id !== activeEnvFile.id) {
-                                return envFile;
-                            }
-
-                            return {
-                                ...envFile,
-                                variableCount: response.variables.length,
-                                variables: response.variables,
-                            };
-                        }),
-                    };
-                });
-                setVariableDraftRows(toVariableDraftRows(response.variables));
-                setSelectedDraftRowIds(new Set());
-                setRevealedVariableIds(new Set());
-                setLoadingVariableValueIds(new Set());
-                setVariableError(null);
-            } catch (createError) {
-                setVariableError(getErrorMessage(createError));
-            } finally {
-                setIsSavingVariables(false);
-            }
-        },
+                        return {
+                            ...envFile,
+                            variableCount: response.variables.length,
+                            variables: response.variables,
+                        };
+                    }),
+                };
+            });
+            setVariableDraftRows(toVariableDraftRows(response.variables));
+            setSelectedDraftRowIds(new Set());
+            setRevealedVariableIds(new Set());
+            setLoadingVariableValueIds(new Set());
+            setVariableError(null);
+        } catch (createError) {
+            setVariableError(getErrorMessage(createError));
+        } finally {
+            setIsSavingVariables(false);
+        }
+    },
         [
             activeEnvFile,
             projectUrl,
@@ -1290,49 +1382,120 @@ export default function ProjectDetailPage() {
                             ) : (
                                 project.envFiles.map((envFile) => {
                                     const isActive = activeEnvFile?.id === envFile.id;
+                                    const isRenaming = renamingEnvFileId === envFile.id;
+
+                                    if (isRenaming) {
+                                        return (
+                                            <form
+                                                key={envFile.id}
+                                                className="border border-border bg-background p-2"
+                                                onSubmit={(event) => {
+                                                    void handleRenameEnvFile(event, envFile.id);
+                                                }}
+                                            >
+                                                <input
+                                                    autoFocus
+                                                    value={envFileDraftName}
+                                                    onChange={(event) => {
+                                                        setEnvFileDraftName(event.target.value);
+                                                        setEnvFileNameRenameError(null);
+                                                    }}
+                                                    maxLength={120}
+                                                    placeholder="Env file name"
+                                                    className="h-8 w-full border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring"
+                                                />
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <Button
+                                                        type="submit"
+                                                        size="sm"
+                                                        disabled={isSavingEnvFileName}
+                                                    >
+                                                        <Save />
+                                                        {isSavingEnvFileName ? "Saving..." : "Save"}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={cancelRenamingEnvFile}
+                                                        disabled={isSavingEnvFileName}
+                                                    >
+                                                        <X />
+                                                        Cancel
+                                                    </Button>
+                                                </div>
+                                                {envFileNameRenameError ? (
+                                                    <p className="mt-2 text-xs text-red-300">
+                                                        {envFileNameRenameError}
+                                                    </p>
+                                                ) : null}
+                                            </form>
+                                        );
+                                    }
 
                                     return (
-                                        <button
+                                        <div
                                             key={envFile.id}
-                                            type="button"
-                                            className={`flex w-full items-center justify-between gap-3 border px-3 py-2 text-left transition ${isActive
+                                            className={`group flex items-center justify-between gap-2 border px-3 py-2 transition ${isActive
                                                 ? "border-foreground bg-foreground text-background"
                                                 : "border-border bg-background text-foreground hover:bg-accent"
                                                 }`}
-                                            onClick={() => {
-                                                setActiveEnvFileId(envFile.id);
-                                                setVariableDraftRows(
-                                                    toVariableDraftRows(envFile.variables)
-                                                );
-                                                setSelectedDraftRowIds(new Set());
-                                                setRevealedVariableIds(new Set());
-                                                setLoadingVariableValueIds(new Set());
-                                                setVariableError(null);
-                                            }}
                                         >
-                                            <span className="min-w-0">
-                                                <span className="flex items-center gap-2">
-                                                    <span
-                                                        className="size-2 shrink-0"
-                                                        style={{
-                                                            backgroundColor: getEnvironmentColor(
-                                                                envFile.environment
-                                                            ),
-                                                        }}
-                                                        aria-hidden="true"
-                                                    />
-                                                    <span className="truncate text-sm font-medium">
-                                                        {envFile.name}
+                                            <button
+                                                type="button"
+                                                className="min-w-0 flex-1 text-left"
+                                                onClick={() => {
+                                                    setActiveEnvFileId(envFile.id);
+                                                    setVariableDraftRows(
+                                                        toVariableDraftRows(envFile.variables)
+                                                    );
+                                                    setSelectedDraftRowIds(new Set());
+                                                    setRevealedVariableIds(new Set());
+                                                    setLoadingVariableValueIds(new Set());
+                                                    setVariableError(null);
+                                                }}
+                                            >
+                                                <span className="min-w-0">
+                                                    <span className="flex items-center gap-2">
+                                                        <span
+                                                            className="size-2 shrink-0"
+                                                            style={{
+                                                                backgroundColor: getEnvironmentColor(
+                                                                    envFile.environment
+                                                                ),
+                                                            }}
+                                                            aria-hidden="true"
+                                                        />
+                                                        <span className="truncate text-sm font-medium">
+                                                            {envFile.name}
+                                                        </span>
+                                                    </span>
+                                                    <span className="mt-1 block text-xs opacity-70">
+                                                        {environmentTypeLabels[envFile.environment]}
                                                     </span>
                                                 </span>
-                                                <span className="mt-1 block text-xs opacity-70">
-                                                    {environmentTypeLabels[envFile.environment]}
+                                            </button>
+                                            <span className="flex shrink-0 items-center gap-2">
+                                                <span className="text-xs opacity-70">
+                                                    {envFile.variableCount}
                                                 </span>
+                                                {project.canManage ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon-xs"
+                                                        onClick={() => {
+                                                            startRenamingEnvFile(envFile);
+                                                        }}
+                                                        aria-label={`Rename ${envFile.name}`}
+                                                        title="Rename env file"
+                                                        className={isActive ? "border-background/40 text-background hover:bg-background/10 hover:text-background" : ""}
+                                                    >
+                                                        <Pencil />
+                                                    </Button>
+                                                ) : null}
                                             </span>
-                                            <span className="shrink-0 text-xs opacity-70">
-                                                {envFile.variableCount}
-                                            </span>
-                                        </button>
+                                        </div>
                                     );
                                 })
                             )}
