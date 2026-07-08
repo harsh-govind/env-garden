@@ -4,6 +4,16 @@ import { useCallback, useState, type FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import DashboardSidebar from "@/components/dashboard/sidebar";
 import DashboardTopNav from "@/components/dashboard/top-nav";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -38,8 +48,12 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         isLoading,
         isWorkspaceLoading,
         isCreatingWorkspace,
+        isRenamingWorkspace,
+        isDeletingWorkspace,
         selectWorkspace,
         createWorkspace,
+        renameWorkspace,
+        deleteWorkspace,
         createProject,
         isCreatingProject,
     } = useWorkspace();
@@ -56,6 +70,10 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
     const [projectEnvironmentsInput, setProjectEnvironmentsInput] = useState<EnvironmentTypeValue[]>(
         [...defaultProjectEnvironmentTypes]
     );
+    const [isRenameWorkspaceDialogOpen, setIsRenameWorkspaceDialogOpen] = useState(false);
+    const [workspaceRenameInput, setWorkspaceRenameInput] = useState("");
+    const [workspaceActionError, setWorkspaceActionError] = useState<string | null>(null);
+    const [isDeleteWorkspaceDialogOpen, setIsDeleteWorkspaceDialogOpen] = useState(false);
 
     const workspaceName = activeWorkspace?.name ?? "No workspace";
 
@@ -72,6 +90,25 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         setCreateDialogError(null);
         setIsCreateDialogOpen(true);
     }, []);
+
+    const handleOpenRenameWorkspaceDialog = useCallback(() => {
+        if (!activeWorkspaceId) {
+            return;
+        }
+
+        setWorkspaceRenameInput(activeWorkspace?.name ?? "");
+        setWorkspaceActionError(null);
+        setIsRenameWorkspaceDialogOpen(true);
+    }, [activeWorkspace?.name, activeWorkspaceId]);
+
+    const handleOpenDeleteWorkspaceDialog = useCallback(() => {
+        if (!activeWorkspaceId) {
+            return;
+        }
+
+        setWorkspaceActionError(null);
+        setIsDeleteWorkspaceDialogOpen(true);
+    }, [activeWorkspaceId]);
 
     const handleOpenCreateProjectDialog = useCallback(() => {
         setCreateTarget("project");
@@ -197,6 +234,70 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
         projectNameInput,
     ]);
 
+    const handleRenameWorkspaceSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!activeWorkspaceId) {
+            setWorkspaceActionError("No active workspace selected.");
+            return;
+        }
+
+        const name = workspaceRenameInput.trim();
+
+        if (name.length < 2) {
+            setWorkspaceActionError("Workspace name must be at least 2 characters.");
+            return;
+        }
+
+        if (name.length > 80) {
+            setWorkspaceActionError("Workspace name must be 80 characters or less.");
+            return;
+        }
+
+        try {
+            if (!renameWorkspace) {
+                throw new Error("Workspace rename is not available.");
+            }
+
+            await renameWorkspace({
+                workspaceId: activeWorkspaceId,
+                name,
+            });
+            setWorkspaceActionError(null);
+            setIsRenameWorkspaceDialogOpen(false);
+        } catch (renameError) {
+            setWorkspaceActionError(
+                renameError instanceof Error
+                    ? renameError.message
+                    : "Failed to rename workspace."
+            );
+        }
+    }, [activeWorkspaceId, renameWorkspace, workspaceRenameInput]);
+
+    const handleDeleteWorkspace = useCallback(async () => {
+        if (!activeWorkspaceId) {
+            setWorkspaceActionError("No active workspace selected.");
+            return;
+        }
+
+        try {
+            if (!deleteWorkspace) {
+                throw new Error("Workspace deletion is not available.");
+            }
+
+            await deleteWorkspace(activeWorkspaceId);
+            setWorkspaceActionError(null);
+            setIsDeleteWorkspaceDialogOpen(false);
+            router.replace("/");
+        } catch (deleteError) {
+            setWorkspaceActionError(
+                deleteError instanceof Error
+                    ? deleteError.message
+                    : "Failed to delete workspace."
+            );
+        }
+    }, [activeWorkspaceId, deleteWorkspace, router]);
+
     const handleWorkspaceChange = useCallback((workspaceId: string) => {
         selectWorkspace(workspaceId);
 
@@ -243,8 +344,12 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                         activeWorkspaceId={activeWorkspaceId}
                         activeWorkspaceName={workspaceName}
                         isCreatingWorkspace={isCreatingWorkspace}
+                        isRenamingWorkspace={isRenamingWorkspace}
+                        isDeletingWorkspace={isDeletingWorkspace}
                         isCreatingProject={isCreatingProject}
                         onWorkspaceChange={handleWorkspaceChange}
+                        onRenameWorkspace={handleOpenRenameWorkspaceDialog}
+                        onDeleteWorkspace={handleOpenDeleteWorkspaceDialog}
                         onCreateProject={handleOpenCreateProjectDialog}
                         onCreateWorkspace={handleOpenCreateWorkspaceDialog}
                         onOpenSidebar={() => setIsSidebarOpen((prev) => !prev)}
@@ -438,6 +543,101 @@ function AuthenticatedShell({ children }: AuthenticatedLayoutProps) {
                             )}
                         </DialogContent>
                     </Dialog>
+
+                    <Dialog
+                        open={isRenameWorkspaceDialogOpen}
+                        onOpenChange={(isOpen) => {
+                            setIsRenameWorkspaceDialogOpen(isOpen);
+
+                            if (!isOpen) {
+                                setWorkspaceActionError(null);
+                            }
+                        }}
+                    >
+                        <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Rename workspace</DialogTitle>
+                                <DialogDescription>
+                                    Update the workspace name used across the app.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <form
+                                className="space-y-3"
+                                onSubmit={(event) => {
+                                    void handleRenameWorkspaceSubmit(event);
+                                }}
+                            >
+                                <label className="block text-xs tracking-wide text-muted-foreground uppercase">
+                                    Workspace name
+                                    <input
+                                        value={workspaceRenameInput}
+                                        onChange={(event) => {
+                                            setWorkspaceRenameInput(event.target.value);
+                                        }}
+                                        placeholder="Acme Platform"
+                                        className="mt-2 w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+                                        required
+                                    />
+                                </label>
+
+                                {workspaceActionError ? (
+                                    <p className="text-sm text-red-300">{workspaceActionError}</p>
+                                ) : null}
+
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setIsRenameWorkspaceDialogOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={isRenamingWorkspace}>
+                                        {isRenamingWorkspace ? "Renaming workspace..." : "Rename workspace"}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+
+                    <AlertDialog
+                        open={isDeleteWorkspaceDialogOpen}
+                        onOpenChange={(isOpen) => {
+                            setIsDeleteWorkspaceDialogOpen(isOpen);
+
+                            if (!isOpen) {
+                                setWorkspaceActionError(null);
+                            }
+                        }}
+                    >
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete <strong>{activeWorkspace?.name ?? "this workspace"}</strong> and all projects, env files, variables, members, and history.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+
+                            {workspaceActionError ? (
+                                <p className="text-sm text-red-300">{workspaceActionError}</p>
+                            ) : null}
+
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isDeletingWorkspace}>
+                                    Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => {
+                                        void handleDeleteWorkspace();
+                                    }}
+                                    disabled={isDeletingWorkspace}
+                                >
+                                    {isDeletingWorkspace ? "Deleting..." : "Delete workspace"}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             </div>
         </div>

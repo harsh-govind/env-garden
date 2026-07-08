@@ -94,6 +94,11 @@ export type CreateWorkspaceRequest = {
     description?: string;
 };
 
+export type RenameWorkspaceRequest = {
+    workspaceId: string;
+    name: string;
+};
+
 export type WorkspacesResponse = {
     workspaces: WorkspaceSummary[];
 };
@@ -104,6 +109,14 @@ export type WorkspaceResponse = {
 
 export type CreateWorkspaceResponse = {
     workspaceId: string;
+};
+
+export type RenameWorkspaceResponse = {
+    workspace: WorkspaceSummary;
+};
+
+export type DeleteWorkspaceResponse = {
+    success: true;
 };
 
 export type CreateProjectRequest = {
@@ -136,11 +149,15 @@ export type WorkspaceContextValue = {
     isLoading: boolean;
     isWorkspaceLoading: boolean;
     isCreatingWorkspace: boolean;
+    isRenamingWorkspace?: boolean;
+    isDeletingWorkspace?: boolean;
     isCreatingProject?: boolean;
     error: string | null;
     selectWorkspace: (workspaceId: string) => void;
     refreshWorkspaces: () => Promise<void>;
     createWorkspace: (input: CreateWorkspaceRequest) => Promise<void>;
+    renameWorkspace?: (input: RenameWorkspaceRequest) => Promise<void>;
+    deleteWorkspace?: (workspaceId: string) => Promise<void>;
     createProject?: (input: CreateProjectRequest) => Promise<void>;
 };
 
@@ -151,6 +168,10 @@ export type ApiErrorPayload = {
 export type CreateWorkspaceBody = {
     name?: unknown;
     description?: unknown;
+};
+
+export type RenameWorkspaceBody = {
+    name?: unknown;
 };
 
 export type CreateProjectBody = {
@@ -282,8 +303,12 @@ export type DashboardTopNavProps = {
     activeWorkspaceId: string | null;
     activeWorkspaceName: string;
     isCreatingWorkspace: boolean;
+    isRenamingWorkspace?: boolean;
+    isDeletingWorkspace?: boolean;
     isCreatingProject?: boolean;
     onWorkspaceChange: (workspaceId: string) => void;
+    onRenameWorkspace?: () => void;
+    onDeleteWorkspace?: () => void;
     onCreateProject: () => void;
     onCreateWorkspace: () => void;
     onOpenSidebar: () => void;

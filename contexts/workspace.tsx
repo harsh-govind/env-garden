@@ -16,6 +16,9 @@ import type {
     CreateWorkspaceRequest,
     CreateWorkspaceResponse,
     CreateProjectResponse,
+    DeleteWorkspaceResponse,
+    RenameWorkspaceRequest,
+    RenameWorkspaceResponse,
     WorkspaceContextValue,
     WorkspaceDetail,
     WorkspaceResponse,
@@ -94,6 +97,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
     const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+    const [isRenamingWorkspace, setIsRenamingWorkspace] = useState(false);
+    const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -236,6 +241,76 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         []
     );
 
+    const renameWorkspace = useCallback(
+        async (input: RenameWorkspaceRequest) => {
+            setIsRenamingWorkspace(true);
+
+            try {
+                const response = await fetchJson<RenameWorkspaceResponse>(
+                    `/api/workspaces/${input.workspaceId}`,
+                    {
+                        method: "PATCH",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            name: input.name,
+                        }),
+                    }
+                );
+
+                setWorkspaces((currentWorkspaces) =>
+                    currentWorkspaces.map((workspace) =>
+                        workspace.id === response.workspace.id
+                            ? {
+                                ...workspace,
+                                name: response.workspace.name,
+                            }
+                            : workspace
+                    )
+                );
+                setActiveWorkspace((currentWorkspace) =>
+                    currentWorkspace && currentWorkspace.id === response.workspace.id
+                        ? {
+                            ...currentWorkspace,
+                            name: response.workspace.name,
+                        }
+                        : currentWorkspace
+                );
+                setError(null);
+            } catch (renameError) {
+                const message = getErrorMessage(renameError);
+                setError(message);
+                throw new Error(message);
+            } finally {
+                setIsRenamingWorkspace(false);
+            }
+        },
+        []
+    );
+
+    const deleteWorkspace = useCallback(
+        async (workspaceId: string) => {
+            setIsDeletingWorkspace(true);
+
+            try {
+                await fetchJson<DeleteWorkspaceResponse>(`/api/workspaces/${workspaceId}`, {
+                    method: "DELETE",
+                });
+
+                await refreshWorkspaces();
+                setError(null);
+            } catch (deleteError) {
+                const message = getErrorMessage(deleteError);
+                setError(message);
+                throw new Error(message);
+            } finally {
+                setIsDeletingWorkspace(false);
+            }
+        },
+        [refreshWorkspaces]
+    );
+
     useEffect(() => {
         void refreshWorkspaces();
     }, [refreshWorkspaces]);
@@ -291,11 +366,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             isLoading,
             isWorkspaceLoading,
             isCreatingWorkspace,
+            isRenamingWorkspace,
+            isDeletingWorkspace,
             isCreatingProject,
             error,
             selectWorkspace,
             refreshWorkspaces,
             createWorkspace,
+            renameWorkspace,
+            deleteWorkspace,
             createProject,
         }),
         [
@@ -303,11 +382,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             activeWorkspaceId,
             createProject,
             createWorkspace,
+            deleteWorkspace,
             error,
             isCreatingProject,
             isCreatingWorkspace,
+            isDeletingWorkspace,
             isLoading,
+            isRenamingWorkspace,
             isWorkspaceLoading,
+            renameWorkspace,
             refreshWorkspaces,
             selectWorkspace,
             workspaces,

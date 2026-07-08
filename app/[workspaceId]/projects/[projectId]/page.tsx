@@ -1511,7 +1511,7 @@ export default function ProjectDetailPage() {
                                                 startRenamingProject();
                                             }}
                                         >
-                                            Edit
+                                            Rename
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
                                             className="text-red-300 focus:text-red-200"
@@ -1704,7 +1704,7 @@ export default function ProjectDetailPage() {
                                                                     startRenamingEnvFile(envFile);
                                                                 }}
                                                             >
-                                                                Edit
+                                                                Rename
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 className="text-red-300 focus:text-red-200"
