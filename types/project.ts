@@ -133,6 +133,22 @@ export type CreateEnvFileBody = {
     description?: unknown;
 };
 
+export type RenameEnvFileRequest = {
+    name: string;
+};
+
+export type RenameEnvFileBody = {
+    name?: unknown;
+};
+
+export type RenameEnvFileResponse = {
+    envFile: ProjectEnvFile;
+};
+
+export type DeleteEnvFileResponse = {
+    success: true;
+};
+
 export type CreateEnvVariableRequest = {
     key: string;
     value: string;
@@ -176,6 +192,26 @@ export type CreateEnvVariableBody = {
 
 export type SaveEnvVariablesBody = {
     variables?: unknown;
+};
+
+export type RenameProjectRequest = {
+    name: string;
+};
+
+export type RenameProjectBody = {
+    name?: unknown;
+};
+
+export type RenameProjectResponse = {
+    project: {
+        id: string;
+        name: string;
+        updatedAt: string;
+    };
+};
+
+export type DeleteProjectResponse = {
+    success: true;
 };
 
 export type ProjectRouteContext = {

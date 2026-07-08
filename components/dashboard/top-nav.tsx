@@ -1,6 +1,15 @@
 "use client";
 
-import { FolderKanban, LogOut, Menu, Moon, Plus, Sun, User } from "lucide-react";
+import {
+    FolderKanban,
+    LogOut,
+    Menu,
+    Moon,
+    MoreHorizontal,
+    Plus,
+    Sun,
+    User,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -34,8 +43,12 @@ export default function DashboardTopNav({
     activeWorkspaceId,
     activeWorkspaceName,
     isCreatingWorkspace,
+    isRenamingWorkspace,
+    isDeletingWorkspace,
     isCreatingProject,
     onWorkspaceChange,
+    onRenameWorkspace,
+    onDeleteWorkspace,
     onCreateProject,
     onCreateWorkspace,
     onOpenSidebar,
@@ -97,24 +110,56 @@ export default function DashboardTopNav({
                     <span className="text-foreground">{activeWorkspaceName}</span>
                 </div>
 
-                <Select
-                    value={activeWorkspaceId ?? ""}
-                    onValueChange={onWorkspaceChange}
-                    disabled={workspaces.length === 0}
-                >
-                    <SelectTrigger className="w-48" aria-label="Select workspace">
-                        <SelectValue placeholder="No workspaces" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {workspaces.map((workspace) => (
-                            <SelectItem key={workspace.id} value={workspace.id}>
-                                {workspace.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-xs"
+                            aria-label="Workspace actions"
+                            title="Workspace actions"
+                            disabled={!activeWorkspaceId}
+                        >
+                            <MoreHorizontal />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-48">
+                        <DropdownMenuLabel>Workspace</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            onSelect={onRenameWorkspace}
+                            disabled={!activeWorkspaceId || isRenamingWorkspace}
+                        >
+                            {isRenamingWorkspace ? "Renaming..." : "Rename"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onSelect={onDeleteWorkspace}
+                            disabled={!activeWorkspaceId || isDeletingWorkspace}
+                            className="text-red-300 focus:text-red-200"
+                        >
+                            {isDeletingWorkspace ? "Deleting..." : "Delete"}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
                 <div className="ml-auto flex items-center gap-2">
+                    <Select
+                        value={activeWorkspaceId ?? ""}
+                        onValueChange={onWorkspaceChange}
+                        disabled={workspaces.length === 0}
+                    >
+                        <SelectTrigger className="w-48" aria-label="Select workspace">
+                            <SelectValue placeholder="No workspaces" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {workspaces.map((workspace) => (
+                                <SelectItem key={workspace.id} value={workspace.id}>
+                                    {workspace.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button

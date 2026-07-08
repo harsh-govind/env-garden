@@ -16,6 +16,7 @@ import {
     Copy,
     Eye,
     EyeOff,
+    MoreHorizontal,
     FilePlus2,
     Loader2,
     Pencil,
@@ -42,6 +43,19 @@ import {
 } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     defaultProjectEnvironmentTypes,
@@ -53,6 +67,8 @@ import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 import { formatTimeAgo } from "@/lib/utils";
 import type {
     CreateEnvFileResponse,
+    DeleteEnvFileResponse,
+    DeleteProjectResponse,
     EnvVariableValueResponse,
     EnvVariablesValueResponse,
     ParsedEnvRow,
@@ -60,6 +76,8 @@ import type {
     ProjectDetailResponse,
     ProjectEnvFile,
     ProjectEnvVariable,
+    RenameEnvFileResponse,
+    RenameProjectResponse,
     SaveEnvVariablesResponse,
     VariableDraftRow,
 } from "@/types/project";
@@ -379,6 +397,13 @@ export default function ProjectDetailPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const [isRenamingProject, setIsRenamingProject] = useState(false);
+    const [projectDraftName, setProjectDraftName] = useState("");
+    const [isSavingProjectName, setIsSavingProjectName] = useState(false);
+    const [projectNameError, setProjectNameError] = useState<string | null>(null);
+    const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
+    const [isDeletingProject, setIsDeletingProject] = useState(false);
+
     const [envFileEnvironment, setEnvFileEnvironment] =
         useState<EnvironmentTypeValue>(defaultProjectEnvironmentTypes[0]);
     const [envFileName, setEnvFileName] = useState("");
@@ -386,6 +411,18 @@ export default function ProjectDetailPage() {
     const [isCreateEnvFileOpen, setIsCreateEnvFileOpen] = useState(false);
     const [isCreatingEnvFile, setIsCreatingEnvFile] = useState(false);
     const [envFileError, setEnvFileError] = useState<string | null>(null);
+
+    const [renamingEnvFileId, setRenamingEnvFileId] = useState<string | null>(null);
+    const [envFileDraftName, setEnvFileDraftName] = useState("");
+    const [isSavingEnvFileName, setIsSavingEnvFileName] = useState(false);
+    const [envFileNameRenameError, setEnvFileNameRenameError] = useState<string | null>(
+        null
+    );
+    const [envFileIdPendingDelete, setEnvFileIdPendingDelete] = useState<string | null>(
+        null
+    );
+    const [isDeletingEnvFile, setIsDeletingEnvFile] = useState(false);
+    const [envFileDeleteError, setEnvFileDeleteError] = useState<string | null>(null);
 
     const [variableDraftRows, setVariableDraftRows] = useState<VariableDraftRow[]>([]);
     const [selectedDraftRowIds, setSelectedDraftRowIds] = useState<Set<string>>(
@@ -486,6 +523,254 @@ export default function ProjectDetailPage() {
             setIsRefreshing(false);
         }
     }, [activeEnvFileId, requestProject]);
+
+    const startRenamingProject = useCallback(() => {
+        if (!project?.canManage) {
+            return;
+        }
+
+        setProjectDraftName(project.name);
+        setProjectNameError(null);
+        setIsRenamingProject(true);
+    }, [project?.canManage, project?.name]);
+
+    const cancelRenamingProject = useCallback(() => {
+        setIsRenamingProject(false);
+        setProjectDraftName("");
+        setProjectNameError(null);
+    }, []);
+
+    const handleRenameProject = useCallback(
+        async (event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+
+            if (!project?.canManage) {
+                setProjectNameError("Only project or workspace admins can rename this project.");
+                return;
+            }
+
+            const name = projectDraftName.trim();
+
+            if (name.length < 2 || name.length > 80) {
+                setProjectNameError("Project name must be between 2 and 80 characters.");
+                return;
+            }
+
+            setIsSavingProjectName(true);
+
+            try {
+                const response = await fetchJson<RenameProjectResponse>(projectUrl, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        name,
+                    }),
+                });
+
+                setProject((currentProject) => {
+                    if (!currentProject) {
+                        return currentProject;
+                    }
+
+                    return {
+                        ...currentProject,
+                        name: response.project.name,
+                        updatedAt: response.project.updatedAt,
+                    };
+                });
+                setIsRenamingProject(false);
+                setProjectDraftName("");
+                setProjectNameError(null);
+            } catch (renameError) {
+                setProjectNameError(getErrorMessage(renameError));
+            } finally {
+                setIsSavingProjectName(false);
+            }
+        },
+        [project?.canManage, projectDraftName, projectUrl]
+    );
+
+    const startRenamingEnvFile = useCallback(
+        (envFile: ProjectEnvFile) => {
+            if (!project?.canManage) {
+                return;
+            }
+
+            setRenamingEnvFileId(envFile.id);
+            setEnvFileDraftName(envFile.name);
+            setEnvFileNameRenameError(null);
+        },
+        [project?.canManage]
+    );
+
+    const cancelRenamingEnvFile = useCallback(() => {
+        setRenamingEnvFileId(null);
+        setEnvFileDraftName("");
+        setEnvFileNameRenameError(null);
+    }, []);
+
+    const handleRenameEnvFile = useCallback(
+        async (event: FormEvent<HTMLFormElement>, envFileId: string) => {
+            event.preventDefault();
+
+            if (!project?.canManage) {
+                setEnvFileNameRenameError(
+                    "Only project or workspace admins can rename env files."
+                );
+                return;
+            }
+
+            const name = envFileDraftName.trim();
+
+            if (name.length === 0 || name.length > 120) {
+                setEnvFileNameRenameError("Env file name must be 120 characters or less.");
+                return;
+            }
+
+            setIsSavingEnvFileName(true);
+
+            try {
+                const response = await fetchJson<RenameEnvFileResponse>(
+                    `${projectUrl}/env-files/${envFileId}`,
+                    {
+                        method: "PATCH",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            name,
+                        }),
+                    }
+                );
+
+                setProject((currentProject) => {
+                    if (!currentProject) {
+                        return currentProject;
+                    }
+
+                    return {
+                        ...currentProject,
+                        envFiles: currentProject.envFiles.map((currentEnvFile) =>
+                            currentEnvFile.id === envFileId
+                                ? response.envFile
+                                : currentEnvFile
+                        ),
+                    };
+                });
+
+                if (activeEnvFileId === envFileId) {
+                    setActiveEnvFileId(envFileId);
+                }
+
+                setRenamingEnvFileId(null);
+                setEnvFileDraftName("");
+                setEnvFileNameRenameError(null);
+            } catch (renameError) {
+                setEnvFileNameRenameError(getErrorMessage(renameError));
+            } finally {
+                setIsSavingEnvFileName(false);
+            }
+        },
+        [activeEnvFileId, envFileDraftName, project?.canManage, projectUrl]
+    );
+
+    const handleDeleteProject = useCallback(async () => {
+        if (!project?.canManage) {
+            setProjectNameError("Only project or workspace admins can delete this project.");
+            return;
+        }
+
+        setIsDeletingProject(true);
+
+        try {
+            await fetchJson<DeleteProjectResponse>(projectUrl, {
+                method: "DELETE",
+            });
+
+            setIsDeleteProjectDialogOpen(false);
+            window.location.assign("/");
+        } catch (deleteError) {
+            setProjectNameError(getErrorMessage(deleteError));
+        } finally {
+            setIsDeletingProject(false);
+        }
+    }, [project?.canManage, projectUrl]);
+
+    const handleDeleteEnvFile = useCallback(async () => {
+        const envFileId = envFileIdPendingDelete;
+
+        if (!envFileId) {
+            return;
+        }
+
+        if (!project?.canManage) {
+            setEnvFileDeleteError(
+                "Only project or workspace admins can delete env files."
+            );
+            return;
+        }
+
+        setIsDeletingEnvFile(true);
+
+        try {
+            await fetchJson<DeleteEnvFileResponse>(
+                `${projectUrl}/env-files/${envFileId}`,
+                {
+                    method: "DELETE",
+                }
+            );
+
+            setProject((currentProject) => {
+                if (!currentProject) {
+                    return currentProject;
+                }
+
+                const remainingEnvFiles = currentProject.envFiles.filter(
+                    (envFile) => envFile.id !== envFileId
+                );
+
+                if (remainingEnvFiles.length === 0) {
+                    setActiveEnvFileId(null);
+                    setVariableDraftRows([]);
+                    setSelectedDraftRowIds(new Set());
+                    setRevealedVariableIds(new Set());
+                    setLoadingVariableValueIds(new Set());
+                } else if (activeEnvFileId === envFileId) {
+                    const fallbackEnvFile = remainingEnvFiles[0];
+                    setActiveEnvFileId(fallbackEnvFile.id);
+                    setVariableDraftRows(toVariableDraftRows(fallbackEnvFile.variables));
+                    setSelectedDraftRowIds(new Set());
+                    setRevealedVariableIds(new Set());
+                    setLoadingVariableValueIds(new Set());
+                }
+
+                return {
+                    ...currentProject,
+                    envFiles: remainingEnvFiles,
+                };
+            });
+
+            if (renamingEnvFileId === envFileId) {
+                cancelRenamingEnvFile();
+            }
+
+            setEnvFileDeleteError(null);
+            setEnvFileIdPendingDelete(null);
+        } catch (deleteError) {
+            setEnvFileDeleteError(getErrorMessage(deleteError));
+        } finally {
+            setIsDeletingEnvFile(false);
+        }
+    }, [
+        activeEnvFileId,
+        cancelRenamingEnvFile,
+        envFileIdPendingDelete,
+        project?.canManage,
+        projectUrl,
+        renamingEnvFileId,
+    ]);
 
     const activeEnvFile = useMemo(() => {
         if (!project) {
@@ -835,122 +1120,122 @@ export default function ProjectDetailPage() {
     }, [activeEnvFile, projectUrl]);
 
     const handleSaveVariables = useCallback(async () => {
-            if (!activeEnvFile) {
-                setVariableError("Select an env file first.");
+        if (!activeEnvFile) {
+            setVariableError("Select an env file first.");
+            return;
+        }
+
+        const variables = [];
+        const seenKeys = new Set<string>();
+
+        for (const row of variableDraftRows) {
+            const key = row.key.trim();
+            const note = row.note.trim();
+            const hasAnyValue =
+                Boolean(row.variableId) ||
+                key.length > 0 ||
+                row.value.length > 0 ||
+                note.length > 0;
+
+            if (!hasAnyValue) {
+                continue;
+            }
+
+            if (!envKeyPattern.test(key)) {
+                setVariableError(
+                    "Variable keys must start with a letter or underscore and contain only letters, numbers, and underscores."
+                );
                 return;
             }
 
-            const variables = [];
-            const seenKeys = new Set<string>();
+            if (key.length > 120) {
+                setVariableError("Variable keys must be 120 characters or less.");
+                return;
+            }
 
-            for (const row of variableDraftRows) {
-                const key = row.key.trim();
-                const note = row.note.trim();
-                const hasAnyValue =
-                    Boolean(row.variableId) ||
-                    key.length > 0 ||
-                    row.value.length > 0 ||
-                    note.length > 0;
+            if (row.isValueLoaded && row.value.length > 10000) {
+                setVariableError(`Value for ${key} must be 10,000 characters or less.`);
+                return;
+            }
 
-                if (!hasAnyValue) {
-                    continue;
+            if (note.length > 280) {
+                setVariableError(`Note for ${key} must be 280 characters or less.`);
+                return;
+            }
+
+            if (seenKeys.has(key)) {
+                setVariableError(`Duplicate variable key: ${key}.`);
+                return;
+            }
+
+            seenKeys.add(key);
+            const shouldSendValue =
+                !row.variableId || row.value !== row.originalValue;
+
+            if (!row.variableId && !row.isValueLoaded) {
+                setVariableError(`Value is required for ${key}.`);
+                return;
+            }
+
+            variables.push({
+                id: row.variableId,
+                key,
+                ...(shouldSendValue
+                    ? {
+                        value: row.value,
+                    }
+                    : {}),
+                note: note || null,
+            });
+        }
+
+        setIsSavingVariables(true);
+
+        try {
+            const response = await fetchJson<SaveEnvVariablesResponse>(
+                `${projectUrl}/env-files/${activeEnvFile.id}/variables`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        variables,
+                    }),
+                }
+            );
+
+            setProject((currentProject) => {
+                if (!currentProject) {
+                    return currentProject;
                 }
 
-                if (!envKeyPattern.test(key)) {
-                    setVariableError(
-                        "Variable keys must start with a letter or underscore and contain only letters, numbers, and underscores."
-                    );
-                    return;
-                }
-
-                if (key.length > 120) {
-                    setVariableError("Variable keys must be 120 characters or less.");
-                    return;
-                }
-
-                if (row.isValueLoaded && row.value.length > 10000) {
-                    setVariableError(`Value for ${key} must be 10,000 characters or less.`);
-                    return;
-                }
-
-                if (note.length > 280) {
-                    setVariableError(`Note for ${key} must be 280 characters or less.`);
-                    return;
-                }
-
-                if (seenKeys.has(key)) {
-                    setVariableError(`Duplicate variable key: ${key}.`);
-                    return;
-                }
-
-                seenKeys.add(key);
-                const shouldSendValue =
-                    !row.variableId || row.value !== row.originalValue;
-
-                if (!row.variableId && !row.isValueLoaded) {
-                    setVariableError(`Value is required for ${key}.`);
-                    return;
-                }
-
-                variables.push({
-                    id: row.variableId,
-                    key,
-                    ...(shouldSendValue
-                        ? {
-                            value: row.value,
+                return {
+                    ...currentProject,
+                    envFiles: currentProject.envFiles.map((envFile) => {
+                        if (envFile.id !== activeEnvFile.id) {
+                            return envFile;
                         }
-                        : {}),
-                    note: note || null,
-                });
-            }
 
-            setIsSavingVariables(true);
-
-            try {
-                const response = await fetchJson<SaveEnvVariablesResponse>(
-                    `${projectUrl}/env-files/${activeEnvFile.id}/variables`,
-                    {
-                        method: "PUT",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            variables,
-                        }),
-                    }
-                );
-
-                setProject((currentProject) => {
-                    if (!currentProject) {
-                        return currentProject;
-                    }
-
-                    return {
-                        ...currentProject,
-                        envFiles: currentProject.envFiles.map((envFile) => {
-                            if (envFile.id !== activeEnvFile.id) {
-                                return envFile;
-                            }
-
-                            return {
-                                ...envFile,
-                                variableCount: response.variables.length,
-                                variables: response.variables,
-                            };
-                        }),
-                    };
-                });
-                setVariableDraftRows(toVariableDraftRows(response.variables));
-                setSelectedDraftRowIds(new Set());
-                setRevealedVariableIds(new Set());
-                setLoadingVariableValueIds(new Set());
-                setVariableError(null);
-            } catch (createError) {
-                setVariableError(getErrorMessage(createError));
-            } finally {
-                setIsSavingVariables(false);
-            }
-        },
+                        return {
+                            ...envFile,
+                            variableCount: response.variables.length,
+                            variables: response.variables,
+                        };
+                    }),
+                };
+            });
+            setVariableDraftRows(toVariableDraftRows(response.variables));
+            setSelectedDraftRowIds(new Set());
+            setRevealedVariableIds(new Set());
+            setLoadingVariableValueIds(new Set());
+            setVariableError(null);
+        } catch (createError) {
+            setVariableError(getErrorMessage(createError));
+        } finally {
+            setIsSavingVariables(false);
+        }
+    },
         [
             activeEnvFile,
             projectUrl,
@@ -1088,6 +1373,70 @@ export default function ProjectDetailPage() {
 
     return (
         <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
+            <AlertDialog
+                open={isDeleteProjectDialogOpen}
+                onOpenChange={setIsDeleteProjectDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete project?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete <strong>{project.name}</strong> and
+                            all of its env files and variables.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingProject}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                void handleDeleteProject();
+                            }}
+                            disabled={isDeletingProject}
+                        >
+                            {isDeletingProject ? "Deleting..." : "Delete project"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={Boolean(envFileIdPendingDelete)}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        setEnvFileIdPendingDelete(null);
+                        setEnvFileDeleteError(null);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete env file?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the env file and all variables inside
+                            it.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {envFileDeleteError ? (
+                        <p className="text-sm text-red-300">{envFileDeleteError}</p>
+                    ) : null}
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingEnvFile}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                void handleDeleteEnvFile();
+                            }}
+                            disabled={isDeletingEnvFile}
+                        >
+                            {isDeletingEnvFile ? "Deleting..." : "Delete env file"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             <section className="shrink-0 flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="mb-3">
@@ -1101,9 +1450,85 @@ export default function ProjectDetailPage() {
                     <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
                         Project environments
                     </p>
-                    <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-foreground">
-                        {project.name}
-                    </h1>
+                    {isRenamingProject ? (
+                        <form
+                            className="mt-1 flex flex-wrap items-center gap-2"
+                            onSubmit={(event) => {
+                                void handleRenameProject(event);
+                            }}
+                        >
+                            <input
+                                autoFocus
+                                value={projectDraftName}
+                                onChange={(event) => {
+                                    setProjectDraftName(event.target.value);
+                                    setProjectNameError(null);
+                                }}
+                                maxLength={80}
+                                placeholder="Project name"
+                                className="h-9 w-72 max-w-full border border-border bg-background px-3 text-2xl font-semibold tracking-tight text-foreground outline-none focus:border-ring"
+                            />
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={isSavingProjectName}
+                            >
+                                <Save />
+                                {isSavingProjectName ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={cancelRenamingProject}
+                                disabled={isSavingProjectName}
+                            >
+                                <X />
+                                Cancel
+                            </Button>
+                        </form>
+                    ) : (
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <h1 className="truncate text-3xl font-semibold tracking-tight text-foreground">
+                                {project.name}
+                            </h1>
+                            {project.canManage ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon-xs"
+                                            aria-label="Project actions"
+                                            title="Project actions"
+                                        >
+                                            <MoreHorizontal />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                            onSelect={() => {
+                                                startRenamingProject();
+                                            }}
+                                        >
+                                            Rename
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            className="text-red-300 focus:text-red-200"
+                                            onSelect={() => {
+                                                setIsDeleteProjectDialogOpen(true);
+                                            }}
+                                        >
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : null}
+                        </div>
+                    )}
+                    {projectNameError ? (
+                        <p className="mt-2 text-sm text-red-300">{projectNameError}</p>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span>{project.envFiles.length} env files</span>
                         <span>
@@ -1116,18 +1541,20 @@ export default function ProjectDetailPage() {
                     </div>
                 </div>
 
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                        void refreshProject();
-                    }}
-                    disabled={isRefreshing}
-                >
-                    <RefreshCw className={isRefreshing ? "animate-spin" : ""} />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            void refreshProject();
+                        }}
+                        disabled={isRefreshing}
+                    >
+                        <RefreshCw className={isRefreshing ? "animate-spin" : ""} />
+                        Refresh
+                    </Button>
+                </div>
             </section>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden lg:grid lg:grid-cols-[20rem_minmax(0,1fr)]">
@@ -1160,49 +1587,141 @@ export default function ProjectDetailPage() {
                             ) : (
                                 project.envFiles.map((envFile) => {
                                     const isActive = activeEnvFile?.id === envFile.id;
+                                    const isRenaming = renamingEnvFileId === envFile.id;
+
+                                    if (isRenaming) {
+                                        return (
+                                            <form
+                                                key={envFile.id}
+                                                className="border border-border bg-background p-2"
+                                                onSubmit={(event) => {
+                                                    void handleRenameEnvFile(event, envFile.id);
+                                                }}
+                                            >
+                                                <input
+                                                    autoFocus
+                                                    value={envFileDraftName}
+                                                    onChange={(event) => {
+                                                        setEnvFileDraftName(event.target.value);
+                                                        setEnvFileNameRenameError(null);
+                                                    }}
+                                                    maxLength={120}
+                                                    placeholder="Env file name"
+                                                    className="h-8 w-full border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring"
+                                                />
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <Button
+                                                        type="submit"
+                                                        size="sm"
+                                                        disabled={isSavingEnvFileName}
+                                                    >
+                                                        <Save />
+                                                        {isSavingEnvFileName ? "Saving..." : "Save"}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={cancelRenamingEnvFile}
+                                                        disabled={isSavingEnvFileName}
+                                                    >
+                                                        <X />
+                                                        Cancel
+                                                    </Button>
+                                                </div>
+                                                {envFileNameRenameError ? (
+                                                    <p className="mt-2 text-xs text-red-300">
+                                                        {envFileNameRenameError}
+                                                    </p>
+                                                ) : null}
+                                            </form>
+                                        );
+                                    }
 
                                     return (
-                                        <button
+                                        <div
                                             key={envFile.id}
-                                            type="button"
-                                            className={`flex w-full items-center justify-between gap-3 border px-3 py-2 text-left transition ${isActive
+                                            className={`group flex items-center justify-between gap-2 border px-3 py-2 transition ${isActive
                                                 ? "border-foreground bg-foreground text-background"
                                                 : "border-border bg-background text-foreground hover:bg-accent"
                                                 }`}
-                                            onClick={() => {
-                                                setActiveEnvFileId(envFile.id);
-                                                setVariableDraftRows(
-                                                    toVariableDraftRows(envFile.variables)
-                                                );
-                                                setSelectedDraftRowIds(new Set());
-                                                setRevealedVariableIds(new Set());
-                                                setLoadingVariableValueIds(new Set());
-                                                setVariableError(null);
-                                            }}
                                         >
-                                            <span className="min-w-0">
-                                                <span className="flex items-center gap-2">
-                                                    <span
-                                                        className="size-2 shrink-0"
-                                                        style={{
-                                                            backgroundColor: getEnvironmentColor(
-                                                                envFile.environment
-                                                            ),
-                                                        }}
-                                                        aria-hidden="true"
-                                                    />
-                                                    <span className="truncate text-sm font-medium">
-                                                        {envFile.name}
+                                            <button
+                                                type="button"
+                                                className="min-w-0 flex-1 text-left"
+                                                onClick={() => {
+                                                    setActiveEnvFileId(envFile.id);
+                                                    setVariableDraftRows(
+                                                        toVariableDraftRows(envFile.variables)
+                                                    );
+                                                    setSelectedDraftRowIds(new Set());
+                                                    setRevealedVariableIds(new Set());
+                                                    setLoadingVariableValueIds(new Set());
+                                                    setVariableError(null);
+                                                }}
+                                            >
+                                                <span className="min-w-0">
+                                                    <span className="flex items-center gap-2">
+                                                        <span
+                                                            className="size-2 shrink-0"
+                                                            style={{
+                                                                backgroundColor: getEnvironmentColor(
+                                                                    envFile.environment
+                                                                ),
+                                                            }}
+                                                            aria-hidden="true"
+                                                        />
+                                                        <span className="truncate text-sm font-medium">
+                                                            {envFile.name}
+                                                        </span>
+                                                    </span>
+                                                    <span className="mt-1 block text-xs opacity-70">
+                                                        {environmentTypeLabels[envFile.environment]}
                                                     </span>
                                                 </span>
-                                                <span className="mt-1 block text-xs opacity-70">
-                                                    {environmentTypeLabels[envFile.environment]}
+                                            </button>
+                                            <span className="flex shrink-0 items-center gap-2">
+                                                <span className="text-xs opacity-70">
+                                                    {envFile.variableCount}
                                                 </span>
+                                                {project.canManage ? (
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="icon-xs"
+                                                                aria-label={`Actions for ${envFile.name}`}
+                                                                title="Env file actions"
+                                                                className={isActive ? "border-background/40 text-background hover:bg-background/10 hover:text-background" : ""}
+                                                            >
+                                                                <MoreHorizontal />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem
+                                                                onSelect={() => {
+                                                                    startRenamingEnvFile(envFile);
+                                                                }}
+                                                            >
+                                                                Rename
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                className="text-red-300 focus:text-red-200"
+                                                                onSelect={() => {
+                                                                    setEnvFileIdPendingDelete(
+                                                                        envFile.id
+                                                                    );
+                                                                    setEnvFileDeleteError(null);
+                                                                }}
+                                                            >
+                                                                Delete
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                ) : null}
                                             </span>
-                                            <span className="shrink-0 text-xs opacity-70">
-                                                {envFile.variableCount}
-                                            </span>
-                                        </button>
+                                        </div>
                                     );
                                 })
                             )}
@@ -1223,24 +1742,26 @@ export default function ProjectDetailPage() {
 
                             <label className="block text-xs tracking-wide text-muted-foreground uppercase">
                                 Environment
-                                <select
+                                <Select
                                     value={envFileEnvironment}
-                                    onChange={(event) => {
-                                        setEnvFileEnvironment(
-                                            event.target.value as EnvironmentTypeValue
-                                        );
+                                    onValueChange={(value) => {
+                                        setEnvFileEnvironment(value as EnvironmentTypeValue);
                                     }}
-                                    className="mt-2 h-8 w-full border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-ring"
                                 >
-                                    {environmentTypes.map((environmentType) => (
-                                        <option
-                                            key={environmentType.key}
-                                            value={environmentType.key}
-                                        >
-                                            {environmentType.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="mt-2">
+                                        <SelectValue placeholder="Select environment" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {environmentTypes.map((environmentType) => (
+                                            <SelectItem
+                                                key={environmentType.key}
+                                                value={environmentType.key}
+                                            >
+                                                {environmentType.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </label>
 
                             <label className="block text-xs tracking-wide text-muted-foreground uppercase">
