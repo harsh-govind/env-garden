@@ -178,6 +178,22 @@ export type SaveEnvVariablesBody = {
     variables?: unknown;
 };
 
+export type RenameProjectRequest = {
+    name: string;
+};
+
+export type RenameProjectBody = {
+    name?: unknown;
+};
+
+export type RenameProjectResponse = {
+    project: {
+        id: string;
+        name: string;
+        updatedAt: string;
+    };
+};
+
 export type ProjectRouteContext = {
     params: Promise<{
         workspaceId: string;

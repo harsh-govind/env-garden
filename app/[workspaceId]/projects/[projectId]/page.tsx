@@ -60,6 +60,7 @@ import type {
     ProjectDetailResponse,
     ProjectEnvFile,
     ProjectEnvVariable,
+    RenameProjectResponse,
     SaveEnvVariablesResponse,
     VariableDraftRow,
 } from "@/types/project";
@@ -379,6 +380,11 @@ export default function ProjectDetailPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const [isRenamingProject, setIsRenamingProject] = useState(false);
+    const [projectDraftName, setProjectDraftName] = useState("");
+    const [isSavingProjectName, setIsSavingProjectName] = useState(false);
+    const [projectNameError, setProjectNameError] = useState<string | null>(null);
+
     const [envFileEnvironment, setEnvFileEnvironment] =
         useState<EnvironmentTypeValue>(defaultProjectEnvironmentTypes[0]);
     const [envFileName, setEnvFileName] = useState("");
@@ -486,6 +492,74 @@ export default function ProjectDetailPage() {
             setIsRefreshing(false);
         }
     }, [activeEnvFileId, requestProject]);
+
+    const startRenamingProject = useCallback(() => {
+        if (!project?.canManage) {
+            return;
+        }
+
+        setProjectDraftName(project.name);
+        setProjectNameError(null);
+        setIsRenamingProject(true);
+    }, [project?.canManage, project?.name]);
+
+    const cancelRenamingProject = useCallback(() => {
+        setIsRenamingProject(false);
+        setProjectDraftName("");
+        setProjectNameError(null);
+    }, []);
+
+    const handleRenameProject = useCallback(
+        async (event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+
+            if (!project?.canManage) {
+                setProjectNameError("Only project or workspace admins can rename this project.");
+                return;
+            }
+
+            const name = projectDraftName.trim();
+
+            if (name.length < 2 || name.length > 80) {
+                setProjectNameError("Project name must be between 2 and 80 characters.");
+                return;
+            }
+
+            setIsSavingProjectName(true);
+
+            try {
+                const response = await fetchJson<RenameProjectResponse>(projectUrl, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        name,
+                    }),
+                });
+
+                setProject((currentProject) => {
+                    if (!currentProject) {
+                        return currentProject;
+                    }
+
+                    return {
+                        ...currentProject,
+                        name: response.project.name,
+                        updatedAt: response.project.updatedAt,
+                    };
+                });
+                setIsRenamingProject(false);
+                setProjectDraftName("");
+                setProjectNameError(null);
+            } catch (renameError) {
+                setProjectNameError(getErrorMessage(renameError));
+            } finally {
+                setIsSavingProjectName(false);
+            }
+        },
+        [project?.canManage, projectDraftName, projectUrl]
+    );
 
     const activeEnvFile = useMemo(() => {
         if (!project) {
@@ -1101,9 +1175,65 @@ export default function ProjectDetailPage() {
                     <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
                         Project environments
                     </p>
-                    <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-foreground">
-                        {project.name}
-                    </h1>
+                    {isRenamingProject ? (
+                        <form
+                            className="mt-1 flex flex-wrap items-center gap-2"
+                            onSubmit={(event) => {
+                                void handleRenameProject(event);
+                            }}
+                        >
+                            <input
+                                autoFocus
+                                value={projectDraftName}
+                                onChange={(event) => {
+                                    setProjectDraftName(event.target.value);
+                                    setProjectNameError(null);
+                                }}
+                                maxLength={80}
+                                placeholder="Project name"
+                                className="h-9 w-72 max-w-full border border-border bg-background px-3 text-2xl font-semibold tracking-tight text-foreground outline-none focus:border-ring"
+                            />
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={isSavingProjectName}
+                            >
+                                <Save />
+                                {isSavingProjectName ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={cancelRenamingProject}
+                                disabled={isSavingProjectName}
+                            >
+                                <X />
+                                Cancel
+                            </Button>
+                        </form>
+                    ) : (
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <h1 className="truncate text-3xl font-semibold tracking-tight text-foreground">
+                                {project.name}
+                            </h1>
+                            {project.canManage ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon-xs"
+                                    onClick={startRenamingProject}
+                                    aria-label="Rename project"
+                                    title="Rename project"
+                                >
+                                    <Pencil />
+                                </Button>
+                            ) : null}
+                        </div>
+                    )}
+                    {projectNameError ? (
+                        <p className="mt-2 text-sm text-red-300">{projectNameError}</p>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span>{project.envFiles.length} env files</span>
                         <span>

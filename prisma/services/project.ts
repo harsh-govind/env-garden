@@ -516,6 +516,104 @@ export async function getProjectDetailForUser(input: {
     });
 }
 
+export async function renameProject(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string;
+    name: string;
+}): Promise<
+    | { status: "NOT_FOUND" }
+    | { status: "FORBIDDEN" }
+    | { status: "INVALID_NAME" }
+    | { status: "OK"; project: { id: string; name: string; updatedAt: Date } }
+> {
+    const name = input.name.trim();
+
+    if (name.length < 2 || name.length > 80) {
+        return {
+            status: "INVALID_NAME" as const,
+        };
+    }
+
+    return prisma.$transaction(async (tx) => {
+        const access = await getProjectAccessContext(tx, input);
+
+        if (!access) {
+            return {
+                status: "NOT_FOUND" as const,
+            };
+        }
+
+        if (!canManageProject(access)) {
+            return {
+                status: "FORBIDDEN" as const,
+            };
+        }
+
+        const previousName = access.project.name;
+
+        if (previousName === name) {
+            const current = await tx.project.findFirstOrThrow({
+                where: {
+                    id: input.projectId,
+                    workspaceId: input.workspaceId,
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    updatedAt: true,
+                },
+            });
+
+            return {
+                status: "OK" as const,
+                project: current,
+            };
+        }
+
+        const actorEmail = await getActorEmail(tx, input.userId);
+
+        const updatedProject = await tx.project.update({
+            where: {
+                id: input.projectId,
+                workspaceId: input.workspaceId,
+            },
+            data: {
+                name,
+            },
+            select: {
+                id: true,
+                name: true,
+                updatedAt: true,
+            },
+        });
+
+        await tx.workspaceHistory.create({
+            data: {
+                workspaceId: input.workspaceId,
+                operation: "PROJECT_RENAMED",
+                message: `${actorEmail} renamed project "${previousName}" to "${updatedProject.name}".`,
+                data: {
+                    project: {
+                        id: updatedProject.id,
+                        name: updatedProject.name,
+                    },
+                    previousName,
+                    actor: {
+                        userId: input.userId,
+                        email: actorEmail,
+                    },
+                } as CreateWorkspaceHistoryEntryInput["data"],
+            },
+        });
+
+        return {
+            status: "OK" as const,
+            project: updatedProject,
+        };
+    });
+}
+
 export async function createEnvFileForProject(input: {
     workspaceId: string;
     projectId: string;
