@@ -16,6 +16,7 @@ import {
     Copy,
     Eye,
     EyeOff,
+    MoreHorizontal,
     FilePlus2,
     Loader2,
     Pencil,
@@ -42,6 +43,12 @@ import {
 } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     defaultProjectEnvironmentTypes,
@@ -1310,16 +1317,28 @@ export default function ProjectDetailPage() {
                                 {project.name}
                             </h1>
                             {project.canManage ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon-xs"
-                                    onClick={startRenamingProject}
-                                    aria-label="Rename project"
-                                    title="Rename project"
-                                >
-                                    <Pencil />
-                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon-xs"
+                                            aria-label="Project actions"
+                                            title="Project actions"
+                                        >
+                                            <MoreHorizontal />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                            onSelect={() => {
+                                                startRenamingProject();
+                                            }}
+                                        >
+                                            Edit
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             ) : null}
                         </div>
                     )}
@@ -1338,18 +1357,20 @@ export default function ProjectDetailPage() {
                     </div>
                 </div>
 
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                        void refreshProject();
-                    }}
-                    disabled={isRefreshing}
-                >
-                    <RefreshCw className={isRefreshing ? "animate-spin" : ""} />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            void refreshProject();
+                        }}
+                        disabled={isRefreshing}
+                    >
+                        <RefreshCw className={isRefreshing ? "animate-spin" : ""} />
+                        Refresh
+                    </Button>
+                </div>
             </section>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden lg:grid lg:grid-cols-[20rem_minmax(0,1fr)]">
@@ -1480,19 +1501,29 @@ export default function ProjectDetailPage() {
                                                     {envFile.variableCount}
                                                 </span>
                                                 {project.canManage ? (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="icon-xs"
-                                                        onClick={() => {
-                                                            startRenamingEnvFile(envFile);
-                                                        }}
-                                                        aria-label={`Rename ${envFile.name}`}
-                                                        title="Rename env file"
-                                                        className={isActive ? "border-background/40 text-background hover:bg-background/10 hover:text-background" : ""}
-                                                    >
-                                                        <Pencil />
-                                                    </Button>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="icon-xs"
+                                                                aria-label={`Actions for ${envFile.name}`}
+                                                                title="Env file actions"
+                                                                className={isActive ? "border-background/40 text-background hover:bg-background/10 hover:text-background" : ""}
+                                                            >
+                                                                <MoreHorizontal />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem
+                                                                onSelect={() => {
+                                                                    startRenamingEnvFile(envFile);
+                                                                }}
+                                                            >
+                                                                Edit
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 ) : null}
                                             </span>
                                         </div>
