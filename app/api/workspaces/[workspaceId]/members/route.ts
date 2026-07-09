@@ -8,7 +8,7 @@ import {
 import {
     serializeWorkspaceInvite,
     serializeWorkspaceMembers,
-} from "@/lib/member-serializers";
+} from "@/utils/serializers/member";
 import {
     inviteWorkspaceMember,
     listWorkspaceMembersForUser,

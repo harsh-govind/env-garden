@@ -7,7 +7,7 @@ import GoogleProvider from "next-auth/providers/google";
 import {
     DEFAULT_AVATAR_PRESET_ID,
     isAvatarPresetId,
-} from "@/lib/avatar-presets";
+} from "@/constants/avatar-presets";
 import {
     getEmailSenderAddress,
     sendSignInEmail,

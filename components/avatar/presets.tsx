@@ -24,9 +24,9 @@ import {
     type AvatarPresetId,
     type AvatarPresetPickerProps,
 } from "@/types/avatar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
-export { DEFAULT_AVATAR_PRESET_ID } from "@/lib/avatar-presets";
+export { DEFAULT_AVATAR_PRESET_ID } from "@/constants/avatar-presets";
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
     {

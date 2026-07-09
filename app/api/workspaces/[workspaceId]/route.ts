@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { serializeWorkspaceDetail } from "@/lib/workspace-serializers";
+import { serializeWorkspaceDetail } from "@/utils/serializers/workspace";
 import {
     deleteWorkspaceForUser,
     getWorkspaceDetailForUser,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { serializeProjectEnvFile } from "@/lib/project-serializers";
+import { serializeProjectEnvFile } from "@/utils/serializers/project";
 import { deleteEnvFile, renameEnvFile } from "@/prisma/services/project";
 import type {
     DeleteEnvFileResponse,

@@ -14,7 +14,7 @@ import {
     canViewHistory,
 } from "@/constants/access";
 import { matchesRoutePath } from "@/constants/routes";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import type {
     DashboardSidebarProps,
     SidebarItemData,

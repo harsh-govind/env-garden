@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { canViewHistory } from "@/constants/access";
-import { findMostRecentUpdatedAt } from "@/lib/updated-at";
+import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 import type {
     CreateWorkspaceForUserInput,
     WorkspaceDetailRecord,

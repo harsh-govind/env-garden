@@ -14,7 +14,7 @@ import { useAuthenticated } from "@/contexts/authenticated";
 import {
     DEFAULT_AVATAR_PRESET_ID,
     isAvatarPresetId,
-} from "@/lib/avatar-presets";
+} from "@/constants/avatar-presets";
 import type { AvatarPresetId } from "@/types/avatar";
 import type { ProfileResponse } from "@/types/user";
 

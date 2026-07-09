@@ -58,7 +58,7 @@ import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
 import { environmentTypeLabels } from "@/constants/environment";
 import { createInMemoryCache } from "@/lib/cache";
-import { cn, formatTimeAgo } from "@/lib/utils";
+import { cn, formatTimeAgo } from "@/utils";
 import type {
     AccessFilterValue,
     AppliedFilterChip,
@@ -1027,228 +1027,228 @@ function AuthenticatedMembersPage({ workspaceId }: { workspaceId: string }) {
 
     return (
         <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
-                <section className="shrink-0 flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
-                            Workspace members
-                        </p>
-                        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
-                            {workspace?.name ?? data?.workspaceName ?? "Members"}
-                        </h1>
-                    </div>
-
-                    {data?.canManage ? (
-                        <Button type="button" size="sm" onClick={openInviteDialog}>
-                            <UserPlus />
-                            Invite member
-                        </Button>
-                    ) : null}
-                </section>
-
-                {notice ? (
-                    <div className="shrink-0 flex items-center justify-between gap-3 border border-border bg-card px-3 py-2 text-sm text-foreground">
-                        <span>{notice}</span>
-                        <Button
-                            type="button"
-                            size="icon-xs"
-                            variant="ghost"
-                            onClick={() => setNotice(null)}
-                        >
-                            <X />
-                        </Button>
-                    </div>
-                ) : null}
-
-                {error ? (
-                    <p className="shrink-0 border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
-                        {error}
+            <section className="shrink-0 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
+                        Workspace members
                     </p>
-                ) : null}
+                    <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
+                        {workspace?.name ?? data?.workspaceName ?? "Members"}
+                    </h1>
+                </div>
 
-                {isLoading ? (
-                    <MemberPageSkeleton />
-                ) : data ? (
-                    <Tabs
-                        value={activeTab}
-                        onValueChange={(value) => setActiveTab(value as MembersTab)}
-                        className="min-h-0 flex-1 gap-0 overflow-hidden border border-border bg-card"
+                {data?.canManage ? (
+                    <Button type="button" size="sm" onClick={openInviteDialog}>
+                        <UserPlus />
+                        Invite member
+                    </Button>
+                ) : null}
+            </section>
+
+            {notice ? (
+                <div className="shrink-0 flex items-center justify-between gap-3 border border-border bg-card px-3 py-2 text-sm text-foreground">
+                    <span>{notice}</span>
+                    <Button
+                        type="button"
+                        size="icon-xs"
+                        variant="ghost"
+                        onClick={() => setNotice(null)}
                     >
-                        <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-                            <TabsList variant="line" className="h-9">
-                                <TabsTrigger value="members" className="px-3">
-                                    <Users className="size-4" />
-                                    Members
-                                </TabsTrigger>
-                                <TabsTrigger value="invites" className="px-3">
-                                    <Mail className="size-4" />
-                                    Invites
-                                </TabsTrigger>
-                            </TabsList>
-                        </div>
+                        <X />
+                    </Button>
+                </div>
+            ) : null}
 
-                        <TabsContent value="members" className="m-0 flex min-h-0 flex-col overflow-hidden">
-                                <MemberFilters
-                                    search={memberSearch}
-                                    roleFilter={memberRoleFilter}
-                                    accessFilter={memberAccessFilter}
-                                    actionFilter={memberActionFilter}
-                                    sort={memberSort}
-                                    isDebouncing={isMemberSearchDebouncing}
-                                    onSearchChange={(value) => {
-                                        setMemberSearch(value);
-                                        setMemberPage(1);
-                                    }}
-                                    onRoleFilterChange={(value) => {
-                                        setMemberRoleFilter(value);
-                                        setMemberPage(1);
-                                    }}
-                                    onAccessFilterChange={(value) => {
-                                        setMemberAccessFilter(value);
-                                        setMemberPage(1);
-                                    }}
-                                    onActionFilterChange={(value) => {
-                                        setMemberActionFilter(value);
-                                        setMemberPage(1);
-                                    }}
-                                    onSortChange={(value) => {
-                                        setMemberSort(value);
-                                        setMemberPage(1);
-                                    }}
-                                    onClear={clearMemberFilters}
-                                />
+            {error ? (
+                <p className="shrink-0 border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
+                    {error}
+                </p>
+            ) : null}
 
-                                {memberPageState.rows.length > 0 ? (
-                                    <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-                                        {memberPageState.rows.map((member) => (
-                                            <MemberRow
-                                                key={member.id}
-                                                member={member}
-                                                onEdit={() => openEditDialog(member)}
-                                                onRemove={() => {
-                                                    void removeMember(member);
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <EmptyFilteredState
-                                        title="No members match"
-                                        description="Adjust search, role, access, action, or sort filters."
+            {isLoading ? (
+                <MemberPageSkeleton />
+            ) : data ? (
+                <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => setActiveTab(value as MembersTab)}
+                    className="min-h-0 flex-1 gap-0 overflow-hidden border border-border bg-card"
+                >
+                    <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+                        <TabsList variant="line" className="h-9">
+                            <TabsTrigger value="members" className="px-3">
+                                <Users className="size-4" />
+                                Members
+                            </TabsTrigger>
+                            <TabsTrigger value="invites" className="px-3">
+                                <Mail className="size-4" />
+                                Invites
+                            </TabsTrigger>
+                        </TabsList>
+                    </div>
+
+                    <TabsContent value="members" className="m-0 flex min-h-0 flex-col overflow-hidden">
+                        <MemberFilters
+                            search={memberSearch}
+                            roleFilter={memberRoleFilter}
+                            accessFilter={memberAccessFilter}
+                            actionFilter={memberActionFilter}
+                            sort={memberSort}
+                            isDebouncing={isMemberSearchDebouncing}
+                            onSearchChange={(value) => {
+                                setMemberSearch(value);
+                                setMemberPage(1);
+                            }}
+                            onRoleFilterChange={(value) => {
+                                setMemberRoleFilter(value);
+                                setMemberPage(1);
+                            }}
+                            onAccessFilterChange={(value) => {
+                                setMemberAccessFilter(value);
+                                setMemberPage(1);
+                            }}
+                            onActionFilterChange={(value) => {
+                                setMemberActionFilter(value);
+                                setMemberPage(1);
+                            }}
+                            onSortChange={(value) => {
+                                setMemberSort(value);
+                                setMemberPage(1);
+                            }}
+                            onClear={clearMemberFilters}
+                        />
+
+                        {memberPageState.rows.length > 0 ? (
+                            <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+                                {memberPageState.rows.map((member) => (
+                                    <MemberRow
+                                        key={member.id}
+                                        member={member}
+                                        onEdit={() => openEditDialog(member)}
+                                        onRemove={() => {
+                                            void removeMember(member);
+                                        }}
                                     />
-                                )}
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyFilteredState
+                                title="No members match"
+                                description="Adjust search, role, access, action, or sort filters."
+                            />
+                        )}
 
-                                <PaginationControls
-                                    totalCount={filteredMembers.length}
-                                    pageState={memberPageState}
-                                    pageSize={memberPageSize}
-                                    onPageChange={setMemberPage}
-                                    onPageSizeChange={(pageSize) => {
-                                        setMemberPageSize(pageSize);
-                                        setMemberPage(1);
-                                    }}
-                                />
-                        </TabsContent>
-                        <TabsContent value="invites" className="m-0 flex min-h-0 flex-col overflow-hidden">
-                                <InviteFilters
-                                    search={inviteSearch}
-                                    roleFilter={inviteRoleFilter}
-                                    accessFilter={inviteAccessFilter}
-                                    deliveryFilter={inviteDeliveryFilter}
-                                    expiryFilter={inviteExpiryFilter}
-                                    statusFilter={inviteStatusFilter}
-                                    actionFilter={inviteActionFilter}
-                                    sort={inviteSort}
-                                    isDebouncing={isInviteSearchDebouncing}
-                                    onSearchChange={(value) => {
-                                        setInviteSearch(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onRoleFilterChange={(value) => {
-                                        setInviteRoleFilter(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onAccessFilterChange={(value) => {
-                                        setInviteAccessFilter(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onDeliveryFilterChange={(value) => {
-                                        setInviteDeliveryFilter(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onExpiryFilterChange={(value) => {
-                                        setInviteExpiryFilter(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onStatusFilterChange={(value) => {
-                                        setInviteStatusFilter(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onActionFilterChange={(value) => {
-                                        setInviteActionFilter(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onSortChange={(value) => {
-                                        setInviteSort(value);
-                                        setInvitePage(1);
-                                    }}
-                                    onClear={clearInviteFilters}
-                                />
+                        <PaginationControls
+                            totalCount={filteredMembers.length}
+                            pageState={memberPageState}
+                            pageSize={memberPageSize}
+                            onPageChange={setMemberPage}
+                            onPageSizeChange={(pageSize) => {
+                                setMemberPageSize(pageSize);
+                                setMemberPage(1);
+                            }}
+                        />
+                    </TabsContent>
+                    <TabsContent value="invites" className="m-0 flex min-h-0 flex-col overflow-hidden">
+                        <InviteFilters
+                            search={inviteSearch}
+                            roleFilter={inviteRoleFilter}
+                            accessFilter={inviteAccessFilter}
+                            deliveryFilter={inviteDeliveryFilter}
+                            expiryFilter={inviteExpiryFilter}
+                            statusFilter={inviteStatusFilter}
+                            actionFilter={inviteActionFilter}
+                            sort={inviteSort}
+                            isDebouncing={isInviteSearchDebouncing}
+                            onSearchChange={(value) => {
+                                setInviteSearch(value);
+                                setInvitePage(1);
+                            }}
+                            onRoleFilterChange={(value) => {
+                                setInviteRoleFilter(value);
+                                setInvitePage(1);
+                            }}
+                            onAccessFilterChange={(value) => {
+                                setInviteAccessFilter(value);
+                                setInvitePage(1);
+                            }}
+                            onDeliveryFilterChange={(value) => {
+                                setInviteDeliveryFilter(value);
+                                setInvitePage(1);
+                            }}
+                            onExpiryFilterChange={(value) => {
+                                setInviteExpiryFilter(value);
+                                setInvitePage(1);
+                            }}
+                            onStatusFilterChange={(value) => {
+                                setInviteStatusFilter(value);
+                                setInvitePage(1);
+                            }}
+                            onActionFilterChange={(value) => {
+                                setInviteActionFilter(value);
+                                setInvitePage(1);
+                            }}
+                            onSortChange={(value) => {
+                                setInviteSort(value);
+                                setInvitePage(1);
+                            }}
+                            onClear={clearInviteFilters}
+                        />
 
-                                {inviteRows.length === 0 ? (
-                                    <EmptyFilteredState
-                                        title="No invites"
-                                        description="Invite a teammate to create the first invite."
+                        {inviteRows.length === 0 ? (
+                            <EmptyFilteredState
+                                title="No invites"
+                                description="Invite a teammate to create the first invite."
+                            />
+                        ) : invitePageState.rows.length > 0 ? (
+                            <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+                                {invitePageState.rows.map((invite) => (
+                                    <InviteRow
+                                        key={invite.id}
+                                        invite={invite}
+                                        onRevoke={() => {
+                                            void revokeInvite(invite);
+                                        }}
                                     />
-                                ) : invitePageState.rows.length > 0 ? (
-                                    <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-                                        {invitePageState.rows.map((invite) => (
-                                            <InviteRow
-                                                key={invite.id}
-                                                invite={invite}
-                                                onRevoke={() => {
-                                                    void revokeInvite(invite);
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <EmptyFilteredState
-                                        title="No invites match"
-                                        description="Adjust search, role, access, delivery, expiry, or action filters."
-                                    />
-                                )}
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyFilteredState
+                                title="No invites match"
+                                description="Adjust search, role, access, delivery, expiry, or action filters."
+                            />
+                        )}
 
-                                <PaginationControls
-                                    totalCount={filteredInvites.length}
-                                    pageState={invitePageState}
-                                    pageSize={invitePageSize}
-                                    onPageChange={setInvitePage}
-                                    onPageSizeChange={(pageSize) => {
-                                        setInvitePageSize(pageSize);
-                                        setInvitePage(1);
-                                    }}
-                                />
-                        </TabsContent>
-                    </Tabs>
-                ) : null}
+                        <PaginationControls
+                            totalCount={filteredInvites.length}
+                            pageState={invitePageState}
+                            pageSize={invitePageSize}
+                            onPageChange={setInvitePage}
+                            onPageSizeChange={(pageSize) => {
+                                setInvitePageSize(pageSize);
+                                setInvitePage(1);
+                            }}
+                        />
+                    </TabsContent>
+                </Tabs>
+            ) : null}
 
-                <MemberAccessDialog
-                    state={dialogState}
-                    draft={draft}
-                    projects={data?.projects ?? []}
-                    formError={formError}
-                    isSubmitting={isSubmitting}
-                    onOpenChange={(isOpen) => {
-                        if (!isOpen) {
-                            closeDialog();
-                        }
-                    }}
-                    onDraftChange={setDraft}
-                    onProjectChange={upsertProjectDraft}
-                    onSubmit={(event) => {
-                        void handleSubmit(event);
-                    }}
-                />
+            <MemberAccessDialog
+                state={dialogState}
+                draft={draft}
+                projects={data?.projects ?? []}
+                formError={formError}
+                isSubmitting={isSubmitting}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        closeDialog();
+                    }
+                }}
+                onDraftChange={setDraft}
+                onProjectChange={upsertProjectDraft}
+                onSubmit={(event) => {
+                    void handleSubmit(event);
+                }}
+            />
         </div>
     );
 }
@@ -1308,7 +1308,7 @@ function FilterChoiceGroup<TValue extends string>({
                         className={cn(
                             "justify-between",
                             option.value === value &&
-                                "bg-accent text-accent-foreground"
+                            "bg-accent text-accent-foreground"
                         )}
                         onSelect={(event) => {
                             event.preventDefault();
@@ -2117,7 +2117,7 @@ function MemberAccessDialog({
                         </div>
 
                         {draft.role === "MEMBER" &&
-                        draft.projectAccessScope === "ALL_PROJECTS" ? (
+                            draft.projectAccessScope === "ALL_PROJECTS" ? (
                             <label className="block text-xs tracking-wide text-muted-foreground uppercase">
                                 Role on all projects
                                 <Select
@@ -2143,7 +2143,7 @@ function MemberAccessDialog({
                         ) : null}
 
                         {draft.role === "MEMBER" &&
-                        draft.projectAccessScope === "SELECTED_PROJECTS" ? (
+                            draft.projectAccessScope === "SELECTED_PROJECTS" ? (
                             <fieldset className="space-y-2">
                                 <legend className="text-xs tracking-wide text-muted-foreground uppercase">
                                     Projects

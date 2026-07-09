@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { isAvatarPresetId } from "@/lib/avatar-presets";
+import { isAvatarPresetId } from "@/constants/avatar-presets";
 import {
     getUserProfile,
     updateUserProfile,

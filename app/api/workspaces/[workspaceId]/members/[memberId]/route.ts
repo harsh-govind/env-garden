@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { parseMemberAccessBody } from "@/lib/member-access";
-import { serializeWorkspaceMember } from "@/lib/member-serializers";
+import { serializeWorkspaceMember } from "@/utils/serializers/member";
 import {
     removeWorkspaceMember,
     updateWorkspaceMember,
