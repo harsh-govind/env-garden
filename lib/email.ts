@@ -1,10 +1,5 @@
 import "server-only";
 import { Resend } from "resend";
-import {
-    APP_REPOSITORY_NAME,
-    APP_REPOSITORY_URL,
-    APP_WEBSITE_URL,
-} from "@/constants/app";
 import { EMAIL_SENDER_NAME } from "@/constants/email";
 import type {
     EmailLocalPart,
@@ -63,9 +58,6 @@ function renderEmailHtml({
 }) {
     const safeHeading = escapeHtml(heading);
     const safeActionUrl = escapeHtml(actionUrl);
-    const safeWebsiteUrl = escapeHtml(APP_WEBSITE_URL);
-    const safeRepositoryName = escapeHtml(APP_REPOSITORY_NAME);
-    const safeRepositoryUrl = escapeHtml(APP_REPOSITORY_URL);
     const paragraphs = body
         .map((line) => `<p style="margin:0 0 16px">${escapeHtml(line)}</p>`)
         .join("");
@@ -78,7 +70,7 @@ function renderEmailHtml({
         paragraphs,
         `<p style="margin:0 0 18px"><a href="${safeActionUrl}" style="color:#2563eb;text-decoration:underline">${escapeHtml(actionLabel)}</a></p>`,
         `<p style="margin:0 0 16px">${escapeHtml(note)}</p>`,
-        `<p style="margin:24px 0 0;color:#4b5563">Website: <a href="${safeWebsiteUrl}" style="color:#2563eb;text-decoration:underline">${safeWebsiteUrl}</a><br>Repo: <a href="${safeRepositoryUrl}" style="color:#2563eb;text-decoration:underline">${safeRepositoryName}</a></p>`,
+        '<p style="margin:24px 0 0;color:#4b5563">Thanks</p>',
         "</body>",
         "</html>",
     ].join("");
@@ -90,10 +82,10 @@ export async function sendWorkspaceInviteEmail(
     const apiKey = process.env.RESEND_API_KEY;
     const from = getEmailSenderAddress("invite");
 
-    if (process.env.NODE_ENV !== "production") {
-        console.log(`--\n[INVITE LINK]: ${input.inviteUrl}\n--`);
-        return { status: "SENT" };
-    }
+    // if (process.env.NODE_ENV !== "production") {
+    //     console.log(`--\n[INVITE LINK]: ${input.inviteUrl}\n--`);
+    //     return { status: "SENT" };
+    // }
 
     if (!apiKey || !from) {
         return { status: "NOT_CONFIGURED" };
@@ -107,9 +99,6 @@ export async function sendWorkspaceInviteEmail(
         `Accept the invitation: ${input.inviteUrl}`,
         "",
         "This invitation is tied to your email address.",
-        "",
-        `Website: ${APP_WEBSITE_URL}`,
-        `Repo: ${APP_REPOSITORY_NAME} (${APP_REPOSITORY_URL})`,
     ].join("\n");
     const html = renderEmailHtml({
         heading: `Join ${input.workspaceName} on ${EMAIL_SENDER_NAME}`,
@@ -164,9 +153,6 @@ export async function sendSignInEmail(
         input.magicLinkUrl,
         "",
         `This link expires at ${input.expiresAt.toISOString()}.`,
-        "",
-        `Website: ${APP_WEBSITE_URL}`,
-        `Repo: ${APP_REPOSITORY_NAME} (${APP_REPOSITORY_URL})`,
         "",
         "If you did not request this, you can ignore this email.",
     ].join("\n");
