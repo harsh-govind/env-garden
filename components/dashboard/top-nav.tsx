@@ -35,7 +35,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { isAvatarPresetId } from "@/lib/avatar-presets";
+import { isAvatarPresetId } from "@/constants/avatar-presets";
 import type { DashboardTopNavProps } from "@/types/workspace";
 
 export default function DashboardTopNav({

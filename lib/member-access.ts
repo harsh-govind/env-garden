@@ -1,10 +1,10 @@
 import {
     isEnvironmentAccessScopeValue,
-    isEnvironmentTypeValue,
     isProjectAccessScopeValue,
     isProjectRoleValue,
     isWorkspaceRoleValue,
-} from "@/lib/constants";
+} from "@/constants/access";
+import { isEnvironmentTypeValue } from "@/constants/environment";
 import type {
     InviteWorkspaceMemberBody,
     MemberAccessInput,

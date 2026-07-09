@@ -3,7 +3,7 @@ import {
     defaultProjectEnvironmentTypes,
     environmentTypeLabels,
     formatEnvironmentFileName,
-} from "@/lib/constants";
+} from "@/constants/environment";
 import {
     decryptEnvValue,
     decryptEnvValueToBuffer,

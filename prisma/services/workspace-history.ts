@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { canViewHistory } from "@/lib/constants";
+import { canViewHistory } from "@/constants/access";
 import type { Prisma } from "@/prisma/generated/client";
 import type {
     CreateWorkspaceHistoryEntryInput,
@@ -54,21 +54,21 @@ export async function listWorkspaceHistoryForUser(
         workspaceId: input.workspaceId,
         ...(query
             ? {
-                  OR: [
-                      {
-                          message: {
-                              contains: query,
-                              mode: "insensitive",
-                          },
-                      },
-                      {
-                          operation: {
-                              contains: query,
-                              mode: "insensitive",
-                          },
-                      },
-                  ],
-              }
+                OR: [
+                    {
+                        message: {
+                            contains: query,
+                            mode: "insensitive",
+                        },
+                    },
+                    {
+                        operation: {
+                            contains: query,
+                            mode: "insensitive",
+                        },
+                    },
+                ],
+            }
             : {}),
     };
 
@@ -108,11 +108,11 @@ export async function listWorkspaceHistoryForUser(
         ],
         ...(cursor
             ? {
-                  cursor: {
-                      id: cursor,
-                  },
-                  skip: 1,
-              }
+                cursor: {
+                    id: cursor,
+                },
+                skip: 1,
+            }
             : {}),
         take: HISTORY_PAGE_SIZE + 1,
     });

@@ -6,7 +6,7 @@ import type {
     WorkspaceDetail,
     WorkspaceSummary,
 } from "@/types/workspace";
-import { findMostRecentUpdatedAt } from "@/lib/updated-at";
+import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 
 export function serializeWorkspaceSummary(
     record: WorkspaceSummaryRecord

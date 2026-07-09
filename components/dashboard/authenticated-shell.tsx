@@ -26,8 +26,8 @@ import {
 import {
     defaultProjectEnvironmentTypes,
     environmentTypes,
-    matchesRoutePath,
-} from "@/lib/constants";
+} from "@/constants/environment";
+import { matchesRoutePath } from "@/constants/routes";
 import { useWorkspace } from "@/contexts/workspace";
 import type { AuthenticatedLayoutProps } from "@/types/layouts";
 import type { EnvironmentTypeValue } from "@/types/workspace";

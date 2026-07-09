@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { serializeProjectDetail } from "@/lib/project-serializers";
+import { serializeProjectDetail } from "@/utils/serializers/project";
 import {
     deleteProject,
     getProjectDetailForUser,

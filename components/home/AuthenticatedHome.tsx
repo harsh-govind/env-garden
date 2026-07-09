@@ -32,7 +32,7 @@ import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
 import debounce from "lodash/debounce";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatTimeAgo } from "@/lib/utils";
+import { formatTimeAgo } from "@/utils";
 import type {
     DeleteProjectResponse,
     RenameProjectResponse,

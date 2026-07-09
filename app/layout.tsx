@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
+import { APP_NAME } from "@/constants/app";
 import AuthenticatedLayout from "@/layouts/Authenticated";
 import UnauthenticatedLayout from "@/layouts/Unauthenticated";
 import AuthenticatedProvider from "@/provider/authenticated";
 import ProtectedRouteProvider from "@/provider/protected-route";
 import type { LayoutSwitcherProps, RootLayoutProps } from "@/types/layouts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { ThemeProvider } from "@/provider/theme";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
@@ -22,7 +23,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Env Garden",
+  title: APP_NAME,
   description: "Envs, simplified",
 };
 

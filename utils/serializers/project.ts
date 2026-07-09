@@ -7,7 +7,7 @@ import type {
     ProjectEnvVariableMetadataRecord,
     ProjectEnvVariableRecord,
 } from "@/types/project";
-import { findMostRecentUpdatedAt } from "@/lib/updated-at";
+import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 
 export function serializeProjectEnvVariable(
     record: ProjectEnvVariableRecord

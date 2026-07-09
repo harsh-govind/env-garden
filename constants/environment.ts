@@ -1,12 +1,7 @@
-import type { ProtectedRoute } from "@/types/auth";
 import type {
-    EnvironmentAccessScopeValue,
     EnvironmentTypeOption,
     EnvironmentTypeValue,
-    ProjectAccessScopeValue,
-    WorkspaceRoleValue,
 } from "@/types/workspace";
-import type { ProjectRoleValue } from "@/types/project";
 
 export const environmentTypes: EnvironmentTypeOption[] = [
     {
@@ -145,113 +140,16 @@ export const environmentTypeValues = environmentTypes.map(
     (environmentType) => environmentType.key
 );
 
-export const workspaceRoleValues: WorkspaceRoleValue[] = [
-    "OWNER",
-    "ADMIN",
-    "MEMBER",
-];
-
-export const projectAccessScopeValues: ProjectAccessScopeValue[] = [
-    "ALL_PROJECTS",
-    "SELECTED_PROJECTS",
-];
-
-export const environmentAccessScopeValues: EnvironmentAccessScopeValue[] = [
-    "ALL_ENVIRONMENTS",
-    "SELECTED_ENVIRONMENTS",
-];
-
-export const projectRoleValues: ProjectRoleValue[] = [
-    "OWNER",
-    "CONTRIBUTOR",
-    "VIEWER",
-];
-
 export const defaultProjectEnvironmentTypes: EnvironmentTypeValue[] = [
     "DEVELOPMENT",
     "STAGING",
     "PRODUCTION",
 ];
 
-export const publicRoutePaths = ["/"] as const;
-
-export const publicRoutePathPrefixes = ["/invites/"] as const;
-
 export function isEnvironmentTypeValue(value: unknown): value is EnvironmentTypeValue {
     return typeof value === "string" && environmentTypeValues.includes(value as EnvironmentTypeValue);
 }
 
-export function isWorkspaceRoleValue(value: unknown): value is WorkspaceRoleValue {
-    return typeof value === "string" && workspaceRoleValues.includes(value as WorkspaceRoleValue);
-}
-
-export function isProjectAccessScopeValue(value: unknown): value is ProjectAccessScopeValue {
-    return typeof value === "string" && projectAccessScopeValues.includes(value as ProjectAccessScopeValue);
-}
-
-export function isEnvironmentAccessScopeValue(value: unknown): value is EnvironmentAccessScopeValue {
-    return typeof value === "string" && environmentAccessScopeValues.includes(value as EnvironmentAccessScopeValue);
-}
-
-export function isProjectRoleValue(value: unknown): value is ProjectRoleValue {
-    return typeof value === "string" && projectRoleValues.includes(value as ProjectRoleValue);
-}
-
 export function formatEnvironmentFileName(environment: EnvironmentTypeValue) {
     return `.env.${environment.toLowerCase().replaceAll("_", "-")}`;
-}
-
-export const protectedRoutes: ProtectedRoute[] = [
-    {
-        path: "/",
-        redirectTo: "/",
-    },
-    {
-        path: "/:workspaceId/history",
-        redirectTo: "/",
-    },
-    {
-        path: "/:workspaceId/projects/:projectId",
-        redirectTo: "/",
-    },
-];
-
-function normalizePath(path: string) {
-    if (path.length > 1 && path.endsWith("/")) {
-        return path.slice(0, -1);
-    }
-
-    return path;
-}
-
-export function matchesRoutePath(pathname: string, routePath: string) {
-    const normalizedPathname = normalizePath(pathname);
-    const normalizedRoutePath = normalizePath(routePath);
-
-    const pathSegments = normalizedPathname.split("/").filter(Boolean);
-    const routeSegments = normalizedRoutePath.split("/").filter(Boolean);
-
-    if (pathSegments.length !== routeSegments.length) {
-        return false;
-    }
-
-    return routeSegments.every((segment, index) => {
-        if (segment.startsWith(":")) {
-            return pathSegments[index]?.length > 0;
-        }
-
-        return segment === pathSegments[index];
-    });
-}
-
-export function getMatchingProtectedRoute(pathname: string) {
-    return protectedRoutes.find((route) => matchesRoutePath(pathname, route.path));
-}
-
-export function canViewHistory(role: WorkspaceRoleValue) {
-    return role === "OWNER" || role === "ADMIN";
-}
-
-export function canManageWorkspaceMembers(role: WorkspaceRoleValue) {
-    return role === "OWNER" || role === "ADMIN";
 }

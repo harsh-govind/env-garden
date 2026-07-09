@@ -17,8 +17,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
+import { canViewHistory } from "@/constants/access";
 import { createInMemoryCache } from "@/lib/cache";
-import { canViewHistory } from "@/lib/constants";
 import type {
     ApiErrorPayload,
     WorkspaceHistoryCacheEntry,

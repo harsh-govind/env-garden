@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { serializeWorkspaceSummary } from "@/lib/workspace-serializers";
+import { serializeWorkspaceSummary } from "@/utils/serializers/workspace";
 import {
     createWorkspaceForUser,
     listWorkspacesForUser,

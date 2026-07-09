@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { isEnvironmentTypeValue } from "@/lib/constants";
-import { serializeProjectEnvFile } from "@/lib/project-serializers";
+import { isEnvironmentTypeValue } from "@/constants/environment";
+import { serializeProjectEnvFile } from "@/utils/serializers/project";
 import { createEnvFileForProject } from "@/prisma/services/project";
 import type {
     CreateEnvFileBody,

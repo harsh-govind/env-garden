@@ -1,9 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import {
-    canManageWorkspaceMembers,
-    isEnvironmentTypeValue,
-} from "@/lib/constants";
+import { canManageWorkspaceMembers } from "@/constants/access";
+import { isEnvironmentTypeValue } from "@/constants/environment";
 import { Prisma } from "@/prisma/generated/client";
 import type {
     MemberAccessInput,

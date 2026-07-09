@@ -12,9 +12,9 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
     canViewHistory,
-    matchesRoutePath,
-} from "@/lib/constants";
-import { cn } from "@/lib/utils";
+} from "@/constants/access";
+import { matchesRoutePath } from "@/constants/routes";
+import { cn } from "@/utils";
 import type {
     DashboardSidebarProps,
     SidebarItemData,

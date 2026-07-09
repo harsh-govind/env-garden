@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getRandomAvatarPresetId } from "@/lib/avatar-presets";
+import { getRandomAvatarPresetId } from "@/constants/avatar-presets";
 import type {
     AuthUserRecord,
     CreateUserFromAuthInput,
