@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import {
     defaultProjectEnvironmentTypes,
     isEnvironmentTypeValue,
-} from "@/lib/constants";
+} from "@/constants/environment";
 import { createProjectForWorkspace } from "@/prisma/services/project";
 import type {
     CreateProjectBody,

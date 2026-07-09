@@ -56,8 +56,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
+import { environmentTypeLabels } from "@/constants/environment";
 import { createInMemoryCache } from "@/lib/cache";
-import { environmentTypeLabels } from "@/lib/constants";
 import { cn, formatTimeAgo } from "@/lib/utils";
 import type {
     AccessFilterValue,

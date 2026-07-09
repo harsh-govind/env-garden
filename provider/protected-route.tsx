@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { publicRoutePathPrefixes, publicRoutePaths } from "@/lib/constants";
+import { publicRoutePathPrefixes, publicRoutePaths } from "@/constants/routes";
 import type { ProtectedRouteProviderProps } from "@/types/auth";
 
 function isPublicRoute(pathname: string) {

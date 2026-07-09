@@ -12,8 +12,8 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
     canViewHistory,
-    matchesRoutePath,
-} from "@/lib/constants";
+} from "@/constants/access";
+import { matchesRoutePath } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import type {
     DashboardSidebarProps,

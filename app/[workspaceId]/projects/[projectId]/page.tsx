@@ -62,7 +62,7 @@ import {
     environmentTypeLabels,
     environmentTypes,
     formatEnvironmentFileName,
-} from "@/lib/constants";
+} from "@/constants/environment";
 import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 import { formatTimeAgo } from "@/lib/utils";
 import type {

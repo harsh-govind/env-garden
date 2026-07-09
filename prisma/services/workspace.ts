@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { canViewHistory } from "@/lib/constants";
+import { canViewHistory } from "@/constants/access";
 import { findMostRecentUpdatedAt } from "@/lib/updated-at";
 import type {
     CreateWorkspaceForUserInput,
