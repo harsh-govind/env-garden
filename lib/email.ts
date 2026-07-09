@@ -82,10 +82,10 @@ export async function sendWorkspaceInviteEmail(
     const apiKey = process.env.RESEND_API_KEY;
     const from = getEmailSenderAddress("invite");
 
-    // if (process.env.NODE_ENV !== "production") {
-    //     console.log(`--\n[INVITE LINK]: ${input.inviteUrl}\n--`);
-    //     return { status: "SENT" };
-    // }
+    if (process.env.NODE_ENV !== "production") {
+        console.log(`--\n[INVITE LINK]: ${input.inviteUrl}\n--`);
+        return { status: "SENT" };
+    }
 
     if (!apiKey || !from) {
         return { status: "NOT_CONFIGURED" };
