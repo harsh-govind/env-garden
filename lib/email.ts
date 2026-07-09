@@ -44,21 +44,21 @@ function escapeHtml(value: string) {
 }
 
 function renderEmailHtml({
-    heading,
     body,
-    actionLabel,
+    actionPrefix,
     actionUrl,
-    note,
+    noteLines,
 }: {
-    heading: string;
     body: string[];
-    actionLabel: string;
+    actionPrefix: string;
     actionUrl: string;
-    note: string;
+    noteLines: string[];
 }) {
-    const safeHeading = escapeHtml(heading);
     const safeActionUrl = escapeHtml(actionUrl);
     const paragraphs = body
+        .map((line) => `<p style="margin:0 0 16px">${escapeHtml(line)}</p>`)
+        .join("");
+    const noteParagraphs = noteLines
         .map((line) => `<p style="margin:0 0 16px">${escapeHtml(line)}</p>`)
         .join("");
 
@@ -66,10 +66,9 @@ function renderEmailHtml({
         "<!doctype html>",
         "<html>",
         "<body style=\"margin:0;padding:24px;background:#ffffff;color:#111827;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5\">",
-        `<h1 style="margin:0 0 20px;font-size:22px;line-height:1.3">${safeHeading}</h1>`,
         paragraphs,
-        `<p style="margin:0 0 18px"><a href="${safeActionUrl}" style="color:#2563eb;text-decoration:underline">${escapeHtml(actionLabel)}</a></p>`,
-        `<p style="margin:0 0 16px">${escapeHtml(note)}</p>`,
+        `<p style="margin:0 0 16px">${escapeHtml(actionPrefix)} <a href="${safeActionUrl}" style="color:#2563eb;text-decoration:underline">${safeActionUrl}</a></p>`,
+        noteParagraphs,
         '<p style="margin:24px 0 0;color:#4b5563">Thanks</p>',
         "</body>",
         "</html>",
@@ -99,16 +98,17 @@ export async function sendWorkspaceInviteEmail(
         `Accept the invitation: ${input.inviteUrl}`,
         "",
         "This invitation is tied to your email address.",
+        "",
+        "Thanks",
     ].join("\n");
     const html = renderEmailHtml({
-        heading: `Join ${input.workspaceName} on ${EMAIL_SENDER_NAME}`,
         body: [
             "Hi,",
             `${input.invitedByEmail} invited you to ${input.workspaceName} on ${EMAIL_SENDER_NAME}.`,
         ],
-        actionLabel: "Accept the invitation",
+        actionPrefix: "Accept the invitation:",
         actionUrl: input.inviteUrl,
-        note: "This invitation is tied to your email address.",
+        noteLines: ["This invitation is tied to your email address."],
     });
 
     const resend = new Resend(apiKey);
@@ -150,21 +150,25 @@ export async function sendSignInEmail(
         "",
         `Use this link to sign in to ${EMAIL_SENDER_NAME}:`,
         "",
-        input.magicLinkUrl,
+        `Sign in: ${input.magicLinkUrl}`,
         "",
         `This link expires at ${input.expiresAt.toISOString()}.`,
         "",
         "If you did not request this, you can ignore this email.",
+        "",
+        "Thanks",
     ].join("\n");
     const html = renderEmailHtml({
-        heading: `Sign in to ${EMAIL_SENDER_NAME}`,
         body: [
             "Hi,",
             `Use this link to sign in to ${EMAIL_SENDER_NAME}.`,
         ],
-        actionLabel: "Sign in",
+        actionPrefix: "Sign in:",
         actionUrl: input.magicLinkUrl,
-        note: `This link expires at ${input.expiresAt.toISOString()}. If you did not request this, you can ignore this email.`,
+        noteLines: [
+            `This link expires at ${input.expiresAt.toISOString()}.`,
+            "If you did not request this, you can ignore this email.",
+        ],
     });
 
     const resend = new Resend(apiKey);
