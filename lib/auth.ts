@@ -9,7 +9,7 @@ import {
     isAvatarPresetId,
 } from "@/lib/avatar-presets";
 import {
-    getEmailFromAddress,
+    getEmailSenderAddress,
     sendSignInEmail,
 } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
     providers: [
         EmailProvider({
-            from: getEmailFromAddress("auth") ?? "auth@example.com",
+            from: getEmailSenderAddress("auth") ?? undefined,
             maxAge: 15 * 60,
             normalizeIdentifier(identifier) {
                 return normalizeEmail(identifier.split(",")[0] ?? "");

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sendWorkspaceInviteEmail } from "@/lib/email";
-import type { InviteEmailInput } from "@/lib/email";
 import {
     parseInviteEmail,
     parseMemberAccessBody,
@@ -20,6 +19,7 @@ import type {
     InviteWorkspaceMemberBody,
     InviteWorkspaceMemberResponse,
 } from "@/types/member";
+import type { InviteEmailInput } from "@/types/email";
 import type { WorkspaceRouteContext } from "@/types/workspace";
 
 function buildInviteUrl(request: Request, token: string) {
