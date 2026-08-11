@@ -2,7 +2,7 @@ import type { ProtectedRoute } from "@/types/auth";
 
 export const publicRoutePaths = ["/"] as const;
 
-export const publicRoutePathPrefixes = ["/invites/"] as const;
+export const publicRoutePathPrefixes = ["/invites/", "/cli/authorize/"] as const;
 
 export const protectedRoutes: ProtectedRoute[] = [
     {
