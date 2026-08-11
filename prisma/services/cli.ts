@@ -4,6 +4,7 @@ import type {
     AuthenticateCliTokenRecordInput,
     CreateCliLoginRequestRecordInput,
     FindCliLoginRequestForPollingInput,
+    RevokeCliTokenRecordInput,
 } from "@/types/cli";
 
 export async function createCliLoginRequestRecord(
@@ -153,5 +154,14 @@ export async function findAndTouchActiveCliToken(
         });
 
         return cliToken;
+    });
+}
+
+export async function revokeCliTokenRecord(
+    input: RevokeCliTokenRecordInput
+) {
+    await prisma.cliToken.update({
+        where: { id: input.tokenId },
+        data: { revokedAt: input.revokedAt },
     });
 }

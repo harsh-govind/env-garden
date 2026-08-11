@@ -45,6 +45,11 @@ export type AuthenticateCliTokenRecordInput = {
     usedAt: Date;
 };
 
+export type RevokeCliTokenRecordInput = {
+    tokenId: string;
+    revokedAt: Date;
+};
+
 export type CreateCliLoginRequestBody = {
     tokenHash?: unknown;
     tokenPrefix?: unknown;
