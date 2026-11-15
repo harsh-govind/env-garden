@@ -153,3 +153,4 @@ export function isEnvironmentTypeValue(value: unknown): value is EnvironmentType
 export function formatEnvironmentFileName(environment: EnvironmentTypeValue) {
     return `.env.${environment.toLowerCase().replaceAll("_", "-")}`;
 }
+export const ENV_VARIABLE_NOTE_MAX_LENGTH = 1000;

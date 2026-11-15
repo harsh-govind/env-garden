@@ -321,12 +321,15 @@ model EnvVariable {
   iv             String
   authTag        String
   note           String?
+  isCommented    Boolean  @default(false)
+  position       Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   envFile        EnvFile  @relation(fields: [envFileId], references: [id], onDelete: Cascade)
 
   @@unique([envFileId, key])
   @@index([envFileId])
+  @@index([envFileId, position])
 }
 
 model ProjectEnvAccess {

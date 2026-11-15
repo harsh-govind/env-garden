@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ENV_VARIABLE_NOTE_MAX_LENGTH } from "@/constants/environment";
 import { auth } from "@/lib/auth";
 import { serializeProjectEnvVariable } from "@/utils/serializers/project";
 import {
@@ -39,8 +40,8 @@ function parseCreateEnvVariableBody(body: CreateEnvVariableBody) {
         return { error: "Variable value must be 10,000 characters or less." };
     }
 
-    if (note.length > 280) {
-        return { error: "Variable note must be 280 characters or less." };
+    if (note.length > ENV_VARIABLE_NOTE_MAX_LENGTH) {
+        return { error: `Variable note must be ${ENV_VARIABLE_NOTE_MAX_LENGTH} characters or less.` };
     }
 
     return {
@@ -48,6 +49,7 @@ function parseCreateEnvVariableBody(body: CreateEnvVariableBody) {
             key,
             value,
             note: note || null,
+            isCommented: body.isCommented === true,
         },
     };
 }
@@ -67,6 +69,7 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
         key: string;
         value?: string;
         note: string | null;
+        isCommented: boolean;
     }[] = [];
 
     for (const rawVariable of body.variables) {
@@ -103,8 +106,8 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
             return { error: `Value for ${key} must be 10,000 characters or less.` };
         }
 
-        if (note.length > 280) {
-            return { error: `Note for ${key} must be 280 characters or less.` };
+        if (note.length > ENV_VARIABLE_NOTE_MAX_LENGTH) {
+            return { error: `Note for ${key} must be ${ENV_VARIABLE_NOTE_MAX_LENGTH} characters or less.` };
         }
 
         if (seenKeys.has(key)) {
@@ -117,6 +120,7 @@ function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
             key,
             value,
             note: note || null,
+            isCommented: variable.isCommented === true,
         });
     }
 
@@ -251,6 +255,7 @@ export async function POST(request: Request, context: ProjectEnvFileRouteContext
             key: parsed.value.key,
             value: parsed.value.value,
             note: parsed.value.note,
+            isCommented: parsed.value.isCommented,
         });
 
         if (result.status === "NOT_FOUND") {

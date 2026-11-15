@@ -19,6 +19,7 @@ import {
     MoreHorizontal,
     FilePlus2,
     Loader2,
+    Hash,
     Pencil,
     Plus,
     RefreshCw,
@@ -63,6 +64,8 @@ import {
     environmentTypes,
     formatEnvironmentFileName,
 } from "@/constants/environment";
+import { ENV_VARIABLE_NOTE_MAX_LENGTH } from "@/constants/environment";
+import { buildEnvText, envKeyPattern, parseEnvText } from "@/utils/env-file";
 import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 import { formatTimeAgo } from "@/utils";
 import type {
@@ -89,7 +92,6 @@ const environmentOrder = new Map(
         index,
     ])
 );
-const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const hiddenValueMask = "*****";
 
 function getRouteParam(value: string | string[] | undefined) {
@@ -168,6 +170,7 @@ function toVariableDraftRows(variables: ProjectEnvVariable[]): VariableDraftRow[
         isValueEditable: false,
         note: variable.note ?? "",
         isNoteOpen: Boolean(variable.note),
+        isCommented: variable.isCommented,
     }));
 
     return rows.length > 0 ? rows : [createEmptyDraftRow()];
@@ -183,54 +186,12 @@ function createEmptyDraftRow(): VariableDraftRow {
         isValueEditable: true,
         note: "",
         isNoteOpen: false,
+        isCommented: false,
     };
 }
 
-function trimEnvValue(value: string) {
-    const trimmedValue = value.trim();
-    const firstCharacter = trimmedValue[0];
-    const lastCharacter = trimmedValue[trimmedValue.length - 1];
-
-    if (
-        trimmedValue.length >= 2 &&
-        ((firstCharacter === '"' && lastCharacter === '"') ||
-            (firstCharacter === "'" && lastCharacter === "'"))
-    ) {
-        return trimmedValue.slice(1, -1);
-    }
-
-    return trimmedValue;
-}
-
 function parseEnvClipboardText(text: string): ParsedEnvRow[] {
-    return text
-        .split(/\r?\n/)
-        .map((rawLine) => rawLine.trim())
-        .filter((line) => line.length > 0 && !line.startsWith("#"))
-        .map((line) =>
-            line.startsWith("export ") ? line.slice("export ".length).trimStart() : line
-        )
-        .reduce<ParsedEnvRow[]>((parsedRows, line) => {
-            const separatorIndex = line.indexOf("=");
-
-            if (separatorIndex <= 0) {
-                return parsedRows;
-            }
-
-            const key = line.slice(0, separatorIndex).trim();
-
-            if (!envKeyPattern.test(key)) {
-                return parsedRows;
-            }
-
-            parsedRows.push({
-                key,
-                value: trimEnvValue(line.slice(separatorIndex + 1)),
-                note: "",
-            });
-
-            return parsedRows;
-        }, []);
+    return parseEnvText(text);
 }
 
 function createDraftRowFromParsedEnv(parsedRow: ParsedEnvRow): VariableDraftRow {
@@ -243,6 +204,7 @@ function createDraftRowFromParsedEnv(parsedRow: ParsedEnvRow): VariableDraftRow 
         isValueEditable: true,
         note: parsedRow.note,
         isNoteOpen: Boolean(parsedRow.note),
+        isCommented: parsedRow.isCommented,
     };
 }
 
@@ -261,18 +223,11 @@ function areVariableDraftRowsEqual(
             currentRow.variableId === baselineRow.variableId &&
             currentRow.key === baselineRow.key &&
             currentRow.note === baselineRow.note &&
+            currentRow.isCommented === baselineRow.isCommented &&
             (!currentRow.isValueLoaded ||
                 currentRow.value === currentRow.originalValue)
         );
     });
-}
-
-function formatEnvValueForClipboard(value: string) {
-    if (value.length === 0 || !/[\s#"'\\\r\n]/.test(value)) {
-        return value;
-    }
-
-    return JSON.stringify(value);
 }
 
 function buildEnvClipboardText(
@@ -280,20 +235,17 @@ function buildEnvClipboardText(
         key: string;
         value: string;
         note?: string | null;
+        isCommented?: boolean;
     }[]
 ): { text: string } | { error: string } {
-    const lines: string[] = [];
+    const entries: typeof rows = [];
     const seenKeys = new Set<string>();
 
     for (const row of rows) {
         const key = row.key.trim();
         const note = row.note?.trim() ?? "";
-        const hasAnyValue =
-            key.length > 0 ||
-            row.value.length > 0 ||
-            note.length > 0;
 
-        if (!hasAnyValue) {
+        if (key.length === 0 && row.value.length === 0 && note.length === 0) {
             continue;
         }
 
@@ -311,17 +263,17 @@ function buildEnvClipboardText(
         }
 
         seenKeys.add(key);
-        lines.push(`${key}=${formatEnvValueForClipboard(row.value)}`);
+        entries.push({ ...row, key });
     }
 
-    if (lines.length === 0) {
+    if (entries.length === 0) {
         return {
             error: "Add at least one variable to copy.",
         };
     }
 
     return {
-        text: lines.join("\n"),
+        text: buildEnvText(entries),
     };
 }
 
@@ -949,7 +901,7 @@ export default function ProjectDetailPage() {
     const updateVariableDraftRow = useCallback(
         (
             clientId: string,
-            field: "key" | "value" | "note" | "isNoteOpen",
+            field: "key" | "value" | "note" | "isNoteOpen" | "isCommented",
             value: string | boolean
         ) => {
             setVariableDraftRows((currentRows) =>
@@ -1158,8 +1110,10 @@ export default function ProjectDetailPage() {
                 return;
             }
 
-            if (note.length > 280) {
-                setVariableError(`Note for ${key} must be 280 characters or less.`);
+            if (note.length > ENV_VARIABLE_NOTE_MAX_LENGTH) {
+                setVariableError(
+                    `Note for ${key} must be ${ENV_VARIABLE_NOTE_MAX_LENGTH} characters or less.`
+                );
                 return;
             }
 
@@ -1186,6 +1140,7 @@ export default function ProjectDetailPage() {
                     }
                     : {}),
                 note: note || null,
+                isCommented: row.isCommented,
             });
         }
 
@@ -2016,12 +1971,13 @@ export default function ProjectDetailPage() {
 
                                 <div className="min-h-0 flex-1 overflow-auto border border-border">
                                     <div className="min-w-[48rem] divide-y divide-border">
-                                        <div className="sticky top-0 z-10 grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 bg-muted px-3 py-2 text-xs tracking-wide text-muted-foreground uppercase">
+                                        <div className="sticky top-0 z-10 grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem_2.5rem] gap-3 bg-muted px-3 py-2 text-xs tracking-wide text-muted-foreground uppercase">
                                             <span />
                                             <span>Key</span>
                                             <span>Value</span>
                                             <span />
                                             <span className="text-center">Note</span>
+                                            <span className="text-center">#</span>
                                             <span />
                                         </div>
 
@@ -2047,9 +2003,13 @@ export default function ProjectDetailPage() {
                                                 return (
                                                     <div
                                                         key={row.clientId}
-                                                        className="bg-background"
+                                                        className={
+                                                            row.isCommented
+                                                                ? "bg-muted/40"
+                                                                : "bg-background"
+                                                        }
                                                     >
-                                                        <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 px-3 py-3 text-sm">
+                                                        <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem_2.5rem] gap-3 px-3 py-3 text-sm">
                                                             <label className="grid place-items-center">
                                                                 <input
                                                                     type="checkbox"
@@ -2066,6 +2026,12 @@ export default function ProjectDetailPage() {
                                                                 />
                                                             </label>
 
+                                                            <div className="relative min-w-0">
+                                                            {row.isCommented ? (
+                                                                <span className="pointer-events-none absolute inset-y-0 left-2 grid place-items-center font-mono text-sm text-muted-foreground">
+                                                                    #
+                                                                </span>
+                                                            ) : null}
                                                             <input
                                                                 value={row.key}
                                                                 onChange={(event) => {
@@ -2086,8 +2052,9 @@ export default function ProjectDetailPage() {
                                                                     }
                                                                 }}
                                                                 placeholder="DATABASE_URL"
-                                                                className="h-8 min-w-0 border border-border bg-card px-2 font-mono text-sm text-foreground outline-none focus:border-ring"
+                                                                className={`h-8 w-full min-w-0 border border-border bg-card px-2 font-mono text-sm outline-none focus:border-ring ${row.isCommented ? "pl-5 text-muted-foreground" : "text-foreground"}`}
                                                             />
+                                                            </div>
 
                                                             <input
                                                                 type={
@@ -2175,6 +2142,26 @@ export default function ProjectDetailPage() {
                                                                 </Button>
                                                             </div>
 
+                                                            <div className="grid place-items-center">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant={row.isCommented ? "secondary" : "outline"}
+                                                                    size="icon-xs"
+                                                                    onClick={() => {
+                                                                        updateVariableDraftRow(
+                                                                            row.clientId,
+                                                                            "isCommented",
+                                                                            !row.isCommented
+                                                                        );
+                                                                    }}
+                                                                    aria-pressed={row.isCommented}
+                                                                    aria-label={row.isCommented ? "Uncomment variable" : "Comment out variable"}
+                                                                    title={row.isCommented ? "Uncomment variable" : "Comment out variable"}
+                                                                >
+                                                                    <Hash />
+                                                                </Button>
+                                                            </div>
+
                                                             <Button
                                                                 type="button"
                                                                 variant="outline"
@@ -2202,10 +2189,11 @@ export default function ProjectDetailPage() {
                                                         </div>
 
                                                         {row.isNoteOpen ? (
-                                                            <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem] gap-3 px-3 pb-3 text-sm">
-                                                                <div className="col-start-2 col-span-5 min-w-0">
-                                                                    <input
+                                                            <div className="grid grid-cols-[2.5rem_14rem_1fr_2.5rem_2.5rem_2.5rem_2.5rem] gap-3 px-3 pb-3 text-sm">
+                                                                <div className="col-start-2 col-span-6 min-w-0">
+                                                                    <textarea
                                                                         id={`note-${row.clientId}`}
+                                                                        rows={Math.max(1, row.note.split("\n").length)}
                                                                         value={row.note}
                                                                         onChange={(event) => {
                                                                             updateVariableDraftRow(
@@ -2214,8 +2202,8 @@ export default function ProjectDetailPage() {
                                                                                 event.target.value
                                                                             );
                                                                         }}
-                                                                        placeholder="Note"
-                                                                        className="h-8 w-full min-w-0 border border-border bg-card px-2 text-sm text-foreground outline-none focus:border-ring"
+                                                                        placeholder="Comment (saved as # lines above this variable)"
+                                                                        className="block w-full min-w-0 resize-y border border-border bg-card px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground outline-none focus:border-ring focus:text-foreground"
                                                                     />
                                                                 </div>
                                                             </div>

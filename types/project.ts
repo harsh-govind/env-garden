@@ -13,6 +13,8 @@ export type ProjectEnvVariable = {
     key: string;
     value?: string;
     note: string | null;
+    isCommented: boolean;
+    position: number;
     createdAt: string;
     updatedAt: string;
 };
@@ -46,9 +48,10 @@ export type VariableDraftRow = {
     isValueEditable: boolean;
     note: string;
     isNoteOpen: boolean;
+    isCommented: boolean;
 };
 
-export type ParsedEnvRow = Pick<VariableDraftRow, "key" | "value" | "note">;
+export type ParsedEnvRow = Pick<VariableDraftRow, "key" | "value" | "note" | "isCommented">;
 
 export type ProjectEnvFile = {
     id: string;
@@ -153,6 +156,7 @@ export type CreateEnvVariableRequest = {
     key: string;
     value: string;
     note?: string;
+    isCommented?: boolean;
 };
 
 export type CreateEnvVariableResponse = {
@@ -165,6 +169,7 @@ export type SaveEnvVariablesRequest = {
         key: string;
         value?: string;
         note?: string | null;
+        isCommented?: boolean;
     }[];
 };
 
@@ -188,6 +193,7 @@ export type CreateEnvVariableBody = {
     key?: unknown;
     value?: unknown;
     note?: unknown;
+    isCommented?: unknown;
 };
 
 export type SaveEnvVariablesBody = {
