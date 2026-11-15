@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { API_RATE_LIMIT } from "@/constants/rate-limit";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestSession } from "@/lib/request-auth";
 import { getWorkspaceHistoryEntryForUser } from "@/prisma/services/workspace-history";
 import type { WorkspaceHistoryEntryRouteContext } from "@/types/workspace";
@@ -9,6 +11,12 @@ export async function GET(request: Request, context: WorkspaceHistoryEntryRouteC
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, historyId } = await context.params;

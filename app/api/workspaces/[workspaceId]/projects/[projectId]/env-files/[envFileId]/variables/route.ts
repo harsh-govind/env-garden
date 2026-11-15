@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ENV_VARIABLE_NOTE_MAX_LENGTH, envKeyPattern } from "@/constants/environment";
 import { parseSaveEnvVariablesBody } from "@/lib/env-variables";
+import { API_RATE_LIMIT, REVEAL_RATE_LIMIT } from "@/constants/rate-limit";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestSession } from "@/lib/request-auth";
 import { serializeProjectEnvVariable } from "@/utils/serializers/project";
 import {
@@ -60,6 +62,18 @@ export async function GET(request: Request, context: ProjectEnvFileRouteContext)
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
+        }
+
+        const revealLimited = await rateLimitResponse(REVEAL_RATE_LIMIT, session.user.id);
+
+        if (revealLimited) {
+            return revealLimited;
         }
 
         const { workspaceId, projectId, envFileId } = await context.params;
@@ -144,6 +158,12 @@ export async function POST(request: Request, context: ProjectEnvFileRouteContext
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
+        }
+
         const { workspaceId, projectId, envFileId } = await context.params;
 
         if (!workspaceId || !projectId || !envFileId) {
@@ -223,6 +243,12 @@ export async function PUT(request: Request, context: ProjectEnvFileRouteContext)
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, projectId, envFileId } = await context.params;

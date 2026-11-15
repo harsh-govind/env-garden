@@ -19,6 +19,7 @@ import {
     TWO_FACTOR_IDENTIFIER_PREFIX,
 } from "@/constants/auth";
 import { DEFAULT_AVATAR_PRESET_ID, getRandomAvatarPresetId } from "@/constants/avatar-presets";
+import { AUTH_RATE_LIMIT_MAX, AUTH_RATE_LIMIT_WINDOW_SECONDS } from "@/constants/rate-limit";
 import { TWO_FACTOR_PATH } from "@/constants/routes";
 import { sendSignInEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
@@ -84,6 +85,12 @@ export const auth = betterAuth({
                 input: false,
             },
         },
+    },
+    rateLimit: {
+        enabled: true,
+        storage: "database",
+        window: AUTH_RATE_LIMIT_WINDOW_SECONDS,
+        max: AUTH_RATE_LIMIT_MAX,
     },
     session: {
         expiresIn: AUTH_SESSION_EXPIRES_IN_SECONDS,

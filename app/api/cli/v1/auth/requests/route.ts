@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { CLI_LOGIN_RATE_LIMIT } from "@/constants/rate-limit";
+import { getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { getAppUrl } from "@/lib/app-url";
 import {
     CLI_LOGIN_POLL_INTERVAL_SECONDS,
@@ -12,6 +14,12 @@ import type { CreateCliLoginRequestBody } from "@/types/cli";
 
 export async function POST(request: Request) {
     try {
+        const limited = await rateLimitResponse(CLI_LOGIN_RATE_LIMIT, getClientIp(request));
+
+        if (limited) {
+            return limited;
+        }
+
         const body = (await request.json().catch(() => null)) as
             | CreateCliLoginRequestBody
             | null;
