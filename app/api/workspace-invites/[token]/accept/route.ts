@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { acceptWorkspaceInvite } from "@/prisma/services/member";
 import type {
     AcceptWorkspaceInviteResponse,
@@ -8,7 +8,7 @@ import type {
 
 export async function POST(_: Request, context: WorkspaceInviteAcceptRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

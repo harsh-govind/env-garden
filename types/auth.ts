@@ -1,5 +1,5 @@
+import type { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import type { Session } from "next-auth";
 
 export type AuthButtonsProps = {
     isAuthenticated: boolean;
@@ -18,7 +18,7 @@ export type ProtectedRouteProviderProps = {
 
 export type AuthenticatedContextValue = {
     isAuthenticated: boolean;
-    user: Session["user"] | null;
+    user: AuthUser | null;
 };
 
 export type AuthenticatedContextProviderProps = {
@@ -29,3 +29,19 @@ export type AuthenticatedContextProviderProps = {
 export type AuthenticatedProviderProps = {
     children: ReactNode | ((value: AuthenticatedContextValue) => ReactNode);
 };
+
+/** The signed-in user as exposed to the app (from Better Auth's session). */
+export type AuthUser = {
+    id: string;
+    email: string;
+    name: string | null;
+    image?: string | null;
+    avatar?: string | null;
+    twoFactorEnabled?: boolean | null;
+};
+
+export type TwoFactorAwareUser = {
+    twoFactorEnabled?: boolean | null;
+};
+
+export type AppRouter = ReturnType<typeof useRouter>;

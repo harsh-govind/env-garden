@@ -1,8 +1,10 @@
 "use client";
 
 import { Loader2, LogIn, LogOut, Mail } from "lucide-react";
-import { signIn, signOut } from "next-auth/react";
+import { SIGN_IN_PATH } from "@/constants/routes";
+import { authClient, signOutAndGoHome } from "@/lib/auth-client";
 import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { AuthButtonsProps } from "@/types/auth";
@@ -16,6 +18,7 @@ function getCallbackUrl() {
 }
 
 export default function AuthButtons({ isAuthenticated, callbackUrl }: AuthButtonsProps) {
+    const router = useRouter();
     const [email, setEmail] = useState("");
     const [isSendingMagicLink, setIsSendingMagicLink] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
@@ -24,7 +27,9 @@ export default function AuthButtons({ isAuthenticated, callbackUrl }: AuthButton
     if (isAuthenticated) {
         return (
             <Button
-                onClick={() => signOut({ callbackUrl: "/" })}
+                onClick={() => {
+                    void signOutAndGoHome(router);
+                }}
                 variant="outline"
             >
                 <LogOut />
@@ -40,14 +45,14 @@ export default function AuthButtons({ isAuthenticated, callbackUrl }: AuthButton
         setError(null);
 
         try {
-            const result = await signIn("email", {
+            const { error: magicLinkError } = await authClient.signIn.magicLink({
                 email,
-                callbackUrl: callbackUrl ?? getCallbackUrl(),
-                redirect: false,
+                callbackURL: callbackUrl ?? getCallbackUrl(),
+                errorCallbackURL: SIGN_IN_PATH,
             });
 
-            if (!result || result.error) {
-                throw new Error(result?.error ?? "Failed to send magic link.");
+            if (magicLinkError) {
+                throw new Error(magicLinkError.message ?? "Failed to send magic link.");
             }
 
             setMessage("Check your email for a magic link.");
@@ -99,7 +104,13 @@ export default function AuthButtons({ isAuthenticated, callbackUrl }: AuthButton
 
             <Button
                 className="w-full"
-                onClick={() => signIn("google", { callbackUrl: callbackUrl ?? getCallbackUrl() })}
+                onClick={() => {
+                    void authClient.signIn.social({
+                        provider: "google",
+                        callbackURL: callbackUrl ?? getCallbackUrl(),
+                        errorCallbackURL: SIGN_IN_PATH,
+                    });
+                }}
                 variant="outline"
             >
                 <LogIn />
@@ -108,7 +119,13 @@ export default function AuthButtons({ isAuthenticated, callbackUrl }: AuthButton
 
             <Button
                 className="w-full"
-                onClick={() => signIn("github", { callbackUrl: callbackUrl ?? getCallbackUrl() })}
+                onClick={() => {
+                    void authClient.signIn.social({
+                        provider: "github",
+                        callbackURL: callbackUrl ?? getCallbackUrl(),
+                        errorCallbackURL: SIGN_IN_PATH,
+                    });
+                }}
                 variant="outline"
             >
                 <LogIn />

@@ -1,11 +1,13 @@
 import type { ProtectedRoute } from "@/types/auth";
 
 export const SIGN_IN_PATH = "/signin";
+export const TWO_FACTOR_PATH = "/signin/two-factor";
 export const SETTINGS_PATH = "/settings";
 export const SETTINGS_PROFILE_PATH = "/settings/profile";
 export const SETTINGS_SESSIONS_PATH = "/settings/sessions";
+export const SETTINGS_SECURITY_PATH = "/settings/security";
 
-export const publicRoutePaths = ["/", SIGN_IN_PATH] as const;
+export const publicRoutePaths = ["/", SIGN_IN_PATH, TWO_FACTOR_PATH] as const;
 
 export const DOCS_PATH = "/docs";
 export const CLI_DOCS_PATH = "/docs/cli";

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { cliNoStoreHeaders } from "@/constants/cli";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { revokeCliTokenForUser } from "@/prisma/services/cli";
 import type { CliTokenRouteContext } from "@/types/cli";
 
 export async function DELETE(_request: Request, context: CliTokenRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

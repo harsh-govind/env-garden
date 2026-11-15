@@ -4,7 +4,7 @@ import { CLI_TOKEN_TTL_DAYS } from "@/constants/cli";
 import { SETTINGS_SESSIONS_PATH } from "@/constants/routes";
 import AuthButtons from "@/components/auth/auth-buttons";
 import { Separator } from "@/components/ui/separator";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getCliLoginRequestForAuthorization } from "@/lib/cli/login";
 import type { AuthorizeCliPageProps } from "@/types/cli";
 import AuthorizeCliClient from "./authorize-client";
@@ -14,7 +14,7 @@ export default async function AuthorizeCliPage({
 }: AuthorizeCliPageProps) {
     const { requestId } = await params;
     const [session, loginRequest] = await Promise.all([
-        auth(),
+        getSession(),
         getCliLoginRequestForAuthorization(requestId),
     ]);
     const isExpired = !loginRequest || loginRequest.expiresAt <= new Date();

@@ -1,35 +1,42 @@
 "use client";
 
 import { Loader2, Monitor } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { AppSessionSummary, AppSessionsResponse } from "@/types/settings";
-import type { ApiErrorPayload } from "@/types/workspace";
+import { authClient, signOutAndGoHome } from "@/lib/auth-client";
+import type { AppSessionSummary } from "@/types/settings";
 import { formatTimeAgo } from "@/utils";
+import { describeUserAgent } from "@/utils/user-agent/describe-user-agent";
 
 async function fetchAppSessions(): Promise<AppSessionSummary[] | Error> {
-    try {
-        const response = await fetch("/api/settings/app-sessions", { cache: "no-store" });
-        const payload = (await response.json().catch(() => null)) as
-            | (AppSessionsResponse & ApiErrorPayload)
-            | null;
+    const [{ data: sessions, error }, { data: current }] = await Promise.all([
+        authClient.listSessions(),
+        authClient.getSession(),
+    ]);
 
-        if (!response.ok || !payload) {
-            return new Error(payload?.error ?? "Could not load sessions.");
-        }
-
-        return payload.sessions;
-    } catch {
-        return new Error("Could not load sessions.");
+    if (error || !sessions) {
+        return new Error(error?.message ?? "Could not load sessions.");
     }
+
+    return sessions
+        .map((session) => ({
+            token: session.token,
+            device: describeUserAgent(session.userAgent ?? null),
+            ipAddress: session.ipAddress ?? null,
+            createdAt: new Date(session.createdAt).toISOString(),
+            lastActiveAt: new Date(session.updatedAt).toISOString(),
+            isCurrent: session.token === current?.session.token,
+        }))
+        .sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent) || b.lastActiveAt.localeCompare(a.lastActiveAt));
 }
 
 export default function AppSessions() {
+    const router = useRouter();
     const [sessions, setSessions] = useState<AppSessionSummary[] | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [pendingId, setPendingId] = useState<string | null>(null);
+    const [pendingToken, setPendingToken] = useState<string | null>(null);
 
     const applyLoadResult = useCallback((result: AppSessionSummary[] | Error) => {
         if (result instanceof Error) {
@@ -55,31 +62,22 @@ export default function AppSessions() {
         };
     }, [applyLoadResult]);
 
-    const revoke = async (sessionId: string | "others") => {
-        setPendingId(sessionId);
+    const revoke = async (token: string | "others") => {
+        setPendingToken(token);
         setError(null);
 
-        try {
-            const response = await fetch(
-                sessionId === "others"
-                    ? "/api/settings/app-sessions"
-                    : `/api/settings/app-sessions/${encodeURIComponent(sessionId)}`,
-                { method: "DELETE" }
-            );
+        const { error: revokeError } =
+            token === "others"
+                ? await authClient.revokeOtherSessions()
+                : await authClient.revokeSession({ token });
 
-            if (!response.ok) {
-                const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
-                throw new Error(payload?.error ?? "Could not sign out the session.");
-            }
-
+        if (revokeError) {
+            setError(revokeError.message ?? "Could not sign out the session.");
+        } else {
             applyLoadResult(await fetchAppSessions());
-        } catch (revokeError) {
-            setError(
-                revokeError instanceof Error ? revokeError.message : "Could not sign out the session."
-            );
-        } finally {
-            setPendingId(null);
         }
+
+        setPendingToken(null);
     };
 
     const otherSessionCount = sessions?.filter((session) => !session.isCurrent).length ?? 0;
@@ -101,12 +99,12 @@ export default function AppSessions() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pendingId !== null}
+                        disabled={pendingToken !== null}
                         onClick={() => {
                             void revoke("others");
                         }}
                     >
-                        {pendingId === "others" ? <Loader2 className="animate-spin" /> : null}
+                        {pendingToken === "others" ? <Loader2 className="animate-spin" /> : null}
                         Sign out other sessions
                     </Button>
                 ) : null}
@@ -122,7 +120,7 @@ export default function AppSessions() {
                 ) : (
                     <ul className="divide-y divide-border border border-border">
                         {sessions.map((session) => (
-                            <li key={session.id} className="flex items-center justify-between gap-4 px-3 py-3">
+                            <li key={session.token} className="flex items-center justify-between gap-4 px-3 py-3">
                                 <div className="min-w-0">
                                     <p className="flex items-center gap-2 text-sm font-medium text-foreground">
                                         <span className="truncate">{session.device}</span>
@@ -130,7 +128,7 @@ export default function AppSessions() {
                                     </p>
                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                         {session.ipAddress ? `${session.ipAddress} · ` : ""}
-                                        Active {formatTimeAgo(session.lastSeenAt)}
+                                        Active {formatTimeAgo(session.lastActiveAt)}
                                         {" · "}
                                         Signed in {formatTimeAgo(session.createdAt)}
                                     </p>
@@ -141,7 +139,7 @@ export default function AppSessions() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => {
-                                            void signOut({ callbackUrl: "/" });
+                                            void signOutAndGoHome(router);
                                         }}
                                     >
                                         Sign out
@@ -151,12 +149,12 @@ export default function AppSessions() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        disabled={pendingId !== null}
+                                        disabled={pendingToken !== null}
                                         onClick={() => {
-                                            void revoke(session.id);
+                                            void revoke(session.token);
                                         }}
                                     >
-                                        {pendingId === session.id ? <Loader2 className="animate-spin" /> : null}
+                                        {pendingToken === session.token ? <Loader2 className="animate-spin" /> : null}
                                         Revoke
                                     </Button>
                                 )}

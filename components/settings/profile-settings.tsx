@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Mail, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOutAndGoHome } from "@/lib/auth-client";
 import {
     AVATAR_PRESETS,
     AvatarPresetBadge,
@@ -273,7 +273,7 @@ export default function ProfileSettings() {
                             variant="outline"
                             className="border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground"
                             onClick={() => {
-                                void signOut({ callbackUrl: "/" });
+                                void signOutAndGoHome(router);
                             }}
                         >
                             Logout
