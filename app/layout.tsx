@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
-import { APP_NAME } from "@/constants/app";
+import { APP_NAME, CSP_NONCE_HEADER } from "@/constants/app";
 import AuthenticatedLayout from "@/layouts/Authenticated";
 import UnauthenticatedLayout from "@/layouts/Unauthenticated";
 import AuthenticatedProvider from "@/provider/authenticated";
@@ -43,6 +44,8 @@ function LayoutSwitcher({ isAuthenticated, children }: LayoutSwitcherProps) {
 export default async function RootLayout({
   children,
 }: RootLayoutProps) {
+  const nonce = (await headers()).get(CSP_NONCE_HEADER) ?? undefined;
+
   return (
     <html
       lang="en"
@@ -51,6 +54,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider
+          nonce={nonce}
           attribute="class"
           defaultTheme="system"
           enableSystem
