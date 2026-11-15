@@ -225,20 +225,21 @@ function AuthenticatedHistoryPage({ workspaceId }: { workspaceId: string }) {
         }
 
         const controller = new AbortController();
-        const cached = historyCache.get(historyCacheKey);
-
-        if (cached) {
-            setHistory(cached.history);
-            setHasMoreHistory(cached.hasMore);
-            setNextHistoryCursor(cached.nextCursor);
-            setHistoryError(null);
-            setIsHistoryLoading(false);
-            setIsLoadingMoreHistory(false);
-            isLoadingMoreHistoryRef.current = false;
-            return;
-        }
 
         const loadWorkspaceHistory = async () => {
+            const cached = historyCache.get(historyCacheKey);
+
+            if (cached) {
+                setHistory(cached.history);
+                setHasMoreHistory(cached.hasMore);
+                setNextHistoryCursor(cached.nextCursor);
+                setHistoryError(null);
+                setIsHistoryLoading(false);
+                setIsLoadingMoreHistory(false);
+                isLoadingMoreHistoryRef.current = false;
+                return;
+            }
+
             setIsHistoryLoading(true);
             setIsLoadingMoreHistory(false);
             setHistoryError(null);

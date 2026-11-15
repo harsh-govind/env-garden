@@ -33,7 +33,7 @@ import {
     X,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
     useCallback,
     useEffect,
@@ -332,6 +332,7 @@ function createVariableKeyPattern(query: string) {
 
 export default function ProjectDetailPage() {
     const params = useParams();
+    const router = useRouter();
     const workspaceId = getRouteParam(params.workspaceId);
     const projectId = getRouteParam(params.projectId);
 
@@ -482,7 +483,7 @@ export default function ProjectDetailPage() {
         setProjectDraftName(project.name);
         setProjectNameError(null);
         setIsRenamingProject(true);
-    }, [project?.canManage, project?.name]);
+    }, [project]);
 
     const cancelRenamingProject = useCallback(() => {
         setIsRenamingProject(false);
@@ -640,13 +641,13 @@ export default function ProjectDetailPage() {
             });
 
             setIsDeleteProjectDialogOpen(false);
-            window.location.assign("/");
+            router.push("/");
         } catch (deleteError) {
             setProjectNameError(getErrorMessage(deleteError));
         } finally {
             setIsDeletingProject(false);
         }
-    }, [project?.canManage, projectUrl]);
+    }, [project?.canManage, projectUrl, router]);
 
     const handleDeleteEnvFile = useCallback(async () => {
         const envFileId = envFileIdPendingDelete;

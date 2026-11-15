@@ -312,20 +312,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     );
 
     useEffect(() => {
-        void refreshWorkspaces();
+        const loadWorkspaces = async () => {
+            await refreshWorkspaces();
+        };
+
+        void loadWorkspaces();
     }, [refreshWorkspaces]);
 
     useEffect(() => {
-        if (!isAuthenticated || !activeWorkspaceId) {
-            setActiveWorkspace(null);
-            setIsWorkspaceLoading(false);
-            persistWorkspaceId(activeWorkspaceId);
-            return;
-        }
-
         const controller = new AbortController();
 
         const loadWorkspace = async () => {
+            if (!isAuthenticated || !activeWorkspaceId) {
+                setActiveWorkspace(null);
+                setIsWorkspaceLoading(false);
+                persistWorkspaceId(activeWorkspaceId);
+                return;
+            }
+
             setIsWorkspaceLoading(true);
 
             try {
