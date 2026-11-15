@@ -37,3 +37,7 @@ export type BackupCodesListProps = {
 };
 
 export type SecurityAction = "idle" | "setup" | "backup-codes" | "disable" | "regenerate";
+
+export type SettingsListSkeletonProps = {
+    rows?: number;
+};

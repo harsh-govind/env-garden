@@ -2,6 +2,7 @@
 
 import { Loader2, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import SettingsListSkeleton from "@/components/settings/settings-list-skeleton";
 import { Button } from "@/components/ui/button";
 import { CLI_TOKEN_TTL_DAYS } from "@/constants/cli";
 import type { CliSession, CliSessionsResponse } from "@/types/cli";
@@ -125,7 +126,7 @@ export default function CliSessions() {
                 {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
 
                 {sessions === null ? (
-                    <p className="text-sm text-muted-foreground">Loading…</p>
+                    <SettingsListSkeleton rows={2} />
                 ) : sessions.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                         No active CLI sessions. Run <code className="font-mono">npx @env-garden/cli login</code> to

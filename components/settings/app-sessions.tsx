@@ -3,6 +3,7 @@
 import { Loader2, Monitor } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import SettingsListSkeleton from "@/components/settings/settings-list-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { authClient, signOutAndGoHome } from "@/lib/auth-client";
@@ -114,7 +115,7 @@ export default function AppSessions() {
                 {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
 
                 {sessions === null ? (
-                    <p className="text-sm text-muted-foreground">Loading…</p>
+                    <SettingsListSkeleton rows={2} />
                 ) : sessions.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No active sessions.</p>
                 ) : (

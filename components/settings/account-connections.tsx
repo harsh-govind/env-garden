@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import ProviderIcon from "@/components/settings/provider-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     AUTH_ERROR_MESSAGES,
     DEFAULT_AUTH_ERROR_MESSAGE,
@@ -136,17 +137,19 @@ export default function AccountConnections() {
                                     <ProviderIcon providerId={provider.id} className="size-4 shrink-0 text-muted-foreground" />
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium text-foreground">{provider.label}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {accounts === null
-                                                ? "Loading…"
-                                                : account
-                                                    ? `Connected ${formatTimeAgo(account.createdAt)}`
-                                                    : "Not connected"}
-                                        </p>
+                                        {accounts === null ? (
+                                            <Skeleton className="mt-1 h-3 w-28" />
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">
+                                                {account ? `Connected ${formatTimeAgo(account.createdAt)}` : "Not connected"}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
-                                {accounts === null ? null : account ? (
+                                {accounts === null ? (
+                                    <Skeleton className="h-7 w-24" />
+                                ) : account ? (
                                     <Button
                                         type="button"
                                         variant="outline"
