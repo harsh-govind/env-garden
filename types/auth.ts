@@ -64,3 +64,11 @@ export type ProviderIconProps = {
     providerId: SocialProviderId;
     className?: string;
 };
+
+export type RequestSession = {
+    via: "web" | "cli";
+    user: {
+        id: string;
+        email: string;
+    };
+};

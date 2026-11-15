@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAppUrl } from "@/lib/app-url";
-import { getSession } from "@/lib/auth";
+import { getRequestSession } from "@/lib/request-auth";
 import { sendWorkspaceInviteEmail } from "@/lib/email";
 import {
     parseInviteEmail,
@@ -59,9 +59,9 @@ async function markWorkspaceInviteEmailSentSafely(inviteId: string) {
     return emailSentAt;
 }
 
-export async function GET(_: Request, context: WorkspaceRouteContext) {
+export async function GET(request: Request, context: WorkspaceRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -100,7 +100,7 @@ export async function GET(_: Request, context: WorkspaceRouteContext) {
 
 export async function POST(request: Request, context: WorkspaceRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

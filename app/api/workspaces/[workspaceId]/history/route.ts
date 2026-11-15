@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getRequestSession } from "@/lib/request-auth";
 import { listWorkspaceHistoryForUser } from "@/prisma/services/workspace-history";
 import type { WorkspaceRouteContext } from "@/types/workspace";
 
 export async function GET(request: Request, context: WorkspaceRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

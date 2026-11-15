@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getRequestSession } from "@/lib/request-auth";
 import { isEnvironmentTypeValue } from "@/constants/environment";
 import { serializeProjectEnvFile } from "@/utils/serializers/project";
 import { createEnvFileForProject } from "@/prisma/services/project";
@@ -36,7 +36,7 @@ function parseCreateEnvFileBody(body: CreateEnvFileBody) {
 
 export async function POST(request: Request, context: ProjectRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

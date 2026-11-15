@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getRequestSession } from "@/lib/request-auth";
 import { serializeWorkspaceSummary } from "@/utils/serializers/workspace";
 import {
     createWorkspaceForUser,
@@ -33,9 +33,9 @@ function parseCreateWorkspaceBody(body: CreateWorkspaceBody) {
     };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -57,7 +57,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
