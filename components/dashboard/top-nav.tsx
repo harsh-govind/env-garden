@@ -7,8 +7,8 @@ import {
     Moon,
     MoreHorizontal,
     Plus,
+    Settings,
     Sun,
-    User,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -215,8 +215,8 @@ export default function DashboardTopNav({
                                         router.push(SETTINGS_PATH);
                                     }}
                                 >
-                                    <User className="size-4" />
-                                    <span>Profile</span>
+                                    <Settings className="size-4" />
+                                    <span>Settings</span>
                                 </button>
 
                                 <button
