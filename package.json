@@ -14,7 +14,7 @@
     "heroku-postbuild": "npx prisma generate && pnpm run build",
     "start": "next start",
     "lint": "eslint",
-    "db:sync": "set -a && . ./.env && set +a && prisma db push --url \"$DIRECT_URL\" && prisma generate"
+    "db:sync": "set -a && . ./.env && set +a && prisma db push && prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",

@@ -60,6 +60,21 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                 ],
             },
             {
+                id: "permissions",
+                title: "Access and permissions",
+                blocks: [
+                    { kind: "text", text: "The CLI acts as your account, with exactly the same workspace, project and environment access as the web app. If your access changes, the CLI follows on its next request." },
+                    {
+                        kind: "list",
+                        items: [
+                            "Approving `eit login` requires a fully signed-in browser session, including your 2FA code if it's on.",
+                            "Account settings, sessions, 2FA, accepting invites and approving CLI logins stay in the web app.",
+                            "CLI actions appear in workspace history, labelled \"via CLI\".",
+                        ],
+                    },
+                ],
+            },
+            {
                 id: "sessions",
                 title: "Sessions and revoking access",
                 blocks: [

@@ -83,6 +83,7 @@ export const LANDING_SECURITY_SPECS: LandingTermDetail[] = [
     { term: "Key scope", detail: "One key per project" },
     { term: "Payload", detail: "Each value encrypted individually" },
     { term: "Sign-in", detail: "Magic link, Google, GitHub" },
+    { term: "Two-factor", detail: "Authenticator app with backup codes" },
     { term: "CLI sessions", detail: "Expire after 7 days, revocable anytime" },
     { term: "Disclosure", detail: "Private vulnerability reporting" },
     { term: "License", detail: "MIT" },
@@ -103,7 +104,11 @@ export const LANDING_FAQS: LandingFaq[] = [
     },
     {
         question: "Is there a CLI?",
-        answer: "Yes. Run `npx @env-garden/cli login`, approve the device in your browser, then `eit pull` to get your .env. Sessions last 7 days and can be revoked from your profile.",
+        answer: "Yes. Run `npx @env-garden/cli login`, approve the device in your browser, then pull, push and run with your variables, or manage workspaces, projects, members and history from the terminal. Sessions last 7 days and can be revoked in Settings.",
+    },
+    {
+        question: "Does it support two-factor authentication?",
+        answer: "Yes. Turn on an authenticator app in Settings → Security. Every sign-in, including magic links and Google or GitHub, then asks for a code, and you get backup codes in case you lose your device.",
     },
     {
         question: "How do I report a vulnerability?",
