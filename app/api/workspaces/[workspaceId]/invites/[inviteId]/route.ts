@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getRequestSession } from "@/lib/request-auth";
 import { revokeWorkspaceInvite } from "@/prisma/services/member";
 import type { WorkspaceInviteRouteContext } from "@/types/member";
 
-export async function DELETE(_: Request, context: WorkspaceInviteRouteContext) {
+export async function DELETE(request: Request, context: WorkspaceInviteRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

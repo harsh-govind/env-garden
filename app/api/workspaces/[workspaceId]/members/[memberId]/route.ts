@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getRequestSession } from "@/lib/request-auth";
 import { parseMemberAccessBody } from "@/lib/member-access";
 import { serializeWorkspaceMember } from "@/utils/serializers/member";
 import {
@@ -14,7 +14,7 @@ import type {
 
 export async function PATCH(request: Request, context: WorkspaceMemberRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -88,9 +88,9 @@ export async function PATCH(request: Request, context: WorkspaceMemberRouteConte
     }
 }
 
-export async function DELETE(_: Request, context: WorkspaceMemberRouteContext) {
+export async function DELETE(request: Request, context: WorkspaceMemberRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

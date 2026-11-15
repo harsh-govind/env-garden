@@ -3,7 +3,7 @@ import type { DocsSectionGroup } from "@/types/docs";
 
 export const CLI_DOCS_TITLE = "CLI";
 export const CLI_DOCS_DESCRIPTION =
-    "Use eit to pull, push and run with your Env Garden variables from the terminal.";
+    "Use eit to manage workspaces, projects, members and env files, and to pull, push and run with your variables from the terminal.";
 
 export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
     {
@@ -146,6 +146,66 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
         ],
     },
     {
+        title: "Workspaces & teams",
+        sections: [
+            {
+                id: "workspaces",
+                title: "Workspaces",
+                blocks: [
+                    { kind: "text", text: "Manage workspaces without opening the browser. Commands use the same permissions as the web app." },
+                    { kind: "code", code: "eit workspace list\neit workspace show Acme\neit workspace create \"Acme\"\neit workspace rename Acme \"Acme Inc\"\neit workspace delete Acme" },
+                ],
+            },
+            {
+                id: "projects",
+                title: "Projects",
+                blocks: [
+                    { kind: "text", text: "New projects get an env file for each environment you pass (or the defaults)." },
+                    { kind: "code", code: "eit project list --workspace Acme\neit project create api --workspace Acme --environments production,development\neit project show api\neit project rename api backend\neit project delete backend" },
+                ],
+            },
+            {
+                id: "env-files",
+                title: "Env files",
+                blocks: [
+                    { kind: "code", code: "eit env list --project api\neit env create .env.staging --environment staging --project api\neit env rename .env.staging .env.stage --project api\neit env delete .env.stage --project api" },
+                    { kind: "text", text: "Environment types: production, staging, beta, development, qa, testing, uat, sandbox, preview, demo, canary, local." },
+                ],
+            },
+            {
+                id: "members",
+                title: "Members and invites",
+                blocks: [
+                    { kind: "code", code: "eit member list --workspace Acme\neit member invite dev@acme.dev --role member --projects api --project-role contributor\neit member update dev@acme.dev --role admin\neit member remove dev@acme.dev\neit invite revoke dev@acme.dev" },
+                    {
+                        kind: "list",
+                        items: [
+                            "`--role` is `member` (default) or `admin`. Admins get every project.",
+                            "Without `--projects`, members get every project at `--project-role` (default `viewer`).",
+                            "`member list` also shows pending invites.",
+                        ],
+                    },
+                ],
+            },
+            {
+                id: "history",
+                title: "History",
+                blocks: [
+                    { kind: "text", text: "See who changed what. CLI actions are labelled \"via CLI\"." },
+                    { kind: "code", code: "eit history --workspace Acme\neit history --search DATABASE_URL --limit 50" },
+                ],
+            },
+            {
+                id: "context",
+                title: "Workspace and project defaults",
+                blocks: [
+                    { kind: "text", text: "`--workspace` and `--project` accept a name or id. When you leave them out, commands use the folder linked with `eit link`, or your only workspace or project." },
+                    { kind: "note", text: "Deletes and removals ask for confirmation. In scripts, pass `--yes`." },
+                ],
+            },
+        ],
+    },
+    {
         title: "Reference",
         sections: [
             {
@@ -165,6 +225,12 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                             ["eit pull [--env] [-o <file>] [--force]", "Download variables into a file."],
                             ["eit push [--env] [-f <file>] [--yes]", "Replace the env file with a local file."],
                             ["eit run [--env] -- <command>", "Run a command with variables injected."],
+                            ["eit workspace <list|show|create|rename|delete>", "Manage workspaces."],
+                            ["eit project <list|show|create|rename|delete>", "Manage projects in a workspace."],
+                            ["eit env <list|create|rename|delete>", "Manage env files in a project."],
+                            ["eit member <list|invite|update|remove>", "Manage workspace members."],
+                            ["eit invite revoke <email>", "Cancel a pending invite."],
+                            ["eit history [--search] [--limit]", "Show workspace activity."],
                         ],
                     },
                 ],

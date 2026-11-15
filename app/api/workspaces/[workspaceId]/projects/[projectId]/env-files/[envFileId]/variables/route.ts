@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ENV_VARIABLE_NOTE_MAX_LENGTH, envKeyPattern } from "@/constants/environment";
 import { parseSaveEnvVariablesBody } from "@/lib/env-variables";
-import { getSession } from "@/lib/auth";
+import { getRequestSession } from "@/lib/request-auth";
 import { serializeProjectEnvVariable } from "@/utils/serializers/project";
 import {
     createEnvVariableForFile,
@@ -56,7 +56,7 @@ function parseCreateEnvVariableBody(body: CreateEnvVariableBody) {
 
 export async function GET(request: Request, context: ProjectEnvFileRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -138,7 +138,7 @@ export async function GET(request: Request, context: ProjectEnvFileRouteContext)
 
 export async function POST(request: Request, context: ProjectEnvFileRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -219,7 +219,7 @@ export async function POST(request: Request, context: ProjectEnvFileRouteContext
 
 export async function PUT(request: Request, context: ProjectEnvFileRouteContext) {
     try {
-        const session = await getSession();
+        const session = await getRequestSession(request);
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
