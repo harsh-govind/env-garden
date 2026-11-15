@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import { APP_SESSION_MAX_AGE_SECONDS } from "@/constants/auth";
 import {
     DEFAULT_AVATAR_PRESET_ID,
     isAvatarPresetId,
@@ -12,7 +13,9 @@ import {
     getEmailSenderAddress,
     sendSignInEmail,
 } from "@/lib/email";
+import { resolveAppSessionId } from "@/lib/app-session";
 import { prisma } from "@/lib/prisma";
+import { revokeAppSession } from "@/prisma/services/app-session";
 import { upsertUserFromAuth } from "@/prisma/services/user";
 
 function normalizeEmail(email: string) {
@@ -57,6 +60,7 @@ export const authOptions: NextAuthOptions = {
     ],
     session: {
         strategy: "jwt",
+        maxAge: APP_SESSION_MAX_AGE_SECONDS,
     },
     pages: {
         signIn: "/signin",
@@ -97,9 +101,16 @@ export const authOptions: NextAuthOptions = {
             token.avatar = isAvatarPresetId(authUser.avatar)
                 ? authUser.avatar
                 : DEFAULT_AVATAR_PRESET_ID;
+            token.sessionId = await resolveAppSessionId({
+                userId: authUser.id,
+                sessionId: token.sessionId,
+                isSignIn: Boolean(user),
+            });
             return token;
         },
         async session({ session, token }) {
+            session.sessionId = token.sessionId;
+
             if (session.user && typeof token.sub === "string") {
                 session.user.id = token.sub;
 
@@ -129,6 +140,13 @@ export const authOptions: NextAuthOptions = {
             }
 
             return baseUrl;
+        },
+    },
+    events: {
+        async signOut({ token }) {
+            if (token?.sessionId) {
+                await revokeAppSession(token.sessionId);
+            }
         },
     },
     secret: process.env.NEXTAUTH_SECRET,

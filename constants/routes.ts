@@ -1,6 +1,9 @@
 import type { ProtectedRoute } from "@/types/auth";
 
 export const SIGN_IN_PATH = "/signin";
+export const SETTINGS_PATH = "/settings";
+export const SETTINGS_PROFILE_PATH = "/settings/profile";
+export const SETTINGS_SESSIONS_PATH = "/settings/sessions";
 
 export const publicRoutePaths = ["/", SIGN_IN_PATH] as const;
 

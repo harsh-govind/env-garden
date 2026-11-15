@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
     canViewHistory,
 } from "@/constants/access";
-import { matchesRoutePath } from "@/constants/routes";
+import { SETTINGS_PATH, matchesRoutePath } from "@/constants/routes";
 import { cn } from "@/utils";
 import type {
     DashboardSidebarProps,
@@ -81,6 +81,7 @@ export default function DashboardSidebar({
     const pathname = usePathname();
     const isHistoryRoute = matchesRoutePath(pathname, "/:workspaceId/history");
     const isMembersRoute = matchesRoutePath(pathname, "/:workspaceId/members");
+    const isSettingsRoute = pathname === SETTINGS_PATH || pathname.startsWith(`${SETTINGS_PATH}/`);
     const canOpenHistory =
         workspaceRole !== null
             ? canViewHistory(workspaceRole)
@@ -93,7 +94,7 @@ export default function DashboardSidebar({
             icon: FolderKanban,
             href: "/",
             count: projectCount,
-            active: !isHistoryRoute && !isMembersRoute,
+            active: !isHistoryRoute && !isMembersRoute && !isSettingsRoute,
         },
         {
             id: "members",
@@ -121,6 +122,8 @@ export default function DashboardSidebar({
             id: "settings",
             label: "Settings",
             icon: Settings,
+            href: SETTINGS_PATH,
+            active: isSettingsRoute,
         },
     ];
 

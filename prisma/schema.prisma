@@ -46,6 +46,7 @@ model User {
   updatedAt                DateTime           @updatedAt
   accounts                 Account[]
   sessions                 Session[]
+  appSessions              AppSession[]
   cliTokens                CliToken[]
   approvedCliLoginRequests CliLoginRequest[]  @relation("CliLoginRequestApprover")
   createdWorkspaces        Workspace[]        @relation("WorkspaceCreator")
@@ -58,6 +59,20 @@ model User {
   workspaceInvitesSent     WorkspaceInvite[]  @relation("WorkspaceInviteSender")
   workspaceInvitesAccepted WorkspaceInvite[]  @relation("WorkspaceInviteAccepter")
   workspaceInvitesRevoked  WorkspaceInvite[]  @relation("WorkspaceInviteRevoker")
+}
+
+model AppSession {
+  id         String    @id @default(cuid())
+  userId     String
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, revokedAt])
 }
 
 model CliToken {

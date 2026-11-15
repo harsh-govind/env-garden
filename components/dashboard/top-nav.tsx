@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
+import { SETTINGS_PATH } from "@/constants/routes";
 import {
     AvatarPresetBadge,
     DEFAULT_AVATAR_PRESET_ID,
@@ -211,7 +212,7 @@ export default function DashboardTopNav({
                                     className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground"
                                     onClick={() => {
                                         setIsProfileMenuOpen(false);
-                                        router.push("/profile");
+                                        router.push(SETTINGS_PATH);
                                     }}
                                 >
                                     <User className="size-4" />
