@@ -7,6 +7,7 @@ import {
     Users,
     X,
 } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -149,9 +150,7 @@ export default function DashboardSidebar({
                             onClick={onClose}
                             aria-label="Go to env.garden home"
                         >
-                            <span className="grid size-7 place-items-center border border-border bg-accent text-xs font-bold tracking-tight text-accent-foreground">
-                                eg
-                            </span>
+                            <LogoMark className="size-7" />
                             <span className="truncate text-base leading-none font-extrabold tracking-tight text-foreground">
                                 env.garden
                             </span>
