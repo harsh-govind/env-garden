@@ -85,7 +85,7 @@ The app API under `/api/workspaces/**` accepts either a browser session or a CLI
 
 Security is the foundation of env-garden.
 
-If you discover a vulnerability, please do not open a public issue with exploit details. Report it privately to the maintainers first.
+If you discover a vulnerability, please do not open a public issue. Report it privately via [GitHub security advisories](https://github.com/harsh-govind/env-garden/security/advisories/new). See [SECURITY.md](SECURITY.md) for the full policy.
 
 ## Contributing
 
