@@ -12,11 +12,12 @@ export const publicRoutePaths = ["/", SIGN_IN_PATH, TWO_FACTOR_PATH] as const;
 
 export const DOCS_PATH = "/docs";
 export const CLI_DOCS_PATH = "/docs/cli";
+export const CLI_AUTHORIZE_PATH = "/cli/authorize";
 
-export const publicRoutePathPrefixes = ["/invites/", "/cli/authorize/", DOCS_PATH] as const;
+export const publicRoutePathPrefixes = ["/invites/", `${CLI_AUTHORIZE_PATH}/`, DOCS_PATH] as const;
 
 /** Routes that render their own full-page layout for every visitor. */
-export const standaloneRoutePathPrefixes = [DOCS_PATH] as const;
+export const standaloneRoutePathPrefixes = [DOCS_PATH, CLI_AUTHORIZE_PATH] as const;
 
 export const protectedRoutes: ProtectedRoute[] = [
     {
