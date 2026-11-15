@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, KeyRound } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import AuthButtons from "@/components/auth/auth-buttons";
+import { LogoMark } from "@/components/brand/logo";
 import { useAuthenticated } from "@/contexts/authenticated";
 
 const authErrorMessages: Record<string, string> = {
@@ -69,9 +70,7 @@ function SignInContent() {
             </Link>
 
             <div className="space-y-4">
-                <span className="grid size-10 place-items-center bg-primary text-primary-foreground">
-                    <KeyRound className="size-4" aria-hidden="true" />
-                </span>
+                <LogoMark className="size-10" />
                 <div className="space-y-1.5">
                     <h1 className="text-2xl font-semibold tracking-tight">
                         Sign in to env.garden

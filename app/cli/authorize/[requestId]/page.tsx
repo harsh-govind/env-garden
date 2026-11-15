@@ -1,4 +1,4 @@
-import { KeyRound } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import AuthButtons from "@/components/auth/auth-buttons";
 import { Separator } from "@/components/ui/separator";
 import { auth } from "@/lib/auth";
@@ -19,7 +19,7 @@ export default async function AuthorizeCliPage({
     return (
         <section className="mx-auto w-full max-w-lg border border-border bg-card px-5 py-5">
             <div className="flex items-center gap-2">
-                <KeyRound className="size-5 text-primary" />
+                <LogoMark className="size-6" />
                 <h1 className="text-xl font-semibold text-foreground">
                     Authorize Env Garden CLI
                 </h1>
