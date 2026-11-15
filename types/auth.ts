@@ -45,3 +45,22 @@ export type TwoFactorAwareUser = {
 };
 
 export type AppRouter = ReturnType<typeof useRouter>;
+
+export type SocialProviderId = "google" | "github";
+
+export type SocialProviderOption = {
+    id: SocialProviderId;
+    label: string;
+};
+
+export type ConnectedAccountSummary = {
+    id: string;
+    providerId: string;
+    accountId: string;
+    createdAt: string;
+};
+
+export type ProviderIconProps = {
+    providerId: SocialProviderId;
+    className?: string;
+};

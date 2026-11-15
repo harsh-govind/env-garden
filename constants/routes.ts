@@ -4,6 +4,7 @@ export const SIGN_IN_PATH = "/signin";
 export const TWO_FACTOR_PATH = "/signin/two-factor";
 export const SETTINGS_PATH = "/settings";
 export const SETTINGS_PROFILE_PATH = "/settings/profile";
+export const SETTINGS_ACCOUNT_PATH = "/settings/account";
 export const SETTINGS_SESSIONS_PATH = "/settings/sessions";
 export const SETTINGS_SECURITY_PATH = "/settings/security";
 

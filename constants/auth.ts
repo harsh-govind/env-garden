@@ -1,3 +1,5 @@
+import type { SocialProviderOption } from "@/types/auth";
+
 /** Error codes Better Auth appends as `?error=` to the sign-in page. */
 export const AUTH_ERROR_MESSAGES: Record<string, string> = {
     INVALID_TOKEN: "This sign-in link is invalid or has already been used. Request a new one.",
@@ -9,6 +11,12 @@ export const AUTH_ERROR_MESSAGES: Record<string, string> = {
         "We couldn't link this sign-in method to your account. Use the method you signed up with.",
     access_denied: "Access was denied. Make sure your account has a verified email address.",
     email_not_found: "Your provider didn't share an email address. Try a different sign-in method.",
+    account_already_linked_to_different_user:
+        "That account is already connected to a different Env Garden user.",
+    "email_doesn't_match":
+        "That account uses a different email address. Connect an account with the same email.",
+    state_mismatch: "The connection request expired. Please try again.",
+    invalid_code: "The provider rejected the request. Please try again.",
 };
 
 export const DEFAULT_AUTH_ERROR_MESSAGE = "Something went wrong while signing in. Please try again.";
@@ -25,3 +33,8 @@ export const TWO_FACTOR_IDENTIFIER_PREFIX = "2fa-";
 export const TWO_FACTOR_ATTEMPTS_IDENTIFIER_PREFIX = "2fa-attempts-";
 export const TWO_FACTOR_COOKIE_MAX_AGE_SECONDS = 10 * 60;
 export const TWO_FACTOR_CODE_LENGTH = 6;
+
+export const SOCIAL_PROVIDERS: SocialProviderOption[] = [
+    { id: "google", label: "Google" },
+    { id: "github", label: "GitHub" },
+];

@@ -93,6 +93,8 @@ export const auth = betterAuth({
         accountLinking: {
             enabled: true,
             trustedProviders: ["google", "github"],
+            // Email magic link always works, so every provider can be disconnected.
+            allowUnlinkingAll: true,
         },
     },
     socialProviders: {
