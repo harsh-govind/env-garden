@@ -36,6 +36,8 @@ export async function authenticateCliRequest(
     return {
         status: "OK",
         tokenId: cliToken.id,
+        tokenName: cliToken.name,
+        expiresAt: cliToken.expiresAt,
         user: cliToken.user,
     };
 }

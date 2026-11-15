@@ -8,6 +8,8 @@ export type CliAuthenticationResult =
     | {
         status: "OK";
         tokenId: string;
+        tokenName: string;
+        expiresAt: Date | null;
         user: CliAuthenticatedUser;
     }
     | {
@@ -73,4 +75,53 @@ export type AuthorizeCliClientProps = {
 
 export type CliApprovalResponse = {
     error?: string;
+};
+
+export type CliSession = {
+    id: string;
+    name: string;
+    tokenPrefix: string;
+    createdAt: string;
+    lastUsedAt: string | null;
+    expiresAt: string | null;
+};
+
+export type CliSessionsResponse = {
+    sessions: CliSession[];
+};
+
+export type CliTokenRouteContext = {
+    params: Promise<{
+        tokenId: string;
+    }>;
+};
+
+export type CliEnvVariable = {
+    key: string;
+    value: string;
+    note: string | null;
+    isCommented: boolean;
+};
+
+export type CliEnvFileSummary = {
+    id: string;
+    name: string;
+    environment: string;
+    variableCount: number;
+};
+
+export type CliProjectSummary = {
+    id: string;
+    name: string;
+    envFiles: CliEnvFileSummary[];
+};
+
+export type CliWorkspaceSummary = {
+    id: string;
+    name: string;
+    projects: CliProjectSummary[];
+};
+
+export type CliProjectsResponse = {
+    workspaces: CliWorkspaceSummary[];
 };

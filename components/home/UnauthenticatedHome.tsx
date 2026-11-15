@@ -1,21 +1,15 @@
-"use client";
-
-import {
-    ArrowRight,
-    ArrowUpRight,
-    Check,
-    ChevronRight,
-    Copy,
-    Eye,
-    EyeOff,
-    Lock,
-    Search,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, Lock } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
 import { FaGithub } from "react-icons/fa6";
-import { Logo, LogoMark } from "@/components/brand/logo";
+import { Logo } from "@/components/brand/logo";
+import { CopyCommand } from "@/components/landing/copy-command";
+import { DashboardPreview } from "@/components/landing/dashboard-preview";
+import { FeatureVisual } from "@/components/landing/feature-visual";
+import { FooterLinks } from "@/components/landing/footer-links";
+import { GitHubStars } from "@/components/landing/github-stars";
+import { Label } from "@/components/landing/label";
+import { PrimaryButton } from "@/components/landing/primary-button";
+import { Section } from "@/components/landing/section";
 import { ThemeToggle } from "@/components/landing/theme-toggle";
 import {
     Accordion,
@@ -24,346 +18,23 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { APP_REPOSITORY_URL } from "@/constants/app";
+import {
+    LANDING_AUTHOR_NAME,
+    LANDING_AUTHOR_URL,
+    LANDING_FAQS,
+    LANDING_FEATURES,
+    LANDING_FOOTER_PRODUCT_LINKS,
+    LANDING_FOOTER_PROJECT_LINKS,
+    LANDING_NAV_LINKS,
+    LANDING_SECURITY_SPECS,
+    LANDING_STATS,
+} from "@/constants/landing";
+import { SIGN_IN_PATH } from "@/constants/routes";
 import { cn } from "@/utils";
 
-const SIGN_IN_HREF = "/signin";
-const CLI_COMMAND = "npx @env-garden/cli login";
-
-/* ------------------------------------------------------------------ */
-/* Data                                                                */
-/* ------------------------------------------------------------------ */
-
-const rows = [
-    { key: "DATABASE_URL", value: "postgres://app:••••••••@db.internal:5432/main", by: "HG", when: "2h ago" },
-    { key: "STRIPE_SECRET_KEY", value: "sk_live_••••••••••••••••••••", by: "AK", when: "Yesterday" },
-    { key: "RESEND_API_KEY", value: "re_••••••••••••••••", by: "MR", when: "3d ago" },
-    { key: "NEXTAUTH_SECRET", value: "••••••••••••••••••••••••", by: "HG", when: "1w ago" },
-    { key: "REDIS_URL", value: "rediss://default:••••••••@cache:6379", by: "AK", when: "2w ago" },
-];
-
-const specs = [
-    ["Cipher", "AES-256-GCM"],
-    ["Key scope", "One key per project"],
-    ["Payload", "Each value encrypted individually"],
-    ["Sign-in", "Magic link, Google, GitHub"],
-    ["CLI tokens", "Hashed at rest, revocable"],
-    ["Disclosure", "Private vulnerability reporting"],
-    ["License", "MIT"],
-];
-
-const faqs = [
-    {
-        question: "What is env.garden?",
-        answer: "An open-source workspace for storing, managing and sharing environment variables across a team, so secrets stop living in chat threads and stale local files.",
-    },
-    {
-        question: "How are secrets protected?",
-        answer: "Every value is encrypted with AES-256-GCM using a key scoped to its project, and each value is stored as its own encrypted payload.",
-    },
-    {
-        question: "Is it open source?",
-        answer: "Yes. The full source is public on GitHub under the MIT license. Issues, ideas and pull requests are welcome.",
-    },
-    {
-        question: "Is there a CLI?",
-        answer: "Yes. Run `npx @env-garden/cli login`, approve the device in your browser, and you're in. No tokens to copy and paste.",
-    },
-    {
-        question: "How do I report a vulnerability?",
-        answer: "Privately, please. Don't open a public issue with exploit details. Contact the maintainers first.",
-    },
-];
-
-/* ------------------------------------------------------------------ */
-/* Hooks & small parts                                                 */
-/* ------------------------------------------------------------------ */
-
-function useGitHubStars() {
-    const [stars, setStars] = useState<number | null>(null);
-
-    useEffect(() => {
-        const controller = new AbortController();
-
-        fetch("/api/github/stars", { signal: controller.signal })
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data: { stars?: number | null } | null) => {
-                if (typeof data?.stars === "number") {
-                    setStars(data.stars);
-                }
-            })
-            .catch(() => undefined);
-
-        return () => controller.abort();
-    }, []);
-
-    if (stars === null) {
-        return null;
-    }
-
-    return stars >= 1000 ? `${(stars / 1000).toFixed(1)}k` : String(stars);
-}
-
-/** Small "+" markers that sit on the frame's corners. */
-function Corners() {
-    const base = "absolute size-2.5 text-foreground/30";
-    const plus = (
-        <svg viewBox="0 0 10 10" className="size-full" aria-hidden="true">
-            <path d="M5 0v10M0 5h10" stroke="currentColor" strokeWidth="1" />
-        </svg>
-    );
-
-    return (
-        <>
-            <span className={cn(base, "-top-[5px] -left-[5px]")}>{plus}</span>
-            <span className={cn(base, "-top-[5px] -right-[5px]")}>{plus}</span>
-        </>
-    );
-}
-
-function Section({
-    id,
-    className,
-    children,
-}: {
-    id?: string;
-    className?: string;
-    children: ReactNode;
-}) {
-    return (
-        <section id={id} className={cn("relative scroll-mt-16 border-t", className)}>
-            <Corners />
-            {children}
-        </section>
-    );
-}
-
-function Label({ children, className }: { children: ReactNode; className?: string }) {
-    return (
-        <p className={cn("font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase", className)}>
-            {children}
-        </p>
-    );
-}
-
-function PrimaryButton({ href, children }: { href: string; children: ReactNode }) {
-    return (
-        <Link
-            href={href}
-            className="group inline-flex h-10 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-medium text-background shadow-sm transition hover:bg-foreground/85"
-        >
-            {children}
-            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-    );
-}
-
-function CopyCommand() {
-    const [copied, setCopied] = useState(false);
-
-    const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(CLI_COMMAND);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1600);
-        } catch {
-            // Clipboard may be unavailable; nothing to do.
-        }
-    };
-
-    return (
-        <button
-            type="button"
-            onClick={copy}
-            aria-label="Copy CLI command"
-            className="group inline-flex h-10 items-center gap-3 rounded-md border bg-background px-4 font-mono text-[13px] text-muted-foreground transition hover:text-foreground"
-        >
-            <span className="select-none text-foreground/40">$</span>
-            {CLI_COMMAND}
-            {copied ? (
-                <Check className="size-3.5 text-foreground" />
-            ) : (
-                <Copy className="size-3.5 opacity-40 transition group-hover:opacity-100" />
-            )}
-        </button>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/* Product visuals                                                     */
-/* ------------------------------------------------------------------ */
-
-function DashboardPreview() {
-    return (
-        <div className="overflow-hidden rounded-xl border bg-card text-left shadow-[0_24px_80px_-24px_rgb(0_0_0/0.25)] dark:shadow-[0_24px_80px_-24px_rgb(0_0_0/0.8)]">
-            {/* Window bar */}
-            <div className="flex h-10 items-center gap-3 border-b px-4">
-                <div className="flex gap-1.5">
-                    <span className="size-2.5 rounded-full border border-foreground/15" />
-                    <span className="size-2.5 rounded-full border border-foreground/15" />
-                    <span className="size-2.5 rounded-full border border-foreground/15" />
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <LogoMark className="size-4" />
-                    <span>acme</span>
-                    <ChevronRight className="size-3" />
-                    <span>api</span>
-                    <ChevronRight className="size-3" />
-                    <span className="text-foreground">production</span>
-                </div>
-            </div>
-
-            <div className="grid md:grid-cols-[180px_1fr]">
-                {/* Sidebar */}
-                <aside className="hidden border-r p-3 md:block">
-                    <div className="flex h-8 items-center gap-2 rounded-md border px-2 text-xs text-muted-foreground">
-                        <Search className="size-3.5" />
-                        Search
-                    </div>
-                    <Label className="mt-5 px-2 text-[10px]">Projects</Label>
-                    <ul className="mt-2 space-y-0.5 text-[13px]">
-                        {["api", "web", "worker", "analytics"].map((project, index) => (
-                            <li
-                                key={project}
-                                className={cn(
-                                    "rounded-md px-2 py-1.5",
-                                    index === 0 ? "bg-muted font-medium" : "text-muted-foreground"
-                                )}
-                            >
-                                {project}
-                            </li>
-                        ))}
-                    </ul>
-                    <Label className="mt-5 px-2 text-[10px]">Workspace</Label>
-                    <ul className="mt-2 space-y-0.5 text-[13px] text-muted-foreground">
-                        <li className="px-2 py-1.5">Members</li>
-                        <li className="px-2 py-1.5">History</li>
-                    </ul>
-                </aside>
-
-                {/* Main */}
-                <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
-                        <div className="flex items-center gap-4 text-[13px]">
-                            {["development", "preview", "production"].map((env) => (
-                                <span
-                                    key={env}
-                                    className={cn(
-                                        "relative py-1",
-                                        env === "production"
-                                            ? "font-medium after:absolute after:inset-x-0 after:-bottom-[13px] after:h-px after:bg-foreground"
-                                            : "text-muted-foreground"
-                                    )}
-                                >
-                                    {env}
-                                </span>
-                            ))}
-                        </div>
-                        <span className="hidden h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs sm:inline-flex">
-                            <Copy className="size-3" />
-                            Copy as .env
-                        </span>
-                    </div>
-
-                    <table className="w-full table-fixed text-[13px]">
-                        <thead>
-                            <tr className="border-b text-left text-[11px] text-muted-foreground">
-                                <th className="w-[42%] px-5 py-2 font-normal sm:w-[34%]">Key</th>
-                                <th className="hidden px-5 py-2 font-normal sm:table-cell">Value</th>
-                                <th className="hidden w-36 px-5 py-2 font-normal lg:table-cell">Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((row, index) => (
-                                <tr key={row.key} className="border-b last:border-0">
-                                    <td className="truncate px-5 py-3 font-mono">{row.key}</td>
-                                    <td className="hidden px-5 py-3 sm:table-cell">
-                                        <div className="flex items-center gap-2">
-                                            <span className="truncate font-mono text-muted-foreground">
-                                                {row.value}
-                                            </span>
-                                            {index === 0 ? (
-                                                <Eye className="size-3.5 shrink-0 text-muted-foreground" />
-                                            ) : (
-                                                <EyeOff className="size-3.5 shrink-0 text-muted-foreground/60" />
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="hidden px-5 py-3 whitespace-nowrap text-muted-foreground lg:table-cell">
-                                        <span className="mr-2 inline-grid size-5 place-items-center rounded-full bg-muted text-[9px] font-medium text-foreground">
-                                            {row.by}
-                                        </span>
-                                        {row.when}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function CipherVisual() {
-    return (
-        <div className="space-y-2 font-mono text-[11px] leading-5">
-            <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
-                <span>STRIPE_SECRET_KEY</span>
-                <Lock className="size-3 text-muted-foreground" />
-            </div>
-            <div className="rounded-md border border-dashed px-3 py-2 break-all text-muted-foreground">
-                a3f9·1c0e·77b2·e94d·0f1a·c6b8·52de·9a07·b13f·e8c4
-            </div>
-        </div>
-    );
-}
-
-function AccessVisual() {
-    return (
-        <ul className="divide-y rounded-md border bg-background text-xs">
-            {[
-                ["harsh@acme.dev", "Owner"],
-                ["anya@acme.dev", "Editor"],
-                ["max@acme.dev", "Viewer"],
-            ].map(([email, role]) => (
-                <li key={email} className="flex items-center justify-between px-3 py-2">
-                    <span className="text-muted-foreground">{email}</span>
-                    <span className="rounded border px-1.5 py-0.5 font-mono text-[10px]">{role}</span>
-                </li>
-            ))}
-        </ul>
-    );
-}
-
-function HistoryVisual() {
-    return (
-        <ol className="relative space-y-3 border-l pl-4 text-xs">
-            {[
-                ["Updated", "DATABASE_URL", "2h"],
-                ["Added", "REDIS_URL", "1d"],
-                ["Removed", "LEGACY_TOKEN", "4d"],
-            ].map(([action, key, when]) => (
-                <li key={key} className="relative">
-                    <span className="absolute top-1.5 -left-[19.5px] size-1.5 rounded-full bg-foreground" />
-                    <span className="text-muted-foreground">{action} </span>
-                    <span className="font-mono">{key}</span>
-                    <span className="float-right text-muted-foreground">{when}</span>
-                </li>
-            ))}
-        </ol>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
-
 export default function UnauthenticatedHome() {
-    const stars = useGitHubStars();
-
     return (
         <div className="min-h-screen w-full overflow-x-clip bg-background font-[family-name:var(--font-geist-sans)] text-foreground antialiased selection:bg-foreground selection:text-background">
-            {/* Nav */}
             <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl">
                 <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 md:border-x">
                     <div className="flex items-center gap-8">
@@ -371,10 +42,11 @@ export default function UnauthenticatedHome() {
                             <Logo markClassName="size-6" />
                         </a>
                         <div className="hidden items-center gap-6 text-[13px] text-muted-foreground md:flex">
-                            <a className="transition hover:text-foreground" href="#product">Product</a>
-                            <a className="transition hover:text-foreground" href="#security">Security</a>
-                            <a className="transition hover:text-foreground" href="#cli">CLI</a>
-                            <a className="transition hover:text-foreground" href="#faq">FAQ</a>
+                            {LANDING_NAV_LINKS.map((link) => (
+                                <a key={link.href} className="transition hover:text-foreground" href={link.href}>
+                                    {link.label}
+                                </a>
+                            ))}
                         </div>
                     </div>
 
@@ -384,11 +56,11 @@ export default function UnauthenticatedHome() {
                             className="hidden h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] text-muted-foreground transition hover:text-foreground sm:inline-flex"
                         >
                             <FaGithub className="size-4" />
-                            {stars ? <span className="tabular-nums">{stars}</span> : null}
+                            <GitHubStars />
                         </a>
                         <ThemeToggle />
                         <Link
-                            href={SIGN_IN_HREF}
+                            href={SIGN_IN_PATH}
                             className="ml-1 inline-flex h-8 items-center rounded-md bg-foreground px-3.5 text-[13px] font-medium text-background transition hover:bg-foreground/85"
                         >
                             Sign in
@@ -397,7 +69,6 @@ export default function UnauthenticatedHome() {
                 </nav>
             </header>
 
-            {/* Framed content */}
             <div className="mx-auto max-w-6xl md:border-x">
                 {/* Hero */}
                 <section className="relative overflow-hidden">
@@ -405,13 +76,13 @@ export default function UnauthenticatedHome() {
 
                     <div className="landing-fade-up relative px-5 pt-20 pb-16 sm:px-10 sm:pt-28">
                         <a
-                            href={APP_REPOSITORY_URL}
+                            href="#cli"
                             className="group inline-flex items-center gap-2 text-[13px] text-muted-foreground transition hover:text-foreground"
                         >
                             <span className="rounded border px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-foreground uppercase">
                                 New
                             </span>
-                            Sign in from your terminal with the CLI
+                            Pull, push and run your env from the terminal
                             <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
                         </a>
 
@@ -426,7 +97,7 @@ export default function UnauthenticatedHome() {
                         </p>
 
                         <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <PrimaryButton href={SIGN_IN_HREF}>Start for free</PrimaryButton>
+                            <PrimaryButton href={SIGN_IN_PATH}>Start for free</PrimaryButton>
                             <CopyCommand />
                         </div>
                     </div>
@@ -440,17 +111,12 @@ export default function UnauthenticatedHome() {
                     </div>
                 </section>
 
-                {/* Proof strip */}
+                {/* Stats */}
                 <Section>
                     <dl className="grid grid-cols-2 md:grid-cols-4">
-                        {[
-                            ["AES-256-GCM", "Encryption"],
-                            ["Per project", "Key isolation"],
-                            ["MIT", "License"],
-                            ["100%", "Open source"],
-                        ].map(([value, label], index) => (
+                        {LANDING_STATS.map((stat, index) => (
                             <div
-                                key={label}
+                                key={stat.detail}
                                 className={cn(
                                     "px-5 py-8 sm:px-10",
                                     index % 2 === 1 && "border-l",
@@ -458,8 +124,8 @@ export default function UnauthenticatedHome() {
                                     index === 2 && "md:border-l"
                                 )}
                             >
-                                <dt className="text-xl font-medium tracking-tight">{value}</dt>
-                                <dd className="mt-1 text-[13px] text-muted-foreground">{label}</dd>
+                                <dt className="text-xl font-medium tracking-tight">{stat.term}</dt>
+                                <dd className="mt-1 text-[13px] text-muted-foreground">{stat.detail}</dd>
                             </div>
                         ))}
                     </dl>
@@ -523,26 +189,7 @@ export default function UnauthenticatedHome() {
                 {/* Features */}
                 <Section>
                     <div className="grid md:grid-cols-3">
-                        {[
-                            {
-                                label: "01 · Encryption",
-                                title: "Encrypted before it's stored.",
-                                body: "Each value is sealed with AES-256-GCM under a project-scoped key. One leak never opens everything.",
-                                visual: <CipherVisual />,
-                            },
-                            {
-                                label: "02 · Access",
-                                title: "The right people, nobody else.",
-                                body: "Invite teammates by email to a workspace and control who can see and change each project.",
-                                visual: <AccessVisual />,
-                            },
-                            {
-                                label: "03 · History",
-                                title: "Know what changed, and who.",
-                                body: "Every add, update and removal is recorded, so environment drift stops being a mystery.",
-                                visual: <HistoryVisual />,
-                            },
-                        ].map((feature, index) => (
+                        {LANDING_FEATURES.map((feature, index) => (
                             <article
                                 key={feature.label}
                                 className={cn(
@@ -553,7 +200,9 @@ export default function UnauthenticatedHome() {
                                 <Label>{feature.label}</Label>
                                 <h3 className="mt-4 text-lg font-medium tracking-tight">{feature.title}</h3>
                                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.body}</p>
-                                <div className="mt-8 rounded-lg border bg-muted/40 p-4">{feature.visual}</div>
+                                <div className="mt-8 rounded-lg border bg-muted/40 p-4">
+                                    <FeatureVisual visual={feature.visual} />
+                                </div>
                             </article>
                         ))}
                     </div>
@@ -583,13 +232,13 @@ export default function UnauthenticatedHome() {
                         </div>
 
                         <dl className="border-t border-background/15 md:border-t-0 md:border-l">
-                            {specs.map(([term, detail]) => (
+                            {LANDING_SECURITY_SPECS.map((spec) => (
                                 <div
-                                    key={term}
+                                    key={spec.term}
                                     className="grid grid-cols-[120px_1fr] gap-4 border-b border-background/15 px-5 py-4 text-sm last:border-0 sm:grid-cols-[160px_1fr] sm:px-10"
                                 >
-                                    <dt className="font-mono text-xs leading-5 text-background/50 uppercase">{term}</dt>
-                                    <dd>{detail}</dd>
+                                    <dt className="font-mono text-xs leading-5 text-background/50 uppercase">{spec.term}</dt>
+                                    <dd>{spec.detail}</dd>
                                 </div>
                             ))}
                         </dl>
@@ -605,9 +254,9 @@ export default function UnauthenticatedHome() {
                                 Lives where you work.
                             </h2>
                             <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">
-                                Approve your device in the browser and the CLI handles the rest.
-                                Credentials are stored with user-only permissions and can be
-                                revoked anytime.
+                                Approve your device in the browser, link a folder, and pull your
+                                .env, or run commands with variables injected. Sessions last
+                                7 days and can be revoked anytime.
                             </p>
                         </div>
 
@@ -619,13 +268,15 @@ export default function UnauthenticatedHome() {
                                 <div className="space-y-4 p-5">
                                     <div>
                                         <p><span className="text-muted-foreground">$</span> eit login</p>
-                                        <p className="text-muted-foreground">→ Opening env.garden to approve this device…</p>
-                                        <p>✓ Logged in as harsh@acme.dev</p>
+                                        <p className="text-muted-foreground">✓ Logged in as harsh@acme.dev</p>
                                     </div>
                                     <div>
-                                        <p><span className="text-muted-foreground">$</span> eit status</p>
-                                        <p className="text-muted-foreground">Account   harsh@acme.dev</p>
-                                        <p className="text-muted-foreground">Server    https://env.garden</p>
+                                        <p><span className="text-muted-foreground">$</span> eit link</p>
+                                        <p className="text-muted-foreground">✓ Linked to Acme / api / .env.production</p>
+                                    </div>
+                                    <div>
+                                        <p><span className="text-muted-foreground">$</span> eit pull</p>
+                                        <p className="text-muted-foreground">✓ Pulled 24 variables into .env</p>
                                     </div>
                                     <p>
                                         <span className="text-muted-foreground">$</span>{" "}
@@ -648,7 +299,7 @@ export default function UnauthenticatedHome() {
                         </div>
                         <div className="border-t px-5 py-12 sm:px-10 md:border-t-0 md:border-l md:py-20">
                             <Accordion type="single" collapsible>
-                                {faqs.map((faq) => (
+                                {LANDING_FAQS.map((faq) => (
                                     <AccordionItem key={faq.question} value={faq.question} className="border-b">
                                         <AccordionTrigger className="py-4 text-[15px] font-medium hover:no-underline">
                                             {faq.question}
@@ -671,7 +322,7 @@ export default function UnauthenticatedHome() {
                             Stop pasting secrets. Start sharing them properly.
                         </h2>
                         <div className="flex flex-col gap-3 sm:flex-row">
-                            <PrimaryButton href={SIGN_IN_HREF}>Start for free</PrimaryButton>
+                            <PrimaryButton href={SIGN_IN_PATH}>Start for free</PrimaryButton>
                             <a
                                 href={APP_REPOSITORY_URL}
                                 className="inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-medium transition hover:bg-muted"
@@ -684,7 +335,6 @@ export default function UnauthenticatedHome() {
                 </Section>
             </div>
 
-            {/* Footer */}
             <footer className="border-t">
                 <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-10 md:grid-cols-[1.5fr_1fr_1fr] md:border-x">
                     <div>
@@ -693,22 +343,8 @@ export default function UnauthenticatedHome() {
                             Open-source secret management for teams that ship.
                         </p>
                     </div>
-                    <div className="text-sm">
-                        <Label>Product</Label>
-                        <ul className="mt-4 space-y-2 text-muted-foreground">
-                            <li><a className="transition hover:text-foreground" href="#product">Overview</a></li>
-                            <li><a className="transition hover:text-foreground" href="#security">Security</a></li>
-                            <li><a className="transition hover:text-foreground" href="#cli">CLI</a></li>
-                        </ul>
-                    </div>
-                    <div className="text-sm">
-                        <Label>Project</Label>
-                        <ul className="mt-4 space-y-2 text-muted-foreground">
-                            <li><a className="transition hover:text-foreground" href={APP_REPOSITORY_URL}>GitHub</a></li>
-                            <li><Link className="transition hover:text-foreground" href={SIGN_IN_HREF}>Sign in</Link></li>
-                            <li><a className="transition hover:text-foreground" href="#faq">FAQ</a></li>
-                        </ul>
-                    </div>
+                    <FooterLinks title="Product" links={LANDING_FOOTER_PRODUCT_LINKS} />
+                    <FooterLinks title="Project" links={LANDING_FOOTER_PROJECT_LINKS} />
                 </div>
                 <div className="border-t">
                     <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 text-xs text-muted-foreground sm:px-10 md:border-x">
@@ -716,10 +352,10 @@ export default function UnauthenticatedHome() {
                         <span>
                             Built by{" "}
                             <a
-                                href="https://github.com/harsh-govind"
+                                href={LANDING_AUTHOR_URL}
                                 className="font-medium text-foreground underline decoration-foreground/20 underline-offset-4 transition hover:decoration-foreground"
                             >
-                                Harsh Govind
+                                {LANDING_AUTHOR_NAME}
                             </a>
                         </span>
                     </div>

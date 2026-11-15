@@ -6,18 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import AuthButtons from "@/components/auth/auth-buttons";
 import { LogoMark } from "@/components/brand/logo";
+import { AUTH_ERROR_MESSAGES, DEFAULT_AUTH_ERROR_MESSAGE } from "@/constants/auth";
 import { useAuthenticated } from "@/contexts/authenticated";
-
-const authErrorMessages: Record<string, string> = {
-    OAuthAccountNotLinked:
-        "This email is already linked to another sign-in method. Use the method you signed up with.",
-    AccessDenied: "Access was denied. Make sure your account has a verified email address.",
-    Verification: "This sign-in link is invalid or has expired. Request a new one.",
-    EmailSignin: "We couldn't send the sign-in email. Try again in a moment.",
-    SessionRequired: "Please sign in to continue.",
-};
-
-const DEFAULT_AUTH_ERROR = "Something went wrong while signing in. Please try again.";
 
 // Only allow same-origin relative paths as post-login destinations.
 function getSafeCallbackUrl(value: string | null) {
@@ -42,7 +32,7 @@ function SignInContent() {
 
     const errorCode = searchParams.get("error");
     const errorMessage = errorCode
-        ? authErrorMessages[errorCode] ?? DEFAULT_AUTH_ERROR
+        ? AUTH_ERROR_MESSAGES[errorCode] ?? DEFAULT_AUTH_ERROR_MESSAGE
         : null;
     const callbackUrl =
         typeof window === "undefined"

@@ -1,8 +1,5 @@
+import type { LogoMarkProps, LogoProps } from "@/types/brand";
 import { cn } from "@/utils";
-
-type LogoMarkProps = {
-    className?: string;
-};
 
 /**
  * env.garden mark: ".E" — a dot followed by an E whose three bars
@@ -27,12 +24,6 @@ export function LogoMark({ className }: LogoMarkProps) {
         </svg>
     );
 }
-
-type LogoProps = {
-    className?: string;
-    markClassName?: string;
-    wordmarkClassName?: string;
-};
 
 export function Logo({ className, markClassName, wordmarkClassName }: LogoProps) {
     return (

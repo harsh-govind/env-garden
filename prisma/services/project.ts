@@ -1259,6 +1259,7 @@ export async function getEnvVariablesForFile(input: {
     projectId: string;
     envFileId: string;
     userId: string;
+    via?: "cli";
 }) {
     return prisma.$transaction(async (tx) => {
         const access = await getProjectAccessContext(tx, input);
@@ -1325,7 +1326,9 @@ export async function getEnvVariablesForFile(input: {
                 data: {
                     workspaceId: input.workspaceId,
                     operation: "PROJECT_ENV_VARIABLES_COPIED",
-                    message: `${actorEmail} copied all variables from ${readableEnvFile.name} for project ${project.name}.`,
+                    message: input.via === "cli"
+                        ? `${actorEmail} pulled all variables from ${readableEnvFile.name} for project ${project.name} via CLI.`
+                        : `${actorEmail} copied all variables from ${readableEnvFile.name} for project ${project.name}.`,
                     data: {
                         project: {
                             id: input.projectId,
@@ -1499,6 +1502,7 @@ export async function replaceEnvVariablesForFile(input: {
         note?: string | null;
         isCommented?: boolean;
     }[];
+    via?: "cli";
 }) {
     try {
         return await prisma.$transaction(async (tx) => {
@@ -1659,7 +1663,7 @@ export async function replaceEnvVariablesForFile(input: {
                     data: {
                         workspaceId: input.workspaceId,
                         operation: "PROJECT_ENV_VARIABLES_SAVED",
-                        message: `${actorEmail} saved ${variables.length} variables for ${envFile.name} in project ${access.project.name}.`,
+                        message: `${actorEmail} saved ${variables.length} variables for ${envFile.name} in project ${access.project.name}${input.via === "cli" ? " via CLI" : ""}.`,
                         data: {
                             project: {
                                 id: input.projectId,

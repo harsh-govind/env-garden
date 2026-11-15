@@ -154,3 +154,11 @@ export function formatEnvironmentFileName(environment: EnvironmentTypeValue) {
     return `.env.${environment.toLowerCase().replaceAll("_", "-")}`;
 }
 export const ENV_VARIABLE_NOTE_MAX_LENGTH = 1000;
+
+export const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const MAX_ENV_VARIABLES_PER_SAVE = 500;
+export const HIDDEN_VALUE_MASK = "*****";
+
+export const environmentOrder = new Map(
+    environmentTypes.map((environmentType, index) => [environmentType.key, index])
+);

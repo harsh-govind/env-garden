@@ -1,8 +1,16 @@
 import type { ProtectedRoute } from "@/types/auth";
 
-export const publicRoutePaths = ["/", "/signin"] as const;
+export const SIGN_IN_PATH = "/signin";
 
-export const publicRoutePathPrefixes = ["/invites/", "/cli/authorize/"] as const;
+export const publicRoutePaths = ["/", SIGN_IN_PATH] as const;
+
+export const DOCS_PATH = "/docs";
+export const CLI_DOCS_PATH = "/docs/cli";
+
+export const publicRoutePathPrefixes = ["/invites/", "/cli/authorize/", DOCS_PATH] as const;
+
+/** Routes that render their own full-page layout for every visitor. */
+export const standaloneRoutePathPrefixes = [DOCS_PATH] as const;
 
 export const protectedRoutes: ProtectedRoute[] = [
     {
@@ -45,6 +53,10 @@ export function matchesRoutePath(pathname: string, routePath: string) {
 
         return segment === pathSegments[index];
     });
+}
+
+export function isStandaloneRoute(pathname: string) {
+    return standaloneRoutePathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 export function getMatchingProtectedRoute(pathname: string) {

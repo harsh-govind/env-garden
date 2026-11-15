@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo";
+import { CLI_TOKEN_TTL_DAYS } from "@/constants/cli";
 import AuthButtons from "@/components/auth/auth-buttons";
 import { Separator } from "@/components/ui/separator";
 import { auth } from "@/lib/auth";
@@ -25,7 +27,12 @@ export default async function AuthorizeCliPage({
                 </h1>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-                Approve the login request opened by <code>eit login</code>.
+                Approve the login request opened by <code>eit login</code>. Access lasts{" "}
+                {CLI_TOKEN_TTL_DAYS} days and can be revoked anytime from your{" "}
+                <Link href="/profile" className="underline underline-offset-2">
+                    profile
+                </Link>
+                .
             </p>
 
             <Separator className="my-5" />

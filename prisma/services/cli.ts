@@ -1,3 +1,4 @@
+import { CLI_TOKEN_TTL_MS } from "@/constants/cli";
 import { prisma } from "@/lib/prisma";
 import type {
     ApproveCliLoginRequestInput,
@@ -112,6 +113,7 @@ export async function approveCliLoginRequestRecord(
                 name: loginRequest.tokenName,
                 tokenPrefix: loginRequest.tokenPrefix,
                 tokenHash: loginRequest.tokenHash,
+                expiresAt: new Date(now.getTime() + CLI_TOKEN_TTL_MS),
             },
         });
 
@@ -127,13 +129,12 @@ export async function findAndTouchActiveCliToken(
             where: {
                 tokenHash: input.tokenHash,
                 revokedAt: null,
-                OR: [
-                    { expiresAt: null },
-                    { expiresAt: { gt: input.usedAt } },
-                ],
+                expiresAt: { gt: input.usedAt },
             },
             select: {
                 id: true,
+                name: true,
+                expiresAt: true,
                 user: {
                     select: {
                         id: true,
@@ -164,4 +165,53 @@ export async function revokeCliTokenRecord(
         where: { id: input.tokenId },
         data: { revokedAt: input.revokedAt },
     });
+}
+
+function activeCliTokenWhere(userId: string, now: Date) {
+    return {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+    };
+}
+
+export async function listActiveCliTokensForUser(userId: string) {
+    return prisma.cliToken.findMany({
+        where: activeCliTokenWhere(userId, new Date()),
+        orderBy: { createdAt: "desc" },
+        select: {
+            id: true,
+            name: true,
+            tokenPrefix: true,
+            createdAt: true,
+            lastUsedAt: true,
+            expiresAt: true,
+        },
+    });
+}
+
+export async function revokeCliTokenForUser(input: {
+    userId: string;
+    tokenId: string;
+}) {
+    const result = await prisma.cliToken.updateMany({
+        where: {
+            id: input.tokenId,
+            userId: input.userId,
+            revokedAt: null,
+        },
+        data: { revokedAt: new Date() },
+    });
+
+    return result.count > 0;
+}
+
+export async function revokeAllCliTokensForUser(userId: string) {
+    const now = new Date();
+    const result = await prisma.cliToken.updateMany({
+        where: activeCliTokenWhere(userId, now),
+        data: { revokedAt: now },
+    });
+
+    return result.count;
 }
