@@ -202,6 +202,8 @@ function mapEncryptedEnvVariableRecord(
             projectKey
         ),
         note: input.note,
+        isCommented: input.isCommented,
+        position: input.position,
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
     };
@@ -214,6 +216,8 @@ function mapEnvVariableMetadataRecord(
         id: input.id,
         key: input.key,
         note: input.note,
+        isCommented: input.isCommented,
+        position: input.position,
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
     };
@@ -478,13 +482,13 @@ export async function getProjectDetailForUser(input: {
                         createdAt: true,
                         updatedAt: true,
                         variables: {
-                            orderBy: {
-                                key: "asc",
-                            },
+                            orderBy: [{ position: "asc" }, { key: "asc" }],
                             select: {
                                 id: true,
                                 key: true,
                                 note: true,
+                                isCommented: true,
+                                position: true,
                                 createdAt: true,
                                 updatedAt: true,
                             },
@@ -758,6 +762,8 @@ export async function createEnvFileForProject(input: {
                             iv: true,
                             authTag: true,
                             note: true,
+                            isCommented: true,
+                            position: true,
                             createdAt: true,
                             updatedAt: true,
                         },
@@ -915,6 +921,8 @@ export async function renameEnvFile(input: {
                                 id: true,
                                 key: true,
                                 note: true,
+                                isCommented: true,
+                                position: true,
                                 createdAt: true,
                                 updatedAt: true,
                             },
@@ -965,6 +973,8 @@ export async function renameEnvFile(input: {
                             id: true,
                             key: true,
                             note: true,
+                            isCommented: true,
+                            position: true,
                             createdAt: true,
                             updatedAt: true,
                         },
@@ -1107,6 +1117,7 @@ export async function createEnvVariableForFile(input: {
     key: string;
     value: string;
     note?: string | null;
+    isCommented?: boolean;
 }) {
     try {
         return await prisma.$transaction(async (tx) => {
@@ -1171,17 +1182,26 @@ export async function createEnvVariableForFile(input: {
             const projectKey = await getProjectKeyForProject(tx, input.projectId);
 
             try {
+                const lastVariable = await tx.envVariable.findFirst({
+                    where: { envFileId: input.envFileId },
+                    orderBy: { position: "desc" },
+                    select: { position: true },
+                });
                 const variable = await tx.envVariable.create({
                     data: {
                         envFileId: input.envFileId,
                         key,
                         ...encryptEnvValue(input.value, projectKey),
                         note,
+                        isCommented: input.isCommented ?? false,
+                        position: (lastVariable?.position ?? -1) + 1,
                     },
                     select: {
                         id: true,
                         key: true,
                         note: true,
+                        isCommented: true,
+                        position: true,
                         createdAt: true,
                         updatedAt: true,
                     },
@@ -1280,9 +1300,7 @@ export async function getEnvVariablesForFile(input: {
             where: {
                 envFileId: input.envFileId,
             },
-            orderBy: {
-                key: "asc",
-            },
+            orderBy: [{ position: "asc" }, { key: "asc" }],
             select: {
                 id: true,
                 key: true,
@@ -1290,6 +1308,8 @@ export async function getEnvVariablesForFile(input: {
                 iv: true,
                 authTag: true,
                 note: true,
+                isCommented: true,
+                position: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -1408,6 +1428,8 @@ export async function getEnvVariableForFile(input: {
                 iv: true,
                 authTag: true,
                 note: true,
+                isCommented: true,
+                position: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -1475,6 +1497,7 @@ export async function replaceEnvVariablesForFile(input: {
         key: string;
         value?: string;
         note?: string | null;
+        isCommented?: boolean;
     }[];
 }) {
     try {
@@ -1547,9 +1570,10 @@ export async function replaceEnvVariablesForFile(input: {
                 : null;
 
             try {
-                const variableData = input.variables.map((variable) => {
+                const variableData = input.variables.map((variable, position) => {
                     const key = variable.key.trim();
                     const note = variable.note?.trim() || null;
+                    const isCommented = variable.isCommented === true;
 
                     if (!variable.id) {
                         if (!projectKey || typeof variable.value !== "string") {
@@ -1561,6 +1585,8 @@ export async function replaceEnvVariablesForFile(input: {
                             key,
                             ...encryptEnvValue(variable.value, projectKey),
                             note,
+                            isCommented,
+                            position,
                         };
                     }
 
@@ -1582,6 +1608,8 @@ export async function replaceEnvVariablesForFile(input: {
                                 authTag: existingVariable.authTag,
                             }),
                         note,
+                        isCommented,
+                        position,
                     };
                 });
 
@@ -1601,13 +1629,13 @@ export async function replaceEnvVariablesForFile(input: {
                     where: {
                         envFileId: input.envFileId,
                     },
-                    orderBy: {
-                        key: "asc",
-                    },
+                    orderBy: [{ position: "asc" }, { key: "asc" }],
                     select: {
                         id: true,
                         key: true,
                         note: true,
+                        isCommented: true,
+                        position: true,
                         createdAt: true,
                         updatedAt: true,
                     },

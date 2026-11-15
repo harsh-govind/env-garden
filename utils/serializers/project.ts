@@ -16,6 +16,8 @@ export function serializeProjectEnvVariable(
         id: record.id,
         key: record.key,
         note: record.note,
+        isCommented: record.isCommented,
+        position: record.position,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
     };
@@ -34,6 +36,8 @@ export function serializeProjectEnvVariableMetadata(
         id: record.id,
         key: record.key,
         note: record.note,
+        isCommented: record.isCommented,
+        position: record.position,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
     };
