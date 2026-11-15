@@ -21,7 +21,7 @@ function formatDate(value: string | null) {
 
 async function fetchSessions(): Promise<CliSession[] | Error> {
     try {
-        const response = await fetch("/api/profile/cli-sessions", { cache: "no-store" });
+        const response = await fetch("/api/settings/cli-sessions", { cache: "no-store" });
         const payload = (await response.json().catch(() => null)) as
             | (CliSessionsResponse & ApiErrorPayload)
             | null;
@@ -72,8 +72,8 @@ export default function CliSessions() {
         try {
             const response = await fetch(
                 tokenId === "all"
-                    ? "/api/profile/cli-sessions"
-                    : `/api/profile/cli-sessions/${encodeURIComponent(tokenId)}`,
+                    ? "/api/settings/cli-sessions"
+                    : `/api/settings/cli-sessions/${encodeURIComponent(tokenId)}`,
                 { method: "DELETE" }
             );
 
@@ -93,7 +93,7 @@ export default function CliSessions() {
     };
 
     return (
-        <section className="mx-auto mt-4 max-w-2xl border border-border bg-card">
+        <section className="border border-border bg-card">
             <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
                 <div>
                     <h2 className="inline-flex items-center gap-2 text-lg font-semibold text-foreground">
