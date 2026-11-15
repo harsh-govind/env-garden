@@ -4,13 +4,14 @@ import {
     getWorkspaceDetailForUser,
     listWorkspacesForUser,
 } from "@/prisma/services/workspace";
+import type { CliProjectsResponse, CliWorkspaceSummary } from "@/types/cli";
 
 /** Lists every workspace, project and env file the CLI user can read. */
 export async function GET(request: Request) {
     return withCliUser(request, async (user) => {
         const workspaces = await listWorkspacesForUser(user.id);
 
-        const tree = await Promise.all(
+        const tree: CliWorkspaceSummary[] = await Promise.all(
             workspaces.map(async (workspace) => {
                 const detail = await getWorkspaceDetailForUser(workspace.id, user.id);
                 const projects = await Promise.all(
@@ -42,6 +43,8 @@ export async function GET(request: Request) {
             })
         );
 
-        return cliJson({ workspaces: tree });
+        const response: CliProjectsResponse = { workspaces: tree };
+
+        return cliJson(response);
     });
 }

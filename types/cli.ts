@@ -95,3 +95,33 @@ export type CliTokenRouteContext = {
         tokenId: string;
     }>;
 };
+
+export type CliEnvVariable = {
+    key: string;
+    value: string;
+    note: string | null;
+    isCommented: boolean;
+};
+
+export type CliEnvFileSummary = {
+    id: string;
+    name: string;
+    environment: string;
+    variableCount: number;
+};
+
+export type CliProjectSummary = {
+    id: string;
+    name: string;
+    envFiles: CliEnvFileSummary[];
+};
+
+export type CliWorkspaceSummary = {
+    id: string;
+    name: string;
+    projects: CliProjectSummary[];
+};
+
+export type CliProjectsResponse = {
+    workspaces: CliWorkspaceSummary[];
+};

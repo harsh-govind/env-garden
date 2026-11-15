@@ -4,14 +4,8 @@ import {
     getEnvVariablesForFile,
     replaceEnvVariablesForFile,
 } from "@/prisma/services/project";
+import type { CliEnvVariable } from "@/types/cli";
 import type { ProjectEnvFileRouteContext, SaveEnvVariablesBody } from "@/types/project";
-
-type CliVariable = {
-    key: string;
-    value: string;
-    note: string | null;
-    isCommented: boolean;
-};
 
 /** Returns decrypted variables for `eit pull` / `eit run`. */
 export async function GET(request: Request, context: ProjectEnvFileRouteContext) {
@@ -33,7 +27,7 @@ export async function GET(request: Request, context: ProjectEnvFileRouteContext)
             return cliJson({ error: "You do not have access to this env file." }, 403);
         }
 
-        const variables: CliVariable[] = result.variables.map((variable) => ({
+        const variables: CliEnvVariable[] = result.variables.map((variable) => ({
             key: variable.key,
             value: variable.value ?? "",
             note: variable.note,

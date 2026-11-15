@@ -1,17 +1,9 @@
-export const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-export type ParsedEnvEntry = {
-    key: string;
-    value: string;
-    note: string;
-    isCommented: boolean;
-};
-
-type ParsedAssignment = {
-    key: string;
-    value: string;
-    inlineComment: string;
-};
+import { envKeyPattern } from "@/constants/environment";
+import type {
+    EnvTextEntry,
+    ParsedEnvAssignment,
+    ParsedEnvEntry,
+} from "@/types/env-file";
 
 function unescapeDoubleQuoted(value: string) {
     return value.replace(/\\([nrt"\\])/g, (_, character: string) => {
@@ -36,7 +28,7 @@ function stripCommentMarker(comment: string) {
  * Parses `KEY=value` (optionally prefixed with `export`). Returns null when the
  * line isn't a valid assignment.
  */
-function parseAssignment(line: string): ParsedAssignment | null {
+function parseAssignment(line: string): ParsedEnvAssignment | null {
     const body = line.startsWith("export ") ? line.slice("export ".length).trimStart() : line;
     const separatorIndex = body.indexOf("=");
 
@@ -112,7 +104,7 @@ export function parseEnvText(text: string): ParsedEnvEntry[] {
         }
 
         let isCommented = false;
-        let assignment: ParsedAssignment | null;
+        let assignment: ParsedEnvAssignment | null;
 
         if (line.startsWith("#")) {
             assignment = parseAssignment(line.replace(/^#+\s*/, ""));
@@ -159,12 +151,7 @@ function formatEnvValue(value: string) {
 
 /** Serializes variables back to .env text, writing notes as `#` comment lines. */
 export function buildEnvText(
-    entries: {
-        key: string;
-        value: string;
-        note?: string | null;
-        isCommented?: boolean;
-    }[]
+    entries: EnvTextEntry[]
 ) {
     const lines: string[] = [];
 

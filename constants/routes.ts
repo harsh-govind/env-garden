@@ -1,6 +1,8 @@
 import type { ProtectedRoute } from "@/types/auth";
 
-export const publicRoutePaths = ["/", "/signin"] as const;
+export const SIGN_IN_PATH = "/signin";
+
+export const publicRoutePaths = ["/", SIGN_IN_PATH] as const;
 
 export const publicRoutePathPrefixes = ["/invites/", "/cli/authorize/"] as const;
 

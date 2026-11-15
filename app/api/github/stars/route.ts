@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { APP_REPOSITORY_NAME } from "@/constants/app";
+import type { GitHubRepoResponse, UnghRepoResponse } from "@/types/github";
 
 // Cache for an hour so visitors don't burn GitHub's unauthenticated
 // rate limit (60 requests/hour per IP).
@@ -20,7 +21,7 @@ async function fromGitHub(): Promise<number | null> {
         return null;
     }
 
-    const data = (await response.json()) as { stargazers_count?: unknown };
+    const data = (await response.json()) as GitHubRepoResponse;
     return typeof data.stargazers_count === "number" ? data.stargazers_count : null;
 }
 
@@ -34,7 +35,7 @@ async function fromUngh(): Promise<number | null> {
         return null;
     }
 
-    const data = (await response.json()) as { repo?: { stars?: unknown } };
+    const data = (await response.json()) as UnghRepoResponse;
     return typeof data.repo?.stars === "number" ? data.repo.stars : null;
 }
 

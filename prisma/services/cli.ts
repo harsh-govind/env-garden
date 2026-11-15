@@ -167,11 +167,13 @@ export async function revokeCliTokenRecord(
     });
 }
 
-const activeCliTokenWhere = (userId: string, now: Date) => ({
-    userId,
-    revokedAt: null,
-    expiresAt: { gt: now },
-});
+function activeCliTokenWhere(userId: string, now: Date) {
+    return {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+    };
+}
 
 export async function listActiveCliTokensForUser(userId: string) {
     return prisma.cliToken.findMany({

@@ -64,8 +64,13 @@ import {
     environmentTypes,
     formatEnvironmentFileName,
 } from "@/constants/environment";
-import { ENV_VARIABLE_NOTE_MAX_LENGTH } from "@/constants/environment";
-import { buildEnvText, envKeyPattern, parseEnvText } from "@/utils/env-file";
+import {
+    ENV_VARIABLE_NOTE_MAX_LENGTH,
+    HIDDEN_VALUE_MASK,
+    envKeyPattern,
+    environmentOrder,
+} from "@/constants/environment";
+import { buildEnvText, parseEnvText } from "@/utils/env/env-file";
 import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 import { formatTimeAgo } from "@/utils";
 import type {
@@ -86,13 +91,6 @@ import type {
 } from "@/types/project";
 import type { ApiErrorPayload, EnvironmentTypeValue } from "@/types/workspace";
 
-const environmentOrder = new Map(
-    environmentTypes.map((environmentType, index) => [
-        environmentType.key,
-        index,
-    ])
-);
-const hiddenValueMask = "*****";
 
 function getRouteParam(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -1998,7 +1996,7 @@ export default function ProjectDetailPage() {
                                                     loadingVariableValueIds.has(row.clientId);
                                                 const displayedValue = row.isValueLoaded
                                                     ? row.value
-                                                    : hiddenValueMask;
+                                                    : HIDDEN_VALUE_MASK;
 
                                                 return (
                                                     <div

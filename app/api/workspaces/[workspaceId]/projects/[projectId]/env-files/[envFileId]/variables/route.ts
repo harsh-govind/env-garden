@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ENV_VARIABLE_NOTE_MAX_LENGTH } from "@/constants/environment";
+import { ENV_VARIABLE_NOTE_MAX_LENGTH, envKeyPattern } from "@/constants/environment";
 import { parseSaveEnvVariablesBody } from "@/lib/env-variables";
 import { auth } from "@/lib/auth";
 import { serializeProjectEnvVariable } from "@/utils/serializers/project";
@@ -15,7 +15,6 @@ import type {
     SaveEnvVariablesBody,
 } from "@/types/project";
 
-const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function parseCreateEnvVariableBody(body: CreateEnvVariableBody) {
     const key = typeof body.key === "string" ? body.key.trim() : "";

@@ -1,9 +1,9 @@
-import { ENV_VARIABLE_NOTE_MAX_LENGTH } from "@/constants/environment";
+import {
+    ENV_VARIABLE_NOTE_MAX_LENGTH,
+    MAX_ENV_VARIABLES_PER_SAVE,
+    envKeyPattern,
+} from "@/constants/environment";
 import type { SaveEnvVariablesBody } from "@/types/project";
-
-const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-export const MAX_ENV_VARIABLES_PER_SAVE = 500;
 
 export function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
     if (!Array.isArray(body.variables)) {

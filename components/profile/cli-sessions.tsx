@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CLI_TOKEN_TTL_DAYS } from "@/constants/cli";
 import type { CliSession, CliSessionsResponse } from "@/types/cli";
+import type { ApiErrorPayload } from "@/types/workspace";
 import { formatTimeAgo } from "@/utils";
 
 function formatDate(value: string | null) {
@@ -22,7 +23,7 @@ async function fetchSessions(): Promise<CliSession[] | Error> {
     try {
         const response = await fetch("/api/profile/cli-sessions", { cache: "no-store" });
         const payload = (await response.json().catch(() => null)) as
-            | (CliSessionsResponse & { error?: string })
+            | (CliSessionsResponse & ApiErrorPayload)
             | null;
 
         if (!response.ok || !payload) {
@@ -77,7 +78,7 @@ export default function CliSessions() {
             );
 
             if (!response.ok) {
-                const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+                const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
                 throw new Error(payload?.error ?? "Could not revoke the CLI session.");
             }
 

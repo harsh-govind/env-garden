@@ -10,6 +10,7 @@ export const CLI_LOGIN_REQUEST_TTL_MS = 10 * 60 * 1000;
 export const CLI_LOGIN_POLL_INTERVAL_SECONDS = 2;
 export const CLI_TOKEN_TTL_DAYS = 7;
 export const CLI_TOKEN_TTL_MS = CLI_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+export const CLI_LOGIN_COMMAND = "npx @env-garden/cli login";
 
 export const cliBearerTokenPattern = /^Bearer\s+(.+)$/i;
 export const cliTokenHashPattern = /^[a-f0-9]{64}$/;
