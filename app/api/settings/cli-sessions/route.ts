@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cliNoStoreHeaders } from "@/constants/cli";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import {
     listActiveCliTokensForUser,
     revokeAllCliTokensForUser,
@@ -9,7 +9,7 @@ import type { CliSessionsResponse } from "@/types/cli";
 
 export async function GET() {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,7 +36,7 @@ export async function GET() {
 
 export async function DELETE() {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

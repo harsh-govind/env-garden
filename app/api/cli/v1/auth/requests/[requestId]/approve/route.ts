@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cliNoStoreHeaders } from "@/constants/cli";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { approveCliLoginRequest } from "@/lib/cli/login";
 import type { CliLoginRequestRouteContext } from "@/types/cli";
 
@@ -9,7 +9,7 @@ export async function POST(
     context: CliLoginRequestRouteContext
 ) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json(

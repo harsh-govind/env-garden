@@ -1,8 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getRandomAvatarPresetId } from "@/constants/avatar-presets";
 import type {
-    AuthUserRecord,
-    CreateUserFromAuthInput,
     UpdatedUserProfileRecord,
     UpdateUserProfileInput,
     UserProfileRecord,
@@ -14,62 +11,6 @@ function isNotFoundError(error: unknown) {
     }
 
     return "code" in error && (error as { code?: string }).code === "P2025";
-}
-
-export async function findUserByEmail(email: string): Promise<AuthUserRecord | null> {
-    return prisma.user.findUnique({
-        where: { email },
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            avatar: true,
-        },
-    });
-}
-
-export async function createUserFromAuth(
-    input: CreateUserFromAuthInput
-): Promise<AuthUserRecord> {
-    return prisma.user.create({
-        data: {
-            email: input.email,
-            name: input.name ?? null,
-            avatar: getRandomAvatarPresetId(),
-        },
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            avatar: true,
-        },
-    });
-}
-
-export async function upsertUserFromAuth(
-    input: CreateUserFromAuthInput
-): Promise<AuthUserRecord> {
-    return prisma.user.upsert({
-        where: {
-            email: input.email,
-        },
-        create: {
-            email: input.email,
-            name: input.name ?? null,
-            avatar: getRandomAvatarPresetId(),
-        },
-        update: input.name
-            ? {
-                name: input.name,
-            }
-            : {},
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            avatar: true,
-        },
-    });
 }
 
 export async function updateUserName(userId: string, name: string) {

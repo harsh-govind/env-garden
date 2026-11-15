@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { serializeProjectDetail } from "@/utils/serializers/project";
 import {
     deleteProject,
@@ -15,7 +15,7 @@ import type {
 
 export async function GET(_: Request, context: ProjectRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -57,7 +57,7 @@ export async function GET(_: Request, context: ProjectRouteContext) {
 
 export async function PATCH(request: Request, context: ProjectRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -140,7 +140,7 @@ export async function PATCH(request: Request, context: ProjectRouteContext) {
 
 export async function DELETE(_: Request, context: ProjectRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

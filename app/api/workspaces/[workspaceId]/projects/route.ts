@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import {
     defaultProjectEnvironmentTypes,
     isEnvironmentTypeValue,
@@ -52,7 +52,7 @@ function parseCreateProjectBody(body: CreateProjectBody) {
 
 export async function POST(request: Request, context: WorkspaceRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

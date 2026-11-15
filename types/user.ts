@@ -1,21 +1,9 @@
 import type { AvatarPresetId } from "@/types/avatar";
 
-export type AuthUserRecord = {
-    id: string;
-    email: string;
-    name: string | null;
-    avatar: string;
-};
-
 export type UserProfileRecord = {
     name: string | null;
     email: string;
     avatar: string;
-};
-
-export type CreateUserFromAuthInput = {
-    email: string;
-    name?: string | null;
 };
 
 export type UpdateUserProfileInput = {

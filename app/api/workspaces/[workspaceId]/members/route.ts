@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { sendWorkspaceInviteEmail } from "@/lib/email";
 import {
     parseInviteEmail,
@@ -65,7 +65,7 @@ async function markWorkspaceInviteEmailSentSafely(inviteId: string) {
 
 export async function GET(_: Request, context: WorkspaceRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -104,7 +104,7 @@ export async function GET(_: Request, context: WorkspaceRouteContext) {
 
 export async function POST(request: Request, context: WorkspaceRouteContext) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

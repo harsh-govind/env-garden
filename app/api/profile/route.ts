@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { isAvatarPresetId } from "@/constants/avatar-presets";
 import {
     getUserProfile,
@@ -13,7 +13,7 @@ function normalizeName(value: string) {
 
 export async function GET() {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,7 +41,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

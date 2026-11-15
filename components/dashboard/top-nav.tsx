@@ -7,12 +7,12 @@ import {
     Moon,
     MoreHorizontal,
     Plus,
+    Settings,
     Sun,
-    User,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOutAndGoHome } from "@/lib/auth-client";
 import { useTheme } from "next-themes";
 import { SETTINGS_PATH } from "@/constants/routes";
 import {
@@ -215,8 +215,8 @@ export default function DashboardTopNav({
                                         router.push(SETTINGS_PATH);
                                     }}
                                 >
-                                    <User className="size-4" />
-                                    <span>Profile</span>
+                                    <Settings className="size-4" />
+                                    <span>Settings</span>
                                 </button>
 
                                 <button
@@ -224,7 +224,7 @@ export default function DashboardTopNav({
                                     className="mt-1 flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground"
                                     onClick={() => {
                                         setIsProfileMenuOpen(false);
-                                        void signOut({ callbackUrl: "/" });
+                                        void signOutAndGoHome(router);
                                     }}
                                 >
                                     <LogOut className="size-4" />

@@ -1,41 +1,118 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import type { NextAuthOptions } from "next-auth";
-import { getServerSession } from "next-auth";
-import EmailProvider from "next-auth/providers/email";
-import GitHubProvider from "next-auth/providers/github";
-import GoogleProvider from "next-auth/providers/google";
-import { APP_SESSION_MAX_AGE_SECONDS } from "@/constants/auth";
+import "server-only";
+import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { createAuthMiddleware } from "better-auth/api";
+import { deleteSessionCookie } from "better-auth/cookies";
+import { generateRandomString } from "better-auth/crypto";
+import { nextCookies } from "better-auth/next-js";
+import { magicLink, twoFactor } from "better-auth/plugins";
+import { headers } from "next/headers";
+import { APP_NAME } from "@/constants/app";
 import {
-    DEFAULT_AVATAR_PRESET_ID,
-    isAvatarPresetId,
-} from "@/constants/avatar-presets";
-import {
-    getEmailSenderAddress,
-    sendSignInEmail,
-} from "@/lib/email";
-import { resolveAppSessionId } from "@/lib/app-session";
+    AUTH_SESSION_EXPIRES_IN_SECONDS,
+    AUTH_SESSION_UPDATE_AGE_SECONDS,
+    MAGIC_LINK_EXPIRES_IN_SECONDS,
+    TWO_FACTOR_ATTEMPTS_IDENTIFIER_PREFIX,
+    TWO_FACTOR_COOKIE_MAX_AGE_SECONDS,
+    TWO_FACTOR_COOKIE_NAME,
+    TWO_FACTOR_ENFORCED_PATH_PREFIXES,
+    TWO_FACTOR_IDENTIFIER_PREFIX,
+} from "@/constants/auth";
+import { DEFAULT_AVATAR_PRESET_ID, getRandomAvatarPresetId } from "@/constants/avatar-presets";
+import { TWO_FACTOR_PATH } from "@/constants/routes";
+import { sendSignInEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
-import { revokeAppSession } from "@/prisma/services/app-session";
-import { upsertUserFromAuth } from "@/prisma/services/user";
+import type { TwoFactorAwareUser } from "@/types/auth";
 
-function normalizeEmail(email: string) {
-    return email.trim().toLowerCase();
-}
+/**
+ * Better Auth's 2FA plugin only challenges password sign-ins. env.garden signs
+ * in with magic links and Google/GitHub, so this hook applies the same
+ * challenge to those: drop the new session, set the plugin's signed
+ * `two_factor` cookie, and send the user to enter a code. The plugin's own
+ * verify endpoints then create the session.
+ */
+const enforceTwoFactorOnAllSignIns = createAuthMiddleware(async (ctx) => {
+    const path = ctx.path ?? "";
 
-export const authOptions: NextAuthOptions = {
-    adapter: PrismaAdapter(prisma),
-    providers: [
-        EmailProvider({
-            from: getEmailSenderAddress("auth") ?? undefined,
-            maxAge: 15 * 60,
-            normalizeIdentifier(identifier) {
-                return normalizeEmail(identifier.split(",")[0] ?? "");
+    if (!TWO_FACTOR_ENFORCED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+        return;
+    }
+
+    const newSession = ctx.context.newSession;
+
+    if (!(newSession?.user as TwoFactorAwareUser | undefined)?.twoFactorEnabled) {
+        return;
+    }
+
+    deleteSessionCookie(ctx, true);
+    await ctx.context.internalAdapter.deleteSession(newSession!.session.token);
+    ctx.context.setNewSession(null);
+
+    const identifier = `${TWO_FACTOR_IDENTIFIER_PREFIX}${generateRandomString(20)}`;
+    const expiresAt = new Date(Date.now() + TWO_FACTOR_COOKIE_MAX_AGE_SECONDS * 1000);
+
+    await ctx.context.internalAdapter.createVerificationValue({
+        value: newSession!.user.id,
+        identifier,
+        expiresAt,
+    });
+    await ctx.context.internalAdapter.createVerificationValue({
+        value: "0",
+        identifier: `${TWO_FACTOR_ATTEMPTS_IDENTIFIER_PREFIX}${identifier}`,
+        expiresAt,
+    });
+
+    const twoFactorCookie = ctx.context.createAuthCookie(TWO_FACTOR_COOKIE_NAME, {
+        maxAge: TWO_FACTOR_COOKIE_MAX_AGE_SECONDS,
+    });
+    await ctx.setSignedCookie(twoFactorCookie.name, identifier, ctx.context.secret, twoFactorCookie.attributes);
+
+    throw ctx.redirect(new URL(TWO_FACTOR_PATH, ctx.context.baseURL).toString());
+});
+
+export const auth = betterAuth({
+    appName: APP_NAME,
+    baseURL: process.env.BETTER_AUTH_URL,
+    secret: process.env.BETTER_AUTH_SECRET,
+    database: prismaAdapter(prisma, { provider: "postgresql" }),
+    user: {
+        additionalFields: {
+            avatar: {
+                type: "string",
+                required: false,
+                defaultValue: DEFAULT_AVATAR_PRESET_ID,
+                input: false,
             },
-            async sendVerificationRequest({ identifier, url, expires }) {
+        },
+    },
+    session: {
+        expiresIn: AUTH_SESSION_EXPIRES_IN_SECONDS,
+        updateAge: AUTH_SESSION_UPDATE_AGE_SECONDS,
+    },
+    account: {
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ["google", "github"],
+        },
+    },
+    socialProviders: {
+        google: {
+            clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+        },
+        github: {
+            clientId: process.env.GITHUB_CLIENT_ID ?? "",
+            clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+        },
+    },
+    plugins: [
+        magicLink({
+            expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
+            async sendMagicLink({ email, url }) {
                 const result = await sendSignInEmail({
-                    to: identifier,
+                    to: email,
                     magicLinkUrl: url,
-                    expiresAt: expires,
+                    expiresAt: new Date(Date.now() + MAGIC_LINK_EXPIRES_IN_SECONDS * 1000),
                 });
 
                 if (result.status === "NOT_CONFIGURED") {
@@ -47,111 +124,27 @@ export const authOptions: NextAuthOptions = {
                 }
             },
         }),
-        GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-            allowDangerousEmailAccountLinking: true,
+        twoFactor({
+            issuer: APP_NAME,
+            allowPasswordless: true,
         }),
-        GitHubProvider({
-            clientId: process.env.GITHUB_CLIENT_ID ?? "",
-            clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
-            allowDangerousEmailAccountLinking: true,
-        }),
+        nextCookies(),
     ],
-    session: {
-        strategy: "jwt",
-        maxAge: APP_SESSION_MAX_AGE_SECONDS,
-    },
-    pages: {
-        signIn: "/signin",
-        error: "/signin",
-    },
-    callbacks: {
-        async signIn({ user }) {
-            return typeof user.email === "string" && Boolean(user.email.trim());
-        },
-        async jwt({ token, user }) {
-            const rawEmail =
-                typeof user?.email === "string"
-                    ? user.email
-                    : typeof token.email === "string"
-                        ? token.email
-                        : null;
-            const email = rawEmail ? normalizeEmail(rawEmail) : null;
-            const rawName =
-                typeof user?.name === "string"
-                    ? user.name
-                    : typeof token.name === "string"
-                        ? token.name
-                        : null;
-            const name = rawName?.trim() || null;
-
-            if (!email) {
-                return token;
-            }
-
-            const authUser = await upsertUserFromAuth({
-                email,
-                name,
-            });
-
-            token.email = authUser.email;
-            token.name = authUser.name ?? token.name;
-            token.sub = authUser.id;
-            token.avatar = isAvatarPresetId(authUser.avatar)
-                ? authUser.avatar
-                : DEFAULT_AVATAR_PRESET_ID;
-            token.sessionId = await resolveAppSessionId({
-                userId: authUser.id,
-                sessionId: token.sessionId,
-                isSignIn: Boolean(user),
-            });
-            return token;
-        },
-        async session({ session, token }) {
-            session.sessionId = token.sessionId;
-
-            if (session.user && typeof token.sub === "string") {
-                session.user.id = token.sub;
-
-                if (
-                    typeof token.avatar === "string"
-                    && isAvatarPresetId(token.avatar)
-                ) {
-                    session.user.avatar = token.avatar;
-                }
-            }
-
-            return session;
-        },
-        async redirect({ url, baseUrl }) {
-            if (url.startsWith("/")) {
-                return `${baseUrl}${url}`;
-            }
-
-            try {
-                const parsedUrl = new URL(url);
-
-                if (parsedUrl.origin === baseUrl) {
-                    return url;
-                }
-            } catch {
-                return baseUrl;
-            }
-
-            return baseUrl;
+    databaseHooks: {
+        user: {
+            create: {
+                async before(user) {
+                    return { data: { ...user, avatar: getRandomAvatarPresetId() } };
+                },
+            },
         },
     },
-    events: {
-        async signOut({ token }) {
-            if (token?.sessionId) {
-                await revokeAppSession(token.sessionId);
-            }
-        },
+    hooks: {
+        after: enforceTwoFactorOnAllSignIns,
     },
-    secret: process.env.NEXTAUTH_SECRET,
-};
+});
 
-export function auth() {
-    return getServerSession(authOptions);
+/** The signed-in user and session for the current request, or null. */
+export async function getSession() {
+    return auth.api.getSession({ headers: await headers() });
 }

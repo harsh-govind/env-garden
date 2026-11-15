@@ -1,12 +1,21 @@
-import { auth } from "@/lib/auth";
 import { AuthenticatedContextProvider } from "@/contexts/authenticated";
-import type { AuthenticatedProviderProps } from "@/types/auth";
+import { getSession } from "@/lib/auth";
+import type { AuthenticatedProviderProps, AuthUser } from "@/types/auth";
 
 export default async function AuthenticatedProvider({
     children,
 }: AuthenticatedProviderProps) {
-    const session = await auth();
-    const user = session?.user ?? null;
+    const session = await getSession();
+    const user: AuthUser | null = session
+        ? {
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.name || null,
+            image: session.user.image ?? null,
+            avatar: session.user.avatar ?? null,
+            twoFactorEnabled: session.user.twoFactorEnabled ?? false,
+        }
+        : null;
     const value = {
         isAuthenticated: Boolean(user),
         user,

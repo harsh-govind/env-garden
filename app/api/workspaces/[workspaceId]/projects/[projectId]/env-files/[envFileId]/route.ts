@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { serializeProjectEnvFile } from "@/utils/serializers/project";
 import { deleteEnvFile, renameEnvFile } from "@/prisma/services/project";
 import type {
@@ -14,7 +14,7 @@ export async function PATCH(
     context: ProjectEnvFileRouteContext
 ) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -104,7 +104,7 @@ export async function DELETE(
     context: ProjectEnvFileRouteContext
 ) {
     try {
-        const session = await auth();
+        const session = await getSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

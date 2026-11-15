@@ -10,51 +10,30 @@ export type SettingsTab = {
 };
 
 export type AppSessionSummary = {
-    id: string;
+    token: string;
     device: string;
     ipAddress: string | null;
     createdAt: string;
-    lastSeenAt: string;
+    lastActiveAt: string;
     isCurrent: boolean;
 };
 
-export type AppSessionsResponse = {
-    sessions: AppSessionSummary[];
+export type TwoFactorSetup = {
+    totpURI: string;
+    secret: string;
+    qrCodeDataUrl: string;
+    backupCodes: string[];
 };
 
-export type AppSessionRouteContext = {
-    params: Promise<{
-        sessionId: string;
-    }>;
+export type CodeFormProps = {
+    label: string;
+    submitLabel: string;
+    isPending: boolean;
+    onSubmit: (code: string) => void;
 };
 
-export type CreateAppSessionInput = {
-    userId: string;
-    userAgent: string | null;
-    ipAddress: string | null;
+export type BackupCodesListProps = {
+    codes: string[];
 };
 
-export type RequestClientInfo = {
-    userAgent: string | null;
-    ipAddress: string | null;
-};
-
-export type RevokeAppSessionInput = {
-    userId: string;
-    sessionId: string;
-};
-
-export type RevokeOtherAppSessionsInput = {
-    userId: string;
-    currentSessionId: string | undefined;
-};
-
-export type ResolveAppSessionInput = {
-    userId: string;
-    sessionId: string | undefined;
-    isSignIn: boolean;
-};
-
-export type UpsertLegacyAppSessionInput = CreateAppSessionInput & {
-    sessionId: string;
-};
+export type SecurityAction = "idle" | "setup" | "backup-codes" | "disable" | "regenerate";
