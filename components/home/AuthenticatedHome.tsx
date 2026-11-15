@@ -84,7 +84,9 @@ export default function AuthenticatedHome() {
     const [workspaceDescription, setWorkspaceDescription] = useState("");
     const [formError, setFormError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [projectCards, setProjectCards] = useState<WorkspaceProjectSummary[]>([]);
+    const [projectCards, setProjectCards] = useState<WorkspaceProjectSummary[]>(
+        () => activeWorkspace?.projects ?? []
+    );
     const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
     const [projectDraftName, setProjectDraftName] = useState("");
     const [isSavingProjectName, setIsSavingProjectName] = useState(false);
@@ -111,9 +113,13 @@ export default function AuthenticatedHome() {
         };
     }, [searchQuery]);
 
-    useEffect(() => {
+    // Reset the local (optimistically edited) list when the workspace's projects change.
+    const [syncedProjects, setSyncedProjects] = useState(activeWorkspace?.projects);
+
+    if (syncedProjects !== activeWorkspace?.projects) {
+        setSyncedProjects(activeWorkspace?.projects);
         setProjectCards(activeWorkspace?.projects ?? []);
-    }, [activeWorkspace?.id, activeWorkspace?.projects]);
+    }
 
     const canManageProjects =
         activeWorkspace?.role === "OWNER" || activeWorkspace?.role === "ADMIN";
