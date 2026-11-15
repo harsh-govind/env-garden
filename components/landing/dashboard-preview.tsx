@@ -12,12 +12,12 @@ import { cn } from "@/utils";
 /** Static mock of the env file editor shown in the hero. */
 export function DashboardPreview() {
     return (
-        <div className="overflow-hidden rounded-xl border bg-card text-left shadow-[0_24px_80px_-24px_rgb(0_0_0/0.25)] dark:shadow-[0_24px_80px_-24px_rgb(0_0_0/0.8)]">
+        <div className="overflow-hidden border bg-card text-left shadow-[0_24px_80px_-24px_rgb(0_0_0/0.25)] dark:shadow-[0_24px_80px_-24px_rgb(0_0_0/0.8)]">
             <div className="flex h-10 items-center gap-3 border-b px-4">
                 <div className="flex gap-1.5">
-                    <span className="size-2.5 rounded-full border border-foreground/15" />
-                    <span className="size-2.5 rounded-full border border-foreground/15" />
-                    <span className="size-2.5 rounded-full border border-foreground/15" />
+                    <span className="size-2.5 border border-foreground/15" />
+                    <span className="size-2.5 border border-foreground/15" />
+                    <span className="size-2.5 border border-foreground/15" />
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <LogoMark className="size-4" />
@@ -31,7 +31,7 @@ export function DashboardPreview() {
 
             <div className="grid md:grid-cols-[180px_1fr]">
                 <aside className="hidden border-r p-3 md:block">
-                    <div className="flex h-8 items-center gap-2 rounded-md border px-2 text-xs text-muted-foreground">
+                    <div className="flex h-8 items-center gap-2 border px-2 text-xs text-muted-foreground">
                         <Search className="size-3.5" />
                         Search
                     </div>
@@ -41,7 +41,7 @@ export function DashboardPreview() {
                             <li
                                 key={project}
                                 className={cn(
-                                    "rounded-md px-2 py-1.5",
+                                    "px-2 py-1.5",
                                     index === 0 ? "bg-muted font-medium" : "text-muted-foreground"
                                 )}
                             >
@@ -73,7 +73,7 @@ export function DashboardPreview() {
                                 </span>
                             ))}
                         </div>
-                        <span className="hidden h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs sm:inline-flex">
+                        <span className="hidden h-7 items-center gap-1.5 border px-2.5 text-xs sm:inline-flex">
                             <Copy className="size-3" />
                             Copy as .env
                         </span>
@@ -104,7 +104,7 @@ export function DashboardPreview() {
                                         </div>
                                     </td>
                                     <td className="hidden px-5 py-3 whitespace-nowrap text-muted-foreground lg:table-cell">
-                                        <span className="mr-2 inline-grid size-5 place-items-center rounded-full bg-muted text-[9px] font-medium text-foreground">
+                                        <span className="mr-2 inline-grid size-5 place-items-center bg-muted text-[9px] font-medium text-foreground">
                                             {row.by}
                                         </span>
                                         {row.when}
