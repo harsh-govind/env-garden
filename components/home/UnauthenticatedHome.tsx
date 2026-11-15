@@ -11,6 +11,7 @@ import { Label } from "@/components/landing/label";
 import { PrimaryButton } from "@/components/landing/primary-button";
 import { Section } from "@/components/landing/section";
 import { ThemeToggle } from "@/components/landing/theme-toggle";
+import { Button } from "@/components/ui/button";
 import {
     Accordion,
     AccordionContent,
@@ -51,20 +52,16 @@ export default function UnauthenticatedHome() {
                     </div>
 
                     <div className="flex items-center gap-1">
-                        <a
-                            href={APP_REPOSITORY_URL}
-                            className="hidden h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] text-muted-foreground transition hover:text-foreground sm:inline-flex"
-                        >
-                            <FaGithub className="size-4" />
-                            <GitHubStars />
-                        </a>
+                        <Button asChild variant="ghost" size="sm" className="hidden text-muted-foreground sm:inline-flex">
+                            <a href={APP_REPOSITORY_URL}>
+                                <FaGithub />
+                                <GitHubStars />
+                            </a>
+                        </Button>
                         <ThemeToggle />
-                        <Link
-                            href={SIGN_IN_PATH}
-                            className="ml-1 inline-flex h-8 items-center rounded-md bg-foreground px-3.5 text-[13px] font-medium text-background transition hover:bg-foreground/85"
-                        >
-                            Sign in
-                        </Link>
+                        <Button asChild size="sm" className="ml-1 px-3.5">
+                            <Link href={SIGN_IN_PATH}>Sign in</Link>
+                        </Button>
                     </div>
                 </nav>
             </header>
@@ -79,7 +76,7 @@ export default function UnauthenticatedHome() {
                             href="#cli"
                             className="group inline-flex items-center gap-2 text-[13px] text-muted-foreground transition hover:text-foreground"
                         >
-                            <span className="rounded border px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-foreground uppercase">
+                            <span className="border px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-foreground uppercase">
                                 New
                             </span>
                             Pull, push and run your env from the terminal
@@ -143,16 +140,16 @@ export default function UnauthenticatedHome() {
                     <div className="grid border-t md:grid-cols-2">
                         <div className="px-5 py-10 sm:px-10">
                             <Label>Before</Label>
-                            <div className="mt-6 rounded-lg border bg-card p-4 text-sm">
+                            <div className="mt-6 border bg-card p-4 text-sm">
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span className="font-medium text-foreground"># dev-backend</span>
                                     · 11:42
                                 </div>
                                 <div className="mt-3 flex gap-3">
-                                    <span className="grid size-7 shrink-0 place-items-center rounded bg-muted text-[10px] font-medium">AK</span>
+                                    <span className="grid size-7 shrink-0 place-items-center bg-muted text-[10px] font-medium">AK</span>
                                     <div className="min-w-0 space-y-2">
                                         <p className="text-muted-foreground">here&apos;s the prod db for you 👇</p>
-                                        <code className="block truncate rounded border bg-background px-2 py-1.5 font-mono text-xs line-through decoration-foreground/40">
+                                        <code className="block truncate border bg-background px-2 py-1.5 font-mono text-xs line-through decoration-foreground/40">
                                             DATABASE_URL=postgres://admin:hunter2@prod-db…
                                         </code>
                                         <p className="text-xs text-muted-foreground">
@@ -165,7 +162,7 @@ export default function UnauthenticatedHome() {
 
                         <div className="border-t px-5 py-10 sm:px-10 md:border-t-0 md:border-l">
                             <Label>After</Label>
-                            <div className="mt-6 rounded-lg border bg-card p-4 text-sm">
+                            <div className="mt-6 border bg-card p-4 text-sm">
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <span className="font-medium text-foreground">api / production</span>
                                     <span className="inline-flex items-center gap-1">
@@ -173,7 +170,7 @@ export default function UnauthenticatedHome() {
                                     </span>
                                 </div>
                                 <div className="mt-3 space-y-2">
-                                    <div className="flex items-center justify-between rounded border bg-background px-2 py-1.5 font-mono text-xs">
+                                    <div className="flex items-center justify-between border bg-background px-2 py-1.5 font-mono text-xs">
                                         <span>DATABASE_URL</span>
                                         <span className="text-muted-foreground">••••••••••••</span>
                                     </div>
@@ -200,7 +197,7 @@ export default function UnauthenticatedHome() {
                                 <Label>{feature.label}</Label>
                                 <h3 className="mt-4 text-lg font-medium tracking-tight">{feature.title}</h3>
                                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.body}</p>
-                                <div className="mt-8 rounded-lg border bg-muted/40 p-4">
+                                <div className="mt-8 border bg-muted/40 p-4">
                                     <FeatureVisual visual={feature.visual} />
                                 </div>
                             </article>
@@ -261,7 +258,7 @@ export default function UnauthenticatedHome() {
                         </div>
 
                         <div className="flex items-center border-t px-5 py-10 sm:px-10 md:border-t-0 md:border-l">
-                            <div className="w-full overflow-hidden rounded-lg border bg-card font-mono text-[13px] leading-6">
+                            <div className="w-full overflow-hidden border bg-card font-mono text-[13px] leading-6">
                                 <div className="flex h-9 items-center border-b px-4 text-xs text-muted-foreground">
                                     ~/acme/api
                                 </div>
@@ -323,13 +320,12 @@ export default function UnauthenticatedHome() {
                         </h2>
                         <div className="flex flex-col gap-3 sm:flex-row">
                             <PrimaryButton href={SIGN_IN_PATH}>Start for free</PrimaryButton>
-                            <a
-                                href={APP_REPOSITORY_URL}
-                                className="inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-medium transition hover:bg-muted"
-                            >
-                                <FaGithub className="size-4" />
-                                Star on GitHub
-                            </a>
+                            <Button asChild variant="outline" size="lg" className="h-10 px-4 text-sm">
+                                <a href={APP_REPOSITORY_URL}>
+                                    <FaGithub />
+                                    Star on GitHub
+                                </a>
+                            </Button>
                         </div>
                     </div>
                 </Section>
