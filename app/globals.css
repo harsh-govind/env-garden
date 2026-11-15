@@ -126,5 +126,110 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+  }
+}
+
+/* Landing page */
+@media (pointer: fine) {
+  .has-custom-cursor,
+  .has-custom-cursor * {
+    cursor: none !important;
+  }
+
+  .custom-cursor-dot,
+  .custom-cursor-ring {
+    pointer-events: none;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 9999;
+    opacity: 1;
+    mix-blend-mode: difference;
+    will-change: transform, opacity, width, height;
+  }
+
+  .custom-cursor-dot {
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 999px;
+    transition:
+      opacity 160ms ease,
+      width 160ms ease,
+      height 160ms ease;
+  }
+
+  .custom-cursor-ring {
+    width: 28px;
+    height: 28px;
+    border: 1px solid white;
+    border-radius: 999px;
+    transition:
+      opacity 160ms ease,
+      width 180ms ease,
+      height 180ms ease,
+      background-color 180ms ease;
+  }
+
+  .custom-cursor-dot.is-active {
+    width: 4px;
+    height: 4px;
+  }
+
+  .custom-cursor-ring.is-active {
+    width: 42px;
+    height: 42px;
+    background: rgb(255 255 255 / 0.12);
+  }
+
+  .custom-cursor-dot.is-hidden,
+  .custom-cursor-ring.is-hidden {
+    opacity: 0;
+  }
+}
+
+@layer utilities {
+  .technical-grid {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in oklch, var(--border), transparent 18%) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklch, var(--border), transparent 18%) 1px,
+        transparent 1px
+      );
+    background-size: 42px 42px;
+  }
+
+  .animate-rise {
+    animation: rise 0.7s ease both;
+  }
+
+  .animate-scan {
+    animation: scan 4s linear infinite;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(420%);
   }
 }

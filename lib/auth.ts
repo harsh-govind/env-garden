@@ -58,6 +58,10 @@ export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt",
     },
+    pages: {
+        signIn: "/signin",
+        error: "/signin",
+    },
     callbacks: {
         async signIn({ user }) {
             return typeof user.email === "string" && Boolean(user.email.trim());

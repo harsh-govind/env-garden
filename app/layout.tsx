@@ -24,7 +24,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: APP_NAME,
-  description: "Envs, simplified",
+  description:
+    "Open-source environment variable storage, sharing, and auditability for teams that do not want secrets in chats or docs.",
 };
 
 function LayoutSwitcher({ isAuthenticated, children }: LayoutSwitcherProps) {

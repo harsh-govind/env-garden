@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 
 export type AuthButtonsProps = {
     isAuthenticated: boolean;
+    callbackUrl?: string;
 };
 
 export type ProtectedRoute = {
