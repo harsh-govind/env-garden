@@ -110,6 +110,8 @@ export const auth = betterAuth({
     plugins: [
         magicLink({
             expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
+            // Only a hash is stored, so a database read can't produce a working link.
+            storeToken: "hashed",
             async sendMagicLink({ email, url }) {
                 const result = await sendSignInEmail({
                     to: email,
