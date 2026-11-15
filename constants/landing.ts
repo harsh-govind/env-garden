@@ -112,7 +112,7 @@ export const LANDING_FAQS: LandingFaq[] = [
     },
     {
         question: "How do I report a vulnerability?",
-        answer: "Privately, please. Don't open a public issue with exploit details. Contact the maintainers first.",
+        answer: "Privately, through GitHub security advisories on the env-garden repository. Please don\'t open a public issue with exploit details. See SECURITY.md for the full policy.",
     },
 ];
 
