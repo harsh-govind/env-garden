@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAppUrl } from "@/lib/app-url";
 import { getSession } from "@/lib/auth";
 import { sendWorkspaceInviteEmail } from "@/lib/email";
 import {
@@ -23,12 +24,7 @@ import type { InviteEmailInput } from "@/types/email";
 import type { WorkspaceRouteContext } from "@/types/workspace";
 
 function buildInviteUrl(request: Request, token: string) {
-    const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.APP_URL ||
-        new URL(request.url).origin;
-
-    return new URL(`/invites/${token}`, appUrl).toString();
+    return new URL(`/invites/${token}`, getAppUrl(request)).toString();
 }
 
 async function sendWorkspaceInviteEmailSafely(
