@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAppUrl } from "@/lib/app-url";
 import {
     CLI_LOGIN_POLL_INTERVAL_SECONDS,
     CLI_TOKEN_NAME_MAX_LENGTH,
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
         });
         const authorizationUrl = new URL(
             `/cli/authorize/${loginRequest.id}`,
-            request.url
+            getAppUrl(request)
         ).toString();
 
         return NextResponse.json(
