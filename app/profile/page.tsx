@@ -9,6 +9,7 @@ import {
     AvatarPresetBadge,
     AvatarPresetPicker,
 } from "@/components/avatar/presets";
+import CliSessions from "@/components/profile/cli-sessions";
 import { Button } from "@/components/ui/button";
 import { useAuthenticated } from "@/contexts/authenticated";
 import {
@@ -282,6 +283,8 @@ export default function ProfilePage() {
                     </div>
                 </div>
             </section>
+
+            <CliSessions />
         </div>
     );
 }

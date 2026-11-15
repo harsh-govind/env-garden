@@ -16,6 +16,10 @@ export async function GET(request: Request) {
         return NextResponse.json(
             {
                 user: authentication.user,
+                token: {
+                    name: authentication.tokenName,
+                    expiresAt: authentication.expiresAt?.toISOString() ?? null,
+                },
             },
             { headers: cliNoStoreHeaders }
         );
