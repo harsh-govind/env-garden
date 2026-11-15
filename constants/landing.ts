@@ -1,5 +1,5 @@
 import { APP_REPOSITORY_URL } from "@/constants/app";
-import { SIGN_IN_PATH } from "@/constants/routes";
+import { CLI_DOCS_PATH, SIGN_IN_PATH } from "@/constants/routes";
 import type {
     LandingFaq,
     LandingFeature,
@@ -16,6 +16,7 @@ export const LANDING_NAV_LINKS: LandingLink[] = [
     { label: "Security", href: "#security" },
     { label: "CLI", href: "#cli" },
     { label: "FAQ", href: "#faq" },
+    { label: "Docs", href: CLI_DOCS_PATH },
 ];
 
 export const LANDING_PREVIEW_PROJECTS = ["api", "web", "worker", "analytics"];
@@ -114,6 +115,7 @@ export const LANDING_FOOTER_PRODUCT_LINKS: LandingLink[] = [
     { label: "Overview", href: "#product" },
     { label: "Security", href: "#security" },
     { label: "CLI", href: "#cli" },
+    { label: "CLI docs", href: CLI_DOCS_PATH, isInternal: true },
 ];
 
 export const LANDING_FOOTER_PROJECT_LINKS: LandingLink[] = [

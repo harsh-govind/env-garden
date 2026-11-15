@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
+import { isStandaloneRoute } from "@/constants/routes";
 import type { UnauthenticatedLayoutProps } from "@/types/layouts";
 
 export default function UnauthenticatedLayout({
@@ -9,8 +10,8 @@ export default function UnauthenticatedLayout({
 }: UnauthenticatedLayoutProps) {
     const pathname = usePathname();
 
-    // The landing page renders its own full-width layout.
-    if (pathname === "/") {
+    // The landing page and docs render their own full-width layout.
+    if (pathname === "/" || isStandaloneRoute(pathname)) {
         return <>{children}</>;
     }
 
