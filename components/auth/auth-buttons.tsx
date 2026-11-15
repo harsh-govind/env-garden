@@ -15,7 +15,7 @@ function getCallbackUrl() {
     return `${window.location.pathname}${window.location.search}` || "/";
 }
 
-export default function AuthButtons({ isAuthenticated }: AuthButtonsProps) {
+export default function AuthButtons({ isAuthenticated, callbackUrl }: AuthButtonsProps) {
     const [email, setEmail] = useState("");
     const [isSendingMagicLink, setIsSendingMagicLink] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export default function AuthButtons({ isAuthenticated }: AuthButtonsProps) {
         try {
             const result = await signIn("email", {
                 email,
-                callbackUrl: getCallbackUrl(),
+                callbackUrl: callbackUrl ?? getCallbackUrl(),
                 redirect: false,
             });
 
@@ -99,7 +99,7 @@ export default function AuthButtons({ isAuthenticated }: AuthButtonsProps) {
 
             <Button
                 className="w-full"
-                onClick={() => signIn("google", { callbackUrl: getCallbackUrl() })}
+                onClick={() => signIn("google", { callbackUrl: callbackUrl ?? getCallbackUrl() })}
                 variant="outline"
             >
                 <LogIn />
@@ -108,7 +108,7 @@ export default function AuthButtons({ isAuthenticated }: AuthButtonsProps) {
 
             <Button
                 className="w-full"
-                onClick={() => signIn("github", { callbackUrl: getCallbackUrl() })}
+                onClick={() => signIn("github", { callbackUrl: callbackUrl ?? getCallbackUrl() })}
                 variant="outline"
             >
                 <LogIn />
