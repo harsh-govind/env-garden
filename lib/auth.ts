@@ -92,7 +92,8 @@ export const auth = betterAuth({
     account: {
         accountLinking: {
             enabled: true,
-            trustedProviders: ["google", "github"],
+            // No trustedProviders: Google/GitHub accounts link only when the
+            // provider confirms the email address is verified.
             // Email magic link always works, so every provider can be disconnected.
             allowUnlinkingAll: true,
         },
