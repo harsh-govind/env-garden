@@ -73,7 +73,6 @@ export default function ProfileSettings() {
                     setDraftAvatar(payload.avatar);
                 }
             } catch {
-                // Ignore profile hydration failures and keep fallback preset.
             }
         };
 

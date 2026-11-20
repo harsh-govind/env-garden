@@ -24,10 +24,6 @@ function stripCommentMarker(comment: string) {
     return comment.replace(/^#\s?/, "").trimEnd();
 }
 
-/**
- * Parses `KEY=value` (optionally prefixed with `export`). Returns null when the
- * line isn't a valid assignment.
- */
 function parseAssignment(line: string): ParsedEnvAssignment | null {
     const body = line.startsWith("export ") ? line.slice("export ".length).trimStart() : line;
     const separatorIndex = body.indexOf("=");
@@ -72,7 +68,6 @@ function parseAssignment(line: string): ParsedEnvAssignment | null {
         }
     }
 
-    // Unquoted: an inline comment starts at whitespace followed by `#`.
     const inlineMatch = rawValue.match(/\s+#/);
 
     if (inlineMatch && inlineMatch.index !== undefined) {
@@ -86,12 +81,6 @@ function parseAssignment(line: string): ParsedEnvAssignment | null {
     return { key, value: rawValue, inlineComment: "" };
 }
 
-/**
- * Parses .env text, keeping comments:
- * - `# some text` lines become the note of the next variable.
- * - `#KEY=value` / `# KEY="value"` lines become commented-out variables.
- * - `KEY=value # text` inline comments are appended to the note.
- */
 export function parseEnvText(text: string): ParsedEnvEntry[] {
     const entries: ParsedEnvEntry[] = [];
     let pendingComments: string[] = [];
@@ -149,7 +138,6 @@ function formatEnvValue(value: string) {
     return JSON.stringify(value);
 }
 
-/** Serializes variables back to .env text, writing notes as `#` comment lines. */
 export function buildEnvText(
     entries: EnvTextEntry[]
 ) {

@@ -94,7 +94,6 @@ export default function AuthenticatedHome() {
     const [isDeletingProject, setIsDeletingProject] = useState(false);
     const [projectActionError, setProjectActionError] = useState<string | null>(null);
 
-    // Search + pagination
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedQuery, setDebouncedQuery] = useState("");
     const [page, setPage] = useState(1);
@@ -113,7 +112,6 @@ export default function AuthenticatedHome() {
         };
     }, [searchQuery]);
 
-    // Reset the local (optimistically edited) list when the workspace's projects change.
     const [syncedProjects, setSyncedProjects] = useState(activeWorkspace?.projects);
 
     if (syncedProjects !== activeWorkspace?.projects) {

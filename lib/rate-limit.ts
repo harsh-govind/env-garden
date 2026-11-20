@@ -3,10 +3,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { RateLimitResult, RateLimitRule } from "@/types/rate-limit";
 
-/**
- * The client IP. Heroku appends the address it saw to X-Forwarded-For, so the
- * last entry is trustworthy while earlier ones can be forged by the client.
- */
 export function getClientIp(request: Request) {
     const forwardedFor = request.headers.get("x-forwarded-for");
     const last = forwardedFor?.split(",").map((part) => part.trim()).filter(Boolean).at(-1);
@@ -14,7 +10,6 @@ export function getClientIp(request: Request) {
     return last || request.headers.get("x-real-ip") || "unknown";
 }
 
-/** Fixed-window counter shared across dynos (stored in Postgres). */
 export async function consumeRateLimit(rule: RateLimitRule, subject: string): Promise<RateLimitResult> {
     const key = `${rule.bucket}:${subject}`;
     const rows = await prisma.$queryRaw<{ count: number; windowStart: Date }[]>`
@@ -43,7 +38,6 @@ export async function consumeRateLimit(rule: RateLimitRule, subject: string): Pr
     };
 }
 
-/** Returns a 429 response when the subject is over the limit, otherwise null. */
 export async function rateLimitResponse(rule: RateLimitRule, subject: string) {
     const result = await consumeRateLimit(rule, subject);
 

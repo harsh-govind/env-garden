@@ -1,6 +1,5 @@
 import type { DocsInlineTextProps } from "@/types/docs";
 
-/** Renders `code` spans and **bold** spans inside docs prose. */
 export function InlineText({ text }: DocsInlineTextProps) {
     return (
         <>

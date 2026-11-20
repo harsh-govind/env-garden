@@ -14,7 +14,6 @@ export function CopyCommand() {
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1600);
         } catch {
-            // Clipboard may be unavailable; nothing to do.
         }
     };
 

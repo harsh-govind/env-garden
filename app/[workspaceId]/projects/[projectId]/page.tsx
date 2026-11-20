@@ -91,7 +91,6 @@ import type {
 } from "@/types/project";
 import type { ApiErrorPayload, EnvironmentTypeValue } from "@/types/workspace";
 
-
 function getRouteParam(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }

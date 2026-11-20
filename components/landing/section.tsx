@@ -11,7 +11,6 @@ function CornerMark({ className }: LandingCornerMarkProps) {
     );
 }
 
-/** A framed landing section with "+" markers on its top corners. */
 export function Section({ id, className, children }: LandingSectionProps) {
     return (
         <section id={id} className={cn("relative scroll-mt-16 border-t", className)}>

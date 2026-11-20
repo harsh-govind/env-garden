@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import type { GitHubStarsResponse } from "@/types/landing";
 
-/** Live star count from /api/github/stars; renders nothing until loaded. */
 export function GitHubStars() {
     const [stars, setStars] = useState<number | null>(null);
 

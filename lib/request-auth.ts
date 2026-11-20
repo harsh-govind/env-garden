@@ -3,11 +3,6 @@ import { getSession } from "@/lib/auth";
 import { authenticateCliRequest } from "@/lib/cli/auth";
 import type { RequestSession } from "@/types/auth";
 
-/**
- * The caller of an app API route: a CLI bearer token when an Authorization
- * header is sent, otherwise the browser session. Both resolve to the same
- * user, so routes apply identical permission checks either way.
- */
 export async function getRequestSession(request: Request): Promise<RequestSession | null> {
     if (request.headers.has("authorization")) {
         const cli = await authenticateCliRequest(request);

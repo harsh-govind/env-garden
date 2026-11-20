@@ -9,7 +9,6 @@ import {
 } from "@/constants/landing";
 import { cn } from "@/utils";
 
-/** Static mock of the env file editor shown in the hero. */
 export function DashboardPreview() {
     return (
         <div className="overflow-hidden border bg-card text-left shadow-[0_24px_80px_-24px_rgb(0_0_0/0.25)] dark:shadow-[0_24px_80px_-24px_rgb(0_0_0/0.8)]">

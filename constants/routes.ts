@@ -16,7 +16,6 @@ export const CLI_AUTHORIZE_PATH = "/cli/authorize";
 
 export const publicRoutePathPrefixes = ["/invites/", `${CLI_AUTHORIZE_PATH}/`, DOCS_PATH] as const;
 
-/** Routes that render their own full-page layout for every visitor. */
 export const standaloneRoutePathPrefixes = [DOCS_PATH, CLI_AUTHORIZE_PATH] as const;
 
 export const protectedRoutes: ProtectedRoute[] = [

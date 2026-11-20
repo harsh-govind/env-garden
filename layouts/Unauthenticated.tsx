@@ -10,7 +10,6 @@ export default function UnauthenticatedLayout({
 }: UnauthenticatedLayoutProps) {
     const pathname = usePathname();
 
-    // The landing page and docs render their own full-width layout.
     if (pathname === "/" || isStandaloneRoute(pathname)) {
         return <>{children}</>;
     }

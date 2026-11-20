@@ -1,4 +1,3 @@
-/** Turns a user agent string into a short label like "Chrome on macOS". */
 export function describeUserAgent(userAgent: string | null) {
     if (!userAgent) {
         return "Unknown device";

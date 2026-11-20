@@ -10,7 +10,6 @@ export function cliJson(body: unknown, status = 200) {
     return NextResponse.json(body, { status, headers: cliNoStoreHeaders });
 }
 
-/** Authenticates the CLI bearer token, then runs the handler for that user. */
 export async function withCliUser(
     request: Request,
     handler: (user: CliAuthenticatedUser) => Promise<Response>

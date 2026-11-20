@@ -9,7 +9,6 @@ import {
 import type { CliEnvVariable } from "@/types/cli";
 import type { ProjectEnvFileRouteContext, SaveEnvVariablesBody } from "@/types/project";
 
-/** Returns decrypted variables for `eit pull` / `eit run`. */
 export async function GET(request: Request, context: ProjectEnvFileRouteContext) {
     return withCliUser(request, async (user) => {
         const revealLimited = await rateLimitResponse(REVEAL_RATE_LIMIT, user.id);
@@ -46,7 +45,6 @@ export async function GET(request: Request, context: ProjectEnvFileRouteContext)
     });
 }
 
-/** Replaces all variables in the env file (`eit push`). */
 export async function PUT(request: Request, context: ProjectEnvFileRouteContext) {
     return withCliUser(request, async (user) => {
         const { workspaceId, projectId, envFileId } = await context.params;
@@ -62,7 +60,6 @@ export async function PUT(request: Request, context: ProjectEnvFileRouteContext)
             return cliJson({ error: parsed.error }, 400);
         }
 
-        // The CLI always sends full values; ignore ids so the file is replaced as-is.
         const variables = parsed.value.variables.map((variable) => ({
             key: variable.key,
             value: variable.value,
