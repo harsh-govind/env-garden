@@ -25,7 +25,9 @@ import {
     encryptKeyring,
     generateAccountKeys,
     getPublicAccountKeys,
+    openSealedAccountSeed,
     recoverAccountKeys,
+    sealAccountSeed,
     recoveryPhraseToSeed,
     seedToRecoveryPhrase,
     validateVaultPassphrase,
@@ -111,6 +113,24 @@ describe("account keys", () => {
         assert.equal(hex(recovered.signSecretKey), hex(keys.signSecretKey));
         await assert.rejects(
             recoverAccountKeys({ recoveryPhrase: phrase, expected: await getPublicAccountKeys(await generateAccountKeys()) }),
+            /do not belong/
+        );
+    });
+
+    it("seals a service account seed only for its holder", async () => {
+        const holder = await generateAccountKeys();
+        const serviceAccount = await generateAccountKeys();
+        const expected = await getPublicAccountKeys(serviceAccount);
+        const sealed = await sealAccountSeed(serviceAccount.seed, (await getPublicAccountKeys(holder)).boxPublicKey);
+        const opened = await openSealedAccountSeed({ sealedSeed: sealed, recipient: holder, expected });
+
+        assert.equal(hex(opened.signSecretKey), hex(serviceAccount.signSecretKey));
+        await assert.rejects(
+            openSealedAccountSeed({ sealedSeed: sealed, recipient: await generateAccountKeys(), expected }),
+            /Could not open/
+        );
+        await assert.rejects(
+            openSealedAccountSeed({ sealedSeed: sealed, recipient: holder, expected: await getPublicAccountKeys(holder) }),
             /do not belong/
         );
     });

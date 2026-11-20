@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { canViewHistory } from "@/constants/access";
 import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
+import { deleteServiceAccountUsersForWorkspace } from "@/prisma/services/service-account";
 import type {
     CreateWorkspaceForUserInput,
     WorkspaceDetailRecord,
@@ -480,6 +481,8 @@ export async function deleteWorkspaceForUser(input: {
                 },
             },
         });
+
+        await deleteServiceAccountUsersForWorkspace(tx, input.workspaceId);
 
         const deleted = await tx.workspace.deleteMany({
             where: {

@@ -32,6 +32,10 @@ export const protectedRoutes: ProtectedRoute[] = [
         path: "/:workspaceId/projects/:projectId",
         redirectTo: "/",
     },
+    {
+        path: "/:workspaceId/service-accounts",
+        redirectTo: "/",
+    },
 ];
 
 function normalizePath(path: string) {

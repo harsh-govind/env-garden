@@ -36,34 +36,68 @@ enum WorkspaceInviteStatus {
 }
 
 model User {
-  id                       String                @id @default(cuid())
-  email                    String                @unique
+  id                       String                    @id @default(cuid())
+  email                    String                    @unique
   name                     String?
-  emailVerified            Boolean               @default(false)
+  emailVerified            Boolean                   @default(false)
   image                    String?
-  avatar                   String                @default("sprout")
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
+  avatar                   String                    @default("sprout")
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
   accounts                 Account[]
   sessions                 Session[]
-  twoFactorEnabled         Boolean?              @default(false)
+  twoFactorEnabled         Boolean?                  @default(false)
   twoFactors               TwoFactor[]
   cliTokens                CliToken[]
-  approvedCliLoginRequests CliLoginRequest[]     @relation("CliLoginRequestApprover")
-  createdWorkspaces        Workspace[]           @relation("WorkspaceCreator")
-  createdProjects          Project[]             @relation("ProjectCreator")
-  createdEnvFiles          EnvFile[]             @relation("EnvFileCreator")
-  workspaceMemberships     WorkspaceMember[]     @relation("WorkspaceMemberUser")
-  workspaceMembers         WorkspaceMember[]     @relation("WorkspaceMemberAdder")
-  projectMembers           ProjectMember[]       @relation("ProjectMemberAdder")
-  envAccesses              ProjectEnvAccess[]    @relation("ProjectEnvAccessGrantor")
-  workspaceInvitesSent     WorkspaceInvite[]     @relation("WorkspaceInviteSender")
-  workspaceInvitesAccepted WorkspaceInvite[]     @relation("WorkspaceInviteAccepter")
-  workspaceInvitesRevoked  WorkspaceInvite[]     @relation("WorkspaceInviteRevoker")
+  approvedCliLoginRequests CliLoginRequest[]         @relation("CliLoginRequestApprover")
+  createdWorkspaces        Workspace[]               @relation("WorkspaceCreator")
+  createdProjects          Project[]                 @relation("ProjectCreator")
+  createdEnvFiles          EnvFile[]                 @relation("EnvFileCreator")
+  workspaceMemberships     WorkspaceMember[]         @relation("WorkspaceMemberUser")
+  workspaceMembers         WorkspaceMember[]         @relation("WorkspaceMemberAdder")
+  projectMembers           ProjectMember[]           @relation("ProjectMemberAdder")
+  envAccesses              ProjectEnvAccess[]        @relation("ProjectEnvAccessGrantor")
+  workspaceInvitesSent     WorkspaceInvite[]         @relation("WorkspaceInviteSender")
+  workspaceInvitesAccepted WorkspaceInvite[]         @relation("WorkspaceInviteAccepter")
+  workspaceInvitesRevoked  WorkspaceInvite[]         @relation("WorkspaceInviteRevoker")
   keyring                  UserKeyring?
-  environmentKeysCreated   EnvironmentKey[]      @relation("EnvironmentKeyCreator")
-  environmentKeyShares     EnvironmentKeyShare[] @relation("EnvironmentKeyShareRecipient")
-  environmentKeyGrants     EnvironmentKeyShare[] @relation("EnvironmentKeyShareGranter")
+  environmentKeysCreated   EnvironmentKey[]          @relation("EnvironmentKeyCreator")
+  environmentKeyShares     EnvironmentKeyShare[]     @relation("EnvironmentKeyShareRecipient")
+  environmentKeyGrants     EnvironmentKeyShare[]     @relation("EnvironmentKeyShareGranter")
+  isServiceAccount         Boolean                   @default(false)
+  serviceAccount           ServiceAccount?           @relation("ServiceAccountUser")
+  serviceAccountsCreated   ServiceAccount[]          @relation("ServiceAccountCreator")
+  serviceAccountKeyHolds   ServiceAccountKeyHolder[]
+}
+
+model ServiceAccount {
+  id          String                    @id @default(cuid())
+  userId      String                    @unique
+  workspaceId String
+  name        String
+  createdById String?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  user        User                      @relation("ServiceAccountUser", fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User?                     @relation("ServiceAccountCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  keyHolders  ServiceAccountKeyHolder[]
+
+  @@index([workspaceId])
+  @@index([createdById])
+}
+
+model ServiceAccountKeyHolder {
+  id               String         @id @default(cuid())
+  serviceAccountId String
+  userId           String
+  sealedSeed       String
+  createdAt        DateTime       @default(now())
+  serviceAccount   ServiceAccount @relation(fields: [serviceAccountId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceAccountId, userId])
+  @@index([userId])
 }
 
 model UserKeyring {
@@ -71,11 +105,11 @@ model UserKeyring {
   userId           String   @unique
   signPublicKey    String
   boxPublicKey     String   @unique
-  encryptedSeed    String
-  kdfSalt          String
-  kdfAlgorithm     String
-  kdfOpsLimit      Int
-  kdfMemLimitBytes Int
+  encryptedSeed    String?
+  kdfSalt          String?
+  kdfAlgorithm     String?
+  kdfOpsLimit      Int?
+  kdfMemLimitBytes Int?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -120,17 +154,18 @@ model CliLoginRequest {
 }
 
 model Workspace {
-  id          String             @id @default(cuid())
-  name        String
-  description String?
-  createdById String
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  createdBy   User               @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  projects    Project[]
-  members     WorkspaceMember[]
-  invites     WorkspaceInvite[]
-  history     WorkspaceHistory[]
+  id              String             @id @default(cuid())
+  name            String
+  description     String?
+  createdById     String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  createdBy       User               @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  projects        Project[]
+  members         WorkspaceMember[]
+  invites         WorkspaceInvite[]
+  history         WorkspaceHistory[]
+  serviceAccounts ServiceAccount[]
 
   @@index([createdById])
 }

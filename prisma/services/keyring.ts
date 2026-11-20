@@ -18,7 +18,16 @@ const keyringSelect = {
 
 type KeyringRow = Prisma.UserKeyringGetPayload<{ select: typeof keyringSelect }>;
 
-function mapKeyringRow(row: KeyringRow): KeyringRecord {
+function mapKeyringRow(row: KeyringRow): KeyringRecord | null {
+    if (
+        row.encryptedSeed === null
+        || row.kdfSalt === null
+        || row.kdfOpsLimit === null
+        || row.kdfMemLimitBytes === null
+    ) {
+        return null;
+    }
+
     return {
         signPublicKey: row.signPublicKey,
         boxPublicKey: row.boxPublicKey,
@@ -32,6 +41,11 @@ function mapKeyringRow(row: KeyringRow): KeyringRecord {
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
+}
+
+function toSaveResult(row: KeyringRow): SaveKeyringResult {
+    const keyring = mapKeyringRow(row);
+    return keyring ? { status: "OK", keyring } : { status: "NOT_FOUND" };
 }
 
 function toKeyringData(payload: EncryptedKeyringPayload) {
@@ -75,7 +89,7 @@ export async function createKeyringForUser(
             select: keyringSelect,
         });
 
-        return { status: "OK", keyring: mapKeyringRow(row) };
+        return toSaveResult(row);
     } catch (error) {
         if (isUniqueConstraintError(error)) {
             return { status: "CONFLICT" };
@@ -118,7 +132,7 @@ export async function rewrapKeyringForUser(
             select: keyringSelect,
         });
 
-        return { status: "OK" as const, keyring: mapKeyringRow(row) };
+        return toSaveResult(row);
     });
 }
 
@@ -144,7 +158,7 @@ export async function replaceKeyringForUser(
                 select: keyringSelect,
             });
 
-            return { status: "OK" as const, keyring: mapKeyringRow(row) };
+            return toSaveResult(row);
         });
     } catch (error) {
         if (isUniqueConstraintError(error)) {

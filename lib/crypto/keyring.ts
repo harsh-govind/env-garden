@@ -316,3 +316,46 @@ export async function computeFingerprint(keys: PublicAccountKeys) {
 
     return hex.match(/.{4}/g)?.join(" ") ?? hex;
 }
+
+export async function sealAccountSeed(seed: Uint8Array, recipientBoxPublicKey: string) {
+    const sodium = await loadSodium();
+
+    if (seed.length !== ACCOUNT_SEED_BYTE_LENGTH) {
+        throw new Error("Account seed must be 32 bytes.");
+    }
+
+    return toBase64(
+        sodium,
+        sodium.crypto_box_seal(
+            seed,
+            fromBase64(sodium, recipientBoxPublicKey, sodium.crypto_box_PUBLICKEYBYTES)
+        )
+    );
+}
+
+export async function openSealedAccountSeed(input: {
+    sealedSeed: string;
+    recipient: Pick<AccountKeys, "boxPublicKey" | "boxSecretKey">;
+    expected: PublicAccountKeys;
+}) {
+    const sodium = await loadSodium();
+    let seed: Uint8Array;
+
+    try {
+        seed = sodium.crypto_box_seal_open(
+            fromBase64(sodium, input.sealedSeed),
+            input.recipient.boxPublicKey,
+            input.recipient.boxSecretKey
+        );
+    } catch {
+        throw new Error("Could not open the service account key.");
+    }
+
+    try {
+        const keys = deriveAccountKeysWith(sodium, seed);
+        assertKeysMatch(sodium, keys, input.expected);
+        return keys;
+    } finally {
+        wipe(sodium, seed);
+    }
+}

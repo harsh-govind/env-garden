@@ -3,6 +3,7 @@
 import {
     FolderKanban,
     History,
+    Bot,
     Settings,
     Users,
     X,
@@ -12,6 +13,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
+    canManageWorkspaceMembers,
     canViewHistory,
 } from "@/constants/access";
 import { SETTINGS_PATH, matchesRoutePath } from "@/constants/routes";
@@ -81,6 +83,7 @@ export default function DashboardSidebar({
     const pathname = usePathname();
     const isHistoryRoute = matchesRoutePath(pathname, "/:workspaceId/history");
     const isMembersRoute = matchesRoutePath(pathname, "/:workspaceId/members");
+    const isServiceAccountsRoute = matchesRoutePath(pathname, "/:workspaceId/service-accounts");
     const isSettingsRoute = pathname === SETTINGS_PATH || pathname.startsWith(`${SETTINGS_PATH}/`);
     const canOpenHistory =
         workspaceRole !== null
@@ -94,7 +97,7 @@ export default function DashboardSidebar({
             icon: FolderKanban,
             href: "/",
             count: projectCount,
-            active: !isHistoryRoute && !isMembersRoute && !isSettingsRoute,
+            active: !isHistoryRoute && !isMembersRoute && !isServiceAccountsRoute && !isSettingsRoute,
         },
         {
             id: "members",
@@ -114,6 +117,16 @@ export default function DashboardSidebar({
             href: `/${activeWorkspaceId}/history`,
             count: historyCount,
             active: isHistoryRoute,
+        });
+    }
+
+    if (workspaceRole !== null && canManageWorkspaceMembers(workspaceRole) && activeWorkspaceId) {
+        primaryItems.push({
+            id: "service-accounts",
+            label: "Service accounts",
+            icon: Bot,
+            href: `/${activeWorkspaceId}/service-accounts`,
+            active: isServiceAccountsRoute,
         });
     }
 

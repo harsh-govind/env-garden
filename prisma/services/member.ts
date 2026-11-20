@@ -50,7 +50,7 @@ function canEditMember(actorRole: WorkspaceRoleValue, targetRole: WorkspaceRoleV
     return targetRole !== "OWNER" && canManageTargetRole(actorRole, targetRole);
 }
 
-function canAssignMemberAccess(access: MemberAccessInput) {
+export function canAssignMemberAccess(access: MemberAccessInput) {
     return (
         access.role !== "OWNER" &&
         access.defaultProjectRole !== "OWNER" &&
@@ -74,7 +74,7 @@ function getWorkspaceRoleProjectScope(role: WorkspaceRoleValue) {
     return role === "OWNER" || role === "ADMIN" ? "ALL_PROJECTS" : null;
 }
 
-function normalizeMemberAccess(input: MemberAccessInput): MemberAccessInput {
+export function normalizeMemberAccess(input: MemberAccessInput): MemberAccessInput {
     const forcedProjectAccessScope = getWorkspaceRoleProjectScope(input.role);
 
     if (forcedProjectAccessScope) {
@@ -127,7 +127,7 @@ function isPrismaValidationError(error: unknown) {
     return error instanceof Prisma.PrismaClientValidationError;
 }
 
-async function getActor(
+export async function getActor(
     tx: Prisma.TransactionClient,
     input: {
         workspaceId: string;
@@ -207,7 +207,7 @@ function mapInviteProjectAccess(input: {
     };
 }
 
-async function validateProjectAccess(
+export async function validateProjectAccess(
     tx: Prisma.TransactionClient,
     workspaceId: string,
     access: MemberAccessInput
@@ -313,7 +313,7 @@ async function validateProjectAccess(
     };
 }
 
-async function createProjectMembers(
+export async function createProjectMembers(
     tx: Prisma.TransactionClient,
     input: {
         workspaceId: string;
