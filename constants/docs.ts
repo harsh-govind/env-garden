@@ -39,13 +39,14 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                 id: "login",
                 title: "Log in",
                 blocks: [
-                    { kind: "text", text: "`eit login` opens Env Garden in your browser. Sign in if needed, approve the device, and return to the terminal." },
+                    { kind: "text", text: "`eit login` opens Env Garden in your browser. Sign in, unlock your vault, check that the verification code matches the one in your terminal, approve the device, and return to the terminal." },
                     { kind: "code", code: "eit login\neit login --no-browser          # print the URL instead of opening it\neit login --api-url http://localhost:3000   # self-hosted or local" },
                     {
                         kind: "list",
                         items: [
                             `A session lasts ${CLI_TOKEN_TTL_DAYS} days. After that, run \`eit login\` again.`,
                             "The token is generated on your machine. Only its SHA-256 hash is sent to Env Garden.",
+                            "Your browser splits your account key: one half is sealed to a one-time key only this terminal has, the other is stored on Env Garden encrypted with a key only this terminal has. Neither half decrypts anything on its own.",
                             "Credentials are stored in `~/.config/env-garden/credentials.json` with user-only permissions.",
                         ],
                     },
@@ -55,8 +56,8 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                 id: "status",
                 title: "Status",
                 blocks: [
-                    { kind: "text", text: "`eit status` shows the signed-in account, when the session expires, whether it has been revoked, and which env file the current folder is linked to." },
-                    { kind: "code", code: "eit status" },
+                    { kind: "text", text: "`eit status` shows the signed-in account, when the session expires, whether it has been revoked, your key fingerprint, and which env file the current folder is linked to." },
+                    { kind: "code", code: "eit status\neit keys            # just the key fingerprint" },
                 ],
             },
             {
@@ -64,6 +65,7 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                 title: "Access and permissions",
                 blocks: [
                     { kind: "text", text: "The CLI acts as your account, with exactly the same workspace, project and environment access as the web app. If your access changes, the CLI follows on its next request." },
+                    { kind: "text", text: "Variables are end-to-end encrypted. `pull` and `run` decrypt on your machine and `push` encrypts before uploading, so you can only read environments whose key someone has shared with you." },
                     {
                         kind: "list",
                         items: [
@@ -233,7 +235,9 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                         rows: [
                             ["eit login [--api-url <url>] [--no-browser]", "Sign in and approve this device."],
                             ["eit logout [--local]", "Revoke this device and remove local credentials."],
-                            ["eit status", "Show account, session expiry and folder link."],
+                            ["eit status", "Show account, session expiry, key fingerprint and folder link."],
+                            ["eit keys [fingerprint]", "Show your key fingerprint."],
+                            ["eit keys trust <email>", "Accept a teammate's new key after they reset it."],
                             ["eit link [--workspace] [--project] [--env]", "Link the current folder to an env file."],
                             ["eit unlink", "Remove the folder link."],
                             ["eit list", "List workspaces, projects and env files."],
@@ -258,6 +262,7 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                         kind: "table",
                         headers: ["Variable", "Purpose"],
                         rows: [
+                            ["EIT_TOKEN", "Service account token for CI. Overrides `eit login`."],
                             ["EIT_API_URL", "Env Garden URL, for self-hosted instances."],
                             ["EIT_TOKEN_NAME", "Device name shown on the approval screen and in Settings."],
                             ["EIT_CONFIG_DIR", "Where credentials are stored."],
@@ -269,6 +274,9 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                 id: "ci",
                 title: "Scripts and CI",
                 blocks: [
+                    { kind: "text", text: "In CI, use a service account instead of your own login. A workspace owner or admin creates one under **Service accounts**, gives it access to the environments it needs, and issues a token. Someone who holds those environments' keys then shares them with it from the project page." },
+                    { kind: "text", text: "Store the token as a CI secret named `EIT_TOKEN` and commit `.eit.json` so the CLI knows which env file to use." },
+                    { kind: "code", code: "EIT_TOKEN=${{ secrets.EIT_TOKEN }} npx @env-garden/cli run -- npm run deploy" },
                     { kind: "text", text: "When there's no terminal to answer prompts, pass the flags that skip them. Commands fail instead of waiting for input." },
                     { kind: "code", code: "eit link --workspace Acme --project api --env production\neit pull --force\neit push --yes" },
                 ],
@@ -282,6 +290,9 @@ export const CLI_DOCS_GROUPS: DocsSectionGroup[] = [
                         headers: ["Message", "What to do"],
                         rows: [
                             ["Your session has expired or was revoked", "Run `eit login` again."],
+                            ["Nobody has shared this environment's key with you yet", "Ask a teammate who can open the environment to share its key from the project page."],
+                            ["shared this key with a signing key this machine hasn't seen before", "Confirm with that teammate that they reset their keys, then run `eit keys trust <email>`."],
+                            ["Your encryption keys changed", "You reset your keys in the browser. Run `eit login` again."],
                             ["This folder isn't linked to an env file", "Run `eit link` in the project folder."],
                             [".env already exists", "Confirm the prompt, or pass `--force`."],
                             ["You do not have access to edit this env file", "Ask a workspace admin for edit access to that environment."],

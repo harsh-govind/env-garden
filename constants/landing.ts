@@ -34,8 +34,8 @@ export const LANDING_PREVIEW_ROWS: LandingPreviewRow[] = [
 ];
 
 export const LANDING_STATS: LandingTermDetail[] = [
-    { term: "AES-256-GCM", detail: "Encryption" },
-    { term: "Per project", detail: "Key isolation" },
+    { term: "End-to-end", detail: "Encryption" },
+    { term: "Per environment", detail: "Key isolation" },
     { term: "MIT", detail: "License" },
     { term: "100%", detail: "Open source" },
 ];
@@ -43,14 +43,14 @@ export const LANDING_STATS: LandingTermDetail[] = [
 export const LANDING_FEATURES: LandingFeature[] = [
     {
         label: "01 · Encryption",
-        title: "Encrypted before it's stored.",
-        body: "Each value is sealed with AES-256-GCM under a project-scoped key. One leak never opens everything.",
+        title: "Encrypted before it leaves your device.",
+        body: "Values are encrypted in your browser and CLI with a key per environment. The server, and anyone who breaches it, only ever sees ciphertext.",
         visual: "cipher",
     },
     {
         label: "02 · Access",
         title: "The right people, nobody else.",
-        body: "Invite teammates by email to a workspace and control who can see and change each project.",
+        body: "Only people an environment's key is shared with can read it. Owners manage access, but even they can't read an environment nobody shared with them.",
         visual: "access",
     },
     {
@@ -79,9 +79,10 @@ export const LANDING_HISTORY_SAMPLE = [
 ];
 
 export const LANDING_SECURITY_SPECS: LandingTermDetail[] = [
-    { term: "Cipher", detail: "AES-256-GCM" },
-    { term: "Key scope", detail: "One key per project" },
-    { term: "Payload", detail: "Each value encrypted individually" },
+    { term: "Encryption", detail: "End-to-end, in the browser and CLI" },
+    { term: "Ciphers", detail: "XChaCha20-Poly1305, X25519, Ed25519, Argon2id" },
+    { term: "Key scope", detail: "One key per environment, shared per member" },
+    { term: "Recovery", detail: "24-word phrase only you hold" },
     { term: "Sign-in", detail: "Magic link, Google, GitHub" },
     { term: "Two-factor", detail: "Authenticator app with backup codes" },
     { term: "CLI sessions", detail: "Expire after 7 days, revocable anytime" },
@@ -96,7 +97,7 @@ export const LANDING_FAQS: LandingFaq[] = [
     },
     {
         question: "How are secrets protected?",
-        answer: "Every value is encrypted with AES-256-GCM using a key scoped to its project, and each value is stored as its own encrypted payload.",
+        answer: "End-to-end. Names, values and notes are encrypted in your browser or CLI with a key per environment, and that key is shared only with the members you choose, sealed to each one's public key. env.garden stores ciphertext it cannot decrypt.",
     },
     {
         question: "Is it open source?",

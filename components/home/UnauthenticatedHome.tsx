@@ -88,8 +88,8 @@ export default function UnauthenticatedHome() {
 
                         <p className="mt-6 max-w-xl text-lg leading-relaxed text-pretty text-muted-foreground">
                             env.garden is the open-source home for your team&apos;s
-                            environment variables. Encrypted per value, scoped per project,
-                            shared only with the people who need them.
+                            environment variables. End-to-end encrypted, with a key per
+                            environment shared only with the people who need it.
                         </p>
 
                         <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -211,8 +211,9 @@ export default function UnauthenticatedHome() {
                                 Built around secret handling, not bolted on.
                             </h2>
                             <p className="mt-5 max-w-md leading-relaxed text-background/60">
-                                Read every line that touches your secrets. The whole stack is
-                                open source, and vulnerabilities are handled privately.
+                                Secrets are encrypted on your device and never readable by the
+                                server. Read every line that touches them: the whole stack is open
+                                source, and vulnerabilities are handled privately.
                             </p>
                             <a
                                 href={APP_REPOSITORY_URL}
