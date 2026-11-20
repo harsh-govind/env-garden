@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { API_RATE_LIMIT } from "@/constants/rate-limit";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestSession } from "@/lib/request-auth";
 import { parseMemberAccessBody } from "@/lib/member-access";
 import { serializeWorkspaceMember } from "@/utils/serializers/member";
@@ -18,6 +20,12 @@ export async function PATCH(request: Request, context: WorkspaceMemberRouteConte
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, memberId } = await context.params;
@@ -94,6 +102,12 @@ export async function DELETE(request: Request, context: WorkspaceMemberRouteCont
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, memberId } = await context.params;

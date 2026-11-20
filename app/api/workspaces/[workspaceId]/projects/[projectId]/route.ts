@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { API_RATE_LIMIT } from "@/constants/rate-limit";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestSession } from "@/lib/request-auth";
 import { serializeProjectDetail } from "@/utils/serializers/project";
 import {
@@ -19,6 +21,12 @@ export async function GET(request: Request, context: ProjectRouteContext) {
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, projectId } = await context.params;
@@ -61,6 +69,12 @@ export async function PATCH(request: Request, context: ProjectRouteContext) {
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, projectId } = await context.params;
@@ -144,6 +158,12 @@ export async function DELETE(request: Request, context: ProjectRouteContext) {
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, projectId } = await context.params;

@@ -1,4 +1,6 @@
+import { REVEAL_RATE_LIMIT } from "@/constants/rate-limit";
 import { cliJson, withCliUser } from "@/lib/cli/route";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { parseSaveEnvVariablesBody } from "@/lib/env-variables";
 import {
     getEnvVariablesForFile,
@@ -10,6 +12,12 @@ import type { ProjectEnvFileRouteContext, SaveEnvVariablesBody } from "@/types/p
 /** Returns decrypted variables for `eit pull` / `eit run`. */
 export async function GET(request: Request, context: ProjectEnvFileRouteContext) {
     return withCliUser(request, async (user) => {
+        const revealLimited = await rateLimitResponse(REVEAL_RATE_LIMIT, user.id);
+
+        if (revealLimited) {
+            return revealLimited;
+        }
+
         const { workspaceId, projectId, envFileId } = await context.params;
         const result = await getEnvVariablesForFile({
             workspaceId,

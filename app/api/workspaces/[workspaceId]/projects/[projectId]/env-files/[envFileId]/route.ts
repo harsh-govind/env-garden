@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { API_RATE_LIMIT } from "@/constants/rate-limit";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestSession } from "@/lib/request-auth";
 import { serializeProjectEnvFile } from "@/utils/serializers/project";
 import { deleteEnvFile, renameEnvFile } from "@/prisma/services/project";
@@ -18,6 +20,12 @@ export async function PATCH(
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, projectId, envFileId } = await context.params;
@@ -108,6 +116,12 @@ export async function DELETE(
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId, projectId, envFileId } = await context.params;

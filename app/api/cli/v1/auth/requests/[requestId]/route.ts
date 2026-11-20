@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { CLI_POLL_RATE_LIMIT } from "@/constants/rate-limit";
+import { getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import {
     cliBearerTokenPattern,
     cliNoStoreHeaders,
@@ -23,6 +25,12 @@ export async function GET(
     context: CliLoginRequestRouteContext
 ) {
     try {
+        const limited = await rateLimitResponse(CLI_POLL_RATE_LIMIT, getClientIp(request));
+
+        if (limited) {
+            return limited;
+        }
+
         const pollSecret = readPollSecret(request);
         const { requestId } = await context.params;
 

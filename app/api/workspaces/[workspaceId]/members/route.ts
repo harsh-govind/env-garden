@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAppUrl } from "@/lib/app-url";
+import { API_RATE_LIMIT } from "@/constants/rate-limit";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestSession } from "@/lib/request-auth";
 import { sendWorkspaceInviteEmail } from "@/lib/email";
 import {
@@ -67,6 +69,12 @@ export async function GET(request: Request, context: WorkspaceRouteContext) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
+        }
+
         const { workspaceId } = await context.params;
 
         if (!workspaceId) {
@@ -104,6 +112,12 @@ export async function POST(request: Request, context: WorkspaceRouteContext) {
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limited = await rateLimitResponse(API_RATE_LIMIT, session.user.id);
+
+        if (limited) {
+            return limited;
         }
 
         const { workspaceId } = await context.params;

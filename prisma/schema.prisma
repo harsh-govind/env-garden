@@ -389,3 +389,16 @@ model TwoFactor {
   @@index([userId])
   @@index([secret])
 }
+
+model RateLimit {
+  id          String @id @default(cuid())
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
+model ApiRateLimit {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+}
