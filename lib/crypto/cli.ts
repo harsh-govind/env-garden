@@ -13,8 +13,13 @@ import {
     wipe,
     xorBytes,
 } from "@/lib/crypto/encoding";
+import {
+    deriveAccountKeys,
+    getPublicAccountKeys,
+    wipeAccountKeys,
+} from "@/lib/crypto/keyring";
 import { loadSodium } from "@/lib/crypto/sodium";
-import type { AccountKeys, CliKeyShares } from "@/types/crypto";
+import type { AccountKeys, CliKeyShares, PublicAccountKeys } from "@/types/crypto";
 
 function cliShareAssociatedData(tokenHash: string) {
     return encodeFields(CRYPTO_DOMAIN.cliShare, [tokenHash]);
@@ -27,7 +32,7 @@ export async function splitAccountKeyForCli(input: {
     const sodium = await loadSodium();
     const clientShare = sodium.randombytes_buf(CRYPTO_KEY_BYTE_LENGTH);
     const wrapKey = sodium.randombytes_buf(CRYPTO_KEY_BYTE_LENGTH);
-    const serverShare = xorBytes(input.keys.boxSecretKey, clientShare);
+    const serverShare = xorBytes(input.keys.seed, clientShare);
 
     try {
         return {
@@ -50,7 +55,7 @@ export async function combineCliAccountKey(input: {
     wrapKey: Uint8Array;
     encryptedServerShare: string;
     tokenHash: string;
-    boxPublicKey: string;
+    expected: PublicAccountKeys;
 }) {
     const sodium = await loadSodium();
     const serverShare = aeadDecrypt(
@@ -59,17 +64,25 @@ export async function combineCliAccountKey(input: {
         input.wrapKey,
         cliShareAssociatedData(input.tokenHash)
     );
-    const boxSecretKey = xorBytes(serverShare, input.clientShare);
+    const seed = xorBytes(serverShare, input.clientShare);
     wipe(sodium, serverShare);
 
-    const boxPublicKey = sodium.crypto_scalarmult_base(boxSecretKey);
+    try {
+        const keys = await deriveAccountKeys(seed);
+        const publicKeys = await getPublicAccountKeys(keys);
 
-    if (!sodium.memcmp(boxPublicKey, fromBase64(sodium, input.boxPublicKey, 32))) {
-        wipe(sodium, boxSecretKey);
-        throw new Error("The CLI key does not match this account.");
+        if (
+            publicKeys.signPublicKey !== input.expected.signPublicKey
+            || publicKeys.boxPublicKey !== input.expected.boxPublicKey
+        ) {
+            await wipeAccountKeys(keys);
+            throw new Error("The CLI key does not match this account.");
+        }
+
+        return keys;
+    } finally {
+        wipe(sodium, seed);
     }
-
-    return { boxPublicKey, boxSecretKey };
 }
 
 export async function generateCliTransportKeyPair() {

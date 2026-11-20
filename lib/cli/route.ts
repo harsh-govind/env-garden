@@ -12,7 +12,7 @@ export function cliJson(body: unknown, status = 200) {
 
 export async function withCliUser(
     request: Request,
-    handler: (user: CliAuthenticatedUser) => Promise<Response>
+    handler: (user: CliAuthenticatedUser, token: { id: string }) => Promise<Response>
 ) {
     try {
         const authentication = await authenticateCliRequest(request);
@@ -30,7 +30,7 @@ export async function withCliUser(
             return limited;
         }
 
-        return await handler(authentication.user);
+        return await handler(authentication.user, { id: authentication.tokenId });
     } catch (error) {
         console.error("CLI request failed:", error);
         return cliJson({ error: "Internal server error." }, 500);

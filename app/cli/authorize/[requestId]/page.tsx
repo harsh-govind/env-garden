@@ -54,6 +54,8 @@ export default async function AuthorizeCliPage({
                     <AuthorizeCliClient
                         requestId={loginRequest.id}
                         tokenName={loginRequest.tokenName}
+                        tokenHash={loginRequest.tokenHash}
+                        transportPublicKey={loginRequest.transportPublicKey}
                         userEmail={session.user.email}
                         isAlreadyApproved={Boolean(loginRequest.approvedAt)}
                     />

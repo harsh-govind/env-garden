@@ -213,7 +213,7 @@ describe("environment keys", () => {
 describe("cli keys", () => {
     it("splits and recombines the account key", async () => {
         const keys = await generateAccountKeys();
-        const { boxPublicKey } = await getPublicAccountKeys(keys);
+        const expected = await getPublicAccountKeys(keys);
         const tokenHash = "a".repeat(64);
         const shares = await splitAccountKeyForCli({ keys, tokenHash });
         const transport = await generateCliTransportKeyPair();
@@ -227,13 +227,23 @@ describe("cli keys", () => {
             ...opened,
             encryptedServerShare: shares.encryptedServerShare,
             tokenHash,
-            boxPublicKey,
+            expected,
         });
 
         assert.equal(hex(combined.boxSecretKey), hex(keys.boxSecretKey));
+        assert.equal(hex(combined.signSecretKey), hex(keys.signSecretKey));
         await assert.rejects(
-            combineCliAccountKey({ ...opened, encryptedServerShare: shares.encryptedServerShare, tokenHash: "b".repeat(64), boxPublicKey }),
+            combineCliAccountKey({ ...opened, encryptedServerShare: shares.encryptedServerShare, tokenHash: "b".repeat(64), expected }),
             /Decryption failed/
+        );
+        await assert.rejects(
+            combineCliAccountKey({
+                ...opened,
+                encryptedServerShare: shares.encryptedServerShare,
+                tokenHash,
+                expected: await getPublicAccountKeys(await generateAccountKeys()),
+            }),
+            /does not match/
         );
     });
 

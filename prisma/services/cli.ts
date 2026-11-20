@@ -23,6 +23,7 @@ export async function createCliLoginRequestRecord(
                 tokenHash: input.tokenHash,
                 tokenPrefix: input.tokenPrefix,
                 tokenName: input.tokenName,
+                transportPublicKey: input.transportPublicKey,
                 pollSecretHash: input.pollSecretHash,
                 expiresAt: input.expiresAt,
             },
@@ -40,6 +41,8 @@ export async function findCliLoginRequestForAuthorization(requestId: string) {
         select: {
             id: true,
             tokenName: true,
+            tokenHash: true,
+            transportPublicKey: true,
             expiresAt: true,
             approvedAt: true,
         },
@@ -57,6 +60,7 @@ export async function findCliLoginRequestForPolling(
         select: {
             expiresAt: true,
             approvedAt: true,
+            sealedPackage: true,
         },
     });
 }
@@ -76,6 +80,7 @@ export async function approveCliLoginRequestRecord(
             data: {
                 approvedAt: now,
                 approvedById: input.userId,
+                sealedPackage: input.sealedPackage,
             },
         });
 
@@ -113,12 +118,44 @@ export async function approveCliLoginRequestRecord(
                 name: loginRequest.tokenName,
                 tokenPrefix: loginRequest.tokenPrefix,
                 tokenHash: loginRequest.tokenHash,
+                encryptedServerShare: input.encryptedServerShare,
                 expiresAt: new Date(now.getTime() + CLI_TOKEN_TTL_MS),
             },
         });
 
         return { status: "OK" as const };
     });
+}
+
+export async function getCliAccountKeys(tokenId: string) {
+    const token = await prisma.cliToken.findUnique({
+        where: { id: tokenId },
+        select: {
+            encryptedServerShare: true,
+            user: {
+                select: {
+                    id: true,
+                    keyring: {
+                        select: {
+                            signPublicKey: true,
+                            boxPublicKey: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!token?.user.keyring) {
+        return null;
+    }
+
+    return {
+        userId: token.user.id,
+        encryptedServerShare: token.encryptedServerShare,
+        signPublicKey: token.user.keyring.signPublicKey,
+        boxPublicKey: token.user.keyring.boxPublicKey,
+    };
 }
 
 export async function findAndTouchActiveCliToken(

@@ -129,6 +129,10 @@ export async function replaceKeyringForUser(
     try {
         return await prisma.$transaction(async (tx) => {
             await revokeAllSharesForUser(tx, userId);
+            await tx.cliToken.updateMany({
+                where: { userId, revokedAt: null },
+                data: { revokedAt: new Date() },
+            });
 
             const row = await tx.userKeyring.upsert({
                 where: { userId },

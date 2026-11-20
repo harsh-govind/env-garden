@@ -54,7 +54,9 @@ export async function GET(
         }
 
         return NextResponse.json(
-            { status: result.status },
+            result.status === "APPROVED"
+                ? { status: result.status, sealedPackage: result.sealedPackage }
+                : { status: result.status },
             { headers: cliNoStoreHeaders }
         );
     } catch (error) {

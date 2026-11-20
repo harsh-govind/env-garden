@@ -54,7 +54,7 @@ export async function getCliLoginRequestStatus(
     }
 
     if (loginRequest.approvedAt) {
-        return { status: "APPROVED" as const };
+        return { status: "APPROVED" as const, sealedPackage: loginRequest.sealedPackage };
     }
 
     if (loginRequest.expiresAt <= new Date()) {

@@ -10,6 +10,7 @@ import {
     cliTokenVisiblePrefixPattern,
 } from "@/constants/cli";
 import { createCliLoginRequest } from "@/lib/cli/login";
+import { decodeBase64Field } from "@/lib/crypto-payload";
 import type { CreateCliLoginRequestBody } from "@/types/cli";
 
 export async function POST(request: Request) {
@@ -32,6 +33,15 @@ export async function POST(request: Request) {
         const tokenName = typeof body?.tokenName === "string"
             ? body.tokenName.trim()
             : "";
+
+        const transportPublicKey = decodeBase64Field(body?.transportPublicKey, 32);
+
+        if (!transportPublicKey) {
+            return NextResponse.json(
+                { error: "This version of eit is too old. Update it with npm i -g @env-garden/cli." },
+                { status: 400, headers: cliNoStoreHeaders }
+            );
+        }
 
         if (!cliTokenHashPattern.test(tokenHash)) {
             return NextResponse.json(
@@ -61,6 +71,7 @@ export async function POST(request: Request) {
             tokenHash,
             tokenPrefix,
             tokenName,
+            transportPublicKey,
         });
         const authorizationUrl = new URL(
             `/cli/authorize/${loginRequest.id}`,

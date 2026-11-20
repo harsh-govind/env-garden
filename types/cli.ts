@@ -20,6 +20,7 @@ export type CreateCliLoginRequestInput = {
     tokenHash: string;
     tokenPrefix: string;
     tokenName: string;
+    transportPublicKey: string;
 };
 
 export type CreateCliLoginRequestRecordInput = CreateCliLoginRequestInput & {
@@ -40,6 +41,20 @@ export type FindCliLoginRequestForPollingInput = {
 export type ApproveCliLoginRequestInput = {
     requestId: string;
     userId: string;
+    encryptedServerShare: string;
+    sealedPackage: string;
+};
+
+export type ApproveCliLoginRequestBody = {
+    encryptedServerShare?: unknown;
+    sealedPackage?: unknown;
+};
+
+export type CliAccountKeysResponse = {
+    userId: string;
+    encryptedServerShare: string;
+    signPublicKey: string;
+    boxPublicKey: string;
 };
 
 export type AuthenticateCliTokenRecordInput = {
@@ -56,6 +71,7 @@ export type CreateCliLoginRequestBody = {
     tokenHash?: unknown;
     tokenPrefix?: unknown;
     tokenName?: unknown;
+    transportPublicKey?: unknown;
 };
 
 export type CliLoginRequestRouteContext = {
@@ -69,6 +85,8 @@ export type AuthorizeCliPageProps = CliLoginRequestRouteContext;
 export type AuthorizeCliClientProps = {
     requestId: string;
     tokenName: string;
+    tokenHash: string;
+    transportPublicKey: string;
     userEmail: string;
     isAlreadyApproved: boolean;
 };
