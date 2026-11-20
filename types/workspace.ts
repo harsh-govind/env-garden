@@ -178,6 +178,7 @@ export type CreateProjectBody = {
     name?: unknown;
     description?: unknown;
     environments?: unknown;
+    environmentKeys?: unknown;
 };
 
 export type WorkspaceRouteContext = {

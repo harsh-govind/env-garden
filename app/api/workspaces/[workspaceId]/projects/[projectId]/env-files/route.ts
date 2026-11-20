@@ -3,7 +3,11 @@ import { API_RATE_LIMIT } from "@/constants/rate-limit";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestSession } from "@/lib/request-auth";
 import { isEnvironmentTypeValue } from "@/constants/environment";
-import { serializeProjectEnvFile } from "@/utils/serializers/project";
+import { parseNewEnvironmentKey } from "@/lib/environment-keys";
+import {
+    serializeProjectEnvFile,
+    serializeProjectEnvironmentKey,
+} from "@/utils/serializers/project";
 import { createEnvFileForProject } from "@/prisma/services/project";
 import type {
     CreateEnvFileBody,
@@ -27,11 +31,20 @@ function parseCreateEnvFileBody(body: CreateEnvFileBody) {
         return { error: "Env file description must be 280 characters or less." };
     }
 
+    const environmentKey = body.environmentKey === undefined || body.environmentKey === null
+        ? null
+        : parseNewEnvironmentKey(body.environmentKey, body.environment);
+
+    if (body.environmentKey && !environmentKey) {
+        return { error: "Invalid environment key." };
+    }
+
     return {
         value: {
             name: name || null,
             environment: body.environment,
             description: description || null,
+            environmentKey,
         },
     };
 }
@@ -83,6 +96,7 @@ export async function POST(request: Request, context: ProjectRouteContext) {
             name: parsed.value.name,
             environment: parsed.value.environment,
             description: parsed.value.description,
+            environmentKey: parsed.value.environmentKey,
         });
 
         if (result.status === "NOT_FOUND") {
@@ -106,9 +120,33 @@ export async function POST(request: Request, context: ProjectRouteContext) {
             );
         }
 
+        if (result.status === "KEY_REQUIRED") {
+            return NextResponse.json(
+                { error: "Create an encryption key for this new environment." },
+                { status: 409 }
+            );
+        }
+
+        if (result.status === "KEYRING_REQUIRED") {
+            return NextResponse.json(
+                { error: "Set up your encryption keys first." },
+                { status: 409 }
+            );
+        }
+
+        if (result.status === "INVALID_KEY") {
+            return NextResponse.json(
+                { error: "The environment key was not signed by your account." },
+                { status: 400 }
+            );
+        }
+
         return NextResponse.json(
             {
                 envFile: serializeProjectEnvFile(result.envFile),
+                environmentKey: result.environmentKey
+                    ? serializeProjectEnvironmentKey(result.environmentKey)
+                    : null,
             },
             { status: 201 }
         );

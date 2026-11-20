@@ -9,7 +9,10 @@ import {
     useState,
     type ReactNode,
 } from "react";
+import { defaultProjectEnvironmentTypes } from "@/constants/environment";
 import { useAuthenticated } from "@/contexts/authenticated";
+import { useVault } from "@/contexts/vault";
+import { createEnvironmentKeysForSelf } from "@/lib/environment-crypto";
 import type {
     ApiErrorPayload,
     CreateProjectRequest,
@@ -89,7 +92,8 @@ function persistWorkspaceId(workspaceId: string | null) {
 }
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-    const { isAuthenticated } = useAuthenticated();
+    const { isAuthenticated, user } = useAuthenticated();
+    const { keys } = useVault();
 
     const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
@@ -186,6 +190,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             setIsCreatingProject(true);
 
             try {
+                if (!keys || !user) {
+                    throw new Error("Unlock your vault before creating a project.");
+                }
+
+                const environments = input.environments?.length
+                    ? Array.from(new Set(input.environments))
+                    : defaultProjectEnvironmentTypes;
+                const environmentKeys = await createEnvironmentKeysForSelf({
+                    environments,
+                    keys,
+                    userId: user.id,
+                });
                 const response = await fetchJson<CreateProjectResponse>(
                     `/api/workspaces/${input.workspaceId}/projects`,
                     {
@@ -196,7 +212,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                         body: JSON.stringify({
                             name: input.name,
                             description: input.description,
-                            environments: input.environments,
+                            environments,
+                            environmentKeys,
                         }),
                     }
                 );
@@ -238,7 +255,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 setIsCreatingProject(false);
             }
         },
-        []
+        [keys, user]
     );
 
     const renameWorkspace = useCallback(

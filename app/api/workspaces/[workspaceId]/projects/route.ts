@@ -6,6 +6,7 @@ import {
     defaultProjectEnvironmentTypes,
     isEnvironmentTypeValue,
 } from "@/constants/environment";
+import { parseNewEnvironmentKeys } from "@/lib/environment-keys";
 import { createProjectForWorkspace } from "@/prisma/services/project";
 import type {
     CreateProjectBody,
@@ -49,7 +50,13 @@ function parseCreateProjectBody(body: CreateProjectBody) {
         return { error: "Select at least one project environment." };
     }
 
-    return { value: { name, description: description || null, environments } };
+    const environmentKeys = parseNewEnvironmentKeys(body.environmentKeys, environments);
+
+    if (!environmentKeys) {
+        return { error: "Each environment needs an encryption key created in your browser." };
+    }
+
+    return { value: { name, description: description || null, environments, environmentKeys } };
 }
 
 export async function POST(request: Request, context: WorkspaceRouteContext) {
@@ -90,7 +97,27 @@ export async function POST(request: Request, context: WorkspaceRouteContext) {
             name: parsed.value.name,
             description: parsed.value.description,
             environments: parsed.value.environments,
+            environmentKeys: parsed.value.environmentKeys,
         });
+
+        if (project.status === "NOT_FOUND") {
+            return NextResponse.json({ error: "Workspace not found or access denied." }, { status: 404 });
+        }
+
+        if (project.status === "KEYRING_REQUIRED") {
+            return NextResponse.json({ error: "Set up your encryption keys first." }, { status: 409 });
+        }
+
+        if (project.status === "INVALID_KEY") {
+            return NextResponse.json(
+                { error: "The environment keys were not signed by your account." },
+                { status: 400 }
+            );
+        }
+
+        if (project.status === "CONFLICT") {
+            return NextResponse.json({ error: "Those environment keys already exist. Try again." }, { status: 409 });
+        }
 
         return NextResponse.json(
             {

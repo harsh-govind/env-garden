@@ -1,4 +1,4 @@
-import type { EncryptedValuePayload } from "@/types/encryption";
+import type { EncryptedVariable } from "@/types/crypto";
 import type {
     EnvironmentTypeValue,
     ProjectAccessScopeValue,
@@ -8,10 +8,25 @@ import type {
 
 export type ProjectRoleValue = "OWNER" | "CONTRIBUTOR" | "VIEWER";
 
+export type ProjectEnvVariableCipher = EncryptedVariable & {
+    id: string;
+    position: number;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type ProjectEnvVariableCipherRecord = Omit<
+    ProjectEnvVariableCipher,
+    "createdAt" | "updatedAt"
+> & {
+    createdAt: Date;
+    updatedAt: Date;
+};
+
 export type ProjectEnvVariable = {
     id: string;
     key: string;
-    value?: string;
+    value: string;
     note: string | null;
     isCommented: boolean;
     position: number;
@@ -19,24 +34,38 @@ export type ProjectEnvVariable = {
     updatedAt: string;
 };
 
-export type ProjectEnvVariableRecord = Omit<
-    ProjectEnvVariable,
-    "createdAt" | "updatedAt"
-> & {
-    createdAt: Date;
-    updatedAt: Date;
+export type EnvironmentKeyShareInfo = {
+    version: number;
+    recipientBoxPublicKey: string;
+    sealedSecret: string;
+    signature: string;
+    granter: {
+        userId: string | null;
+        email: string | null;
+        signPublicKey: string;
+    };
 };
 
-export type ProjectEnvVariableMetadataRecord = Omit<
-    ProjectEnvVariableRecord,
-    "value"
->;
+export type ProjectEnvironmentKey = {
+    id: string;
+    environment: EnvironmentTypeValue;
+    version: number;
+    rotationRequired: boolean;
+    share: EnvironmentKeyShareInfo | null;
+};
 
-export type ProjectEnvVariableEncryptedRecord = Omit<
-    ProjectEnvVariableRecord,
-    "value"
-> &
-    EncryptedValuePayload;
+export type ProjectEnvironmentKeyRecord = Omit<ProjectEnvironmentKey, "share"> & {
+    share: (Omit<EnvironmentKeyShareInfo, "granter"> & {
+        granter: EnvironmentKeyShareInfo["granter"];
+    }) | null;
+};
+
+export type NewEnvironmentKeyInput = {
+    id: string;
+    environment: EnvironmentTypeValue;
+    sealedSecret: string;
+    signature: string;
+};
 
 export type VariableDraftRow = {
     clientId: string;
@@ -44,7 +73,6 @@ export type VariableDraftRow = {
     key: string;
     value: string;
     originalValue: string;
-    isValueLoaded: boolean;
     isValueEditable: boolean;
     note: string;
     isNoteOpen: boolean;
@@ -61,7 +89,7 @@ export type ProjectEnvFile = {
     variableCount: number;
     createdAt: string;
     updatedAt: string;
-    variables: ProjectEnvVariable[];
+    variables: ProjectEnvVariableCipher[];
 };
 
 export type ProjectEnvFileRecord = Omit<
@@ -70,7 +98,7 @@ export type ProjectEnvFileRecord = Omit<
 > & {
     createdAt: Date;
     updatedAt: Date;
-    variables: ProjectEnvVariableRecord[];
+    variables: ProjectEnvVariableCipherRecord[];
 };
 
 export type ProjectDetail = {
@@ -81,6 +109,7 @@ export type ProjectDetail = {
     role: ProjectRoleValue | null;
     canManage: boolean;
     envFiles: ProjectEnvFile[];
+    environmentKeys: ProjectEnvironmentKey[];
     createdAt: string;
     updatedAt: string;
 };
@@ -124,16 +153,19 @@ export type CreateEnvFileRequest = {
     name?: string;
     environment: EnvironmentTypeValue;
     description?: string;
+    environmentKey?: Omit<NewEnvironmentKeyInput, "environment">;
 };
 
 export type CreateEnvFileResponse = {
     envFile: ProjectEnvFile;
+    environmentKey: ProjectEnvironmentKey | null;
 };
 
 export type CreateEnvFileBody = {
     name?: unknown;
     environment?: unknown;
     description?: unknown;
+    environmentKey?: unknown;
 };
 
 export type RenameEnvFileRequest = {
@@ -152,48 +184,17 @@ export type DeleteEnvFileResponse = {
     success: true;
 };
 
-export type CreateEnvVariableRequest = {
-    key: string;
-    value: string;
-    note?: string;
-    isCommented?: boolean;
-};
-
-export type CreateEnvVariableResponse = {
-    variable: ProjectEnvVariable;
-};
-
 export type SaveEnvVariablesRequest = {
-    variables: {
-        id?: string;
-        key: string;
-        value?: string;
-        note?: string | null;
-        isCommented?: boolean;
-    }[];
+    variables: EncryptedVariable[];
 };
 
 export type SaveEnvVariablesResponse = {
-    variables: ProjectEnvVariable[];
+    variables: ProjectEnvVariableCipher[];
 };
 
-export type EnvVariableValueResponse = {
-    variable: ProjectEnvVariable & {
-        value: string;
-    };
-};
-
-export type EnvVariablesValueResponse = {
-    variables: (ProjectEnvVariable & {
-        value: string;
-    })[];
-};
-
-export type CreateEnvVariableBody = {
-    key?: unknown;
-    value?: unknown;
-    note?: unknown;
-    isCommented?: unknown;
+export type EnvVariablesCipherResponse = {
+    variables: ProjectEnvVariableCipher[];
+    environmentKey: ProjectEnvironmentKey;
 };
 
 export type SaveEnvVariablesBody = {

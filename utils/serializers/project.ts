@@ -3,43 +3,51 @@ import type {
     ProjectDetailRecord,
     ProjectEnvFile,
     ProjectEnvFileRecord,
-    ProjectEnvVariable,
-    ProjectEnvVariableMetadataRecord,
-    ProjectEnvVariableRecord,
+    ProjectEnvVariableCipher,
+    ProjectEnvVariableCipherRecord,
+    ProjectEnvironmentKey,
+    ProjectEnvironmentKeyRecord,
 } from "@/types/project";
 import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 
-export function serializeProjectEnvVariable(
-    record: ProjectEnvVariableRecord
-): ProjectEnvVariable {
-    const variable: ProjectEnvVariable = {
+export function serializeProjectEnvVariableCipher(
+    record: ProjectEnvVariableCipherRecord
+): ProjectEnvVariableCipher {
+    return {
         id: record.id,
-        key: record.key,
-        note: record.note,
+        keyDigest: record.keyDigest,
+        encryptedKey: record.encryptedKey,
+        encryptedValue: record.encryptedValue,
+        encryptedNote: record.encryptedNote,
+        keyVersion: record.keyVersion,
         isCommented: record.isCommented,
         position: record.position,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
     };
-
-    if (typeof record.value === "string") {
-        variable.value = record.value;
-    }
-
-    return variable;
 }
 
-export function serializeProjectEnvVariableMetadata(
-    record: ProjectEnvVariableMetadataRecord
-): ProjectEnvVariable {
+export function serializeProjectEnvironmentKey(
+    record: ProjectEnvironmentKeyRecord
+): ProjectEnvironmentKey {
     return {
         id: record.id,
-        key: record.key,
-        note: record.note,
-        isCommented: record.isCommented,
-        position: record.position,
-        createdAt: record.createdAt.toISOString(),
-        updatedAt: record.updatedAt.toISOString(),
+        environment: record.environment,
+        version: record.version,
+        rotationRequired: record.rotationRequired,
+        share: record.share
+            ? {
+                version: record.share.version,
+                recipientBoxPublicKey: record.share.recipientBoxPublicKey,
+                sealedSecret: record.share.sealedSecret,
+                signature: record.share.signature,
+                granter: {
+                    userId: record.share.granter.userId,
+                    email: record.share.granter.email,
+                    signPublicKey: record.share.granter.signPublicKey,
+                },
+            }
+            : null,
     };
 }
 
@@ -57,7 +65,7 @@ export function serializeProjectEnvFile(
         variableCount: record.variableCount,
         createdAt: record.createdAt.toISOString(),
         updatedAt: updatedAt.toISOString(),
-        variables: record.variables.map(serializeProjectEnvVariableMetadata),
+        variables: record.variables.map(serializeProjectEnvVariableCipher),
     };
 }
 
@@ -76,5 +84,6 @@ export function serializeProjectDetail(record: ProjectDetailRecord): ProjectDeta
         createdAt: record.createdAt.toISOString(),
         updatedAt: updatedAt.toISOString(),
         envFiles,
+        environmentKeys: record.environmentKeys.map(serializeProjectEnvironmentKey),
     };
 }

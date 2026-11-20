@@ -6,7 +6,10 @@ import {
     getEnvVariablesForFile,
     replaceEnvVariablesForFile,
 } from "@/prisma/services/project";
-import type { CliEnvVariable } from "@/types/cli";
+import {
+    serializeProjectEnvironmentKey,
+    serializeProjectEnvVariableCipher,
+} from "@/utils/serializers/project";
 import type { ProjectEnvFileRouteContext, SaveEnvVariablesBody } from "@/types/project";
 
 export async function GET(request: Request, context: ProjectEnvFileRouteContext) {
@@ -34,14 +37,14 @@ export async function GET(request: Request, context: ProjectEnvFileRouteContext)
             return cliJson({ error: "You do not have access to this env file." }, 403);
         }
 
-        const variables: CliEnvVariable[] = result.variables.map((variable) => ({
-            key: variable.key,
-            value: variable.value ?? "",
-            note: variable.note,
-            isCommented: variable.isCommented,
-        }));
+        if (result.status === "NO_KEY") {
+            return cliJson({ error: "Nobody has shared this environment's key with you yet." }, 403);
+        }
 
-        return cliJson({ variables });
+        return cliJson({
+            variables: result.variables.map(serializeProjectEnvVariableCipher),
+            environmentKey: serializeProjectEnvironmentKey(result.environmentKey),
+        });
     });
 }
 
@@ -60,23 +63,12 @@ export async function PUT(request: Request, context: ProjectEnvFileRouteContext)
             return cliJson({ error: parsed.error }, 400);
         }
 
-        const variables = parsed.value.variables.map((variable) => ({
-            key: variable.key,
-            value: variable.value,
-            note: variable.note,
-            isCommented: variable.isCommented,
-        }));
-
-        if (variables.some((variable) => typeof variable.value !== "string")) {
-            return cliJson({ error: "Every variable needs a value." }, 400);
-        }
-
         const result = await replaceEnvVariablesForFile({
             workspaceId,
             projectId,
             envFileId,
             userId: user.id,
-            variables,
+            variables: parsed.value.variables,
             via: "cli",
         });
 
@@ -86,6 +78,14 @@ export async function PUT(request: Request, context: ProjectEnvFileRouteContext)
 
         if (result.status === "FORBIDDEN") {
             return cliJson({ error: "You do not have access to edit this env file." }, 403);
+        }
+
+        if (result.status === "NO_KEY") {
+            return cliJson({ error: "Nobody has shared this environment's key with you yet." }, 403);
+        }
+
+        if (result.status === "STALE_KEY") {
+            return cliJson({ error: "This environment's key was rotated. Pull and try again." }, 409);
         }
 
         if (result.status === "CONFLICT") {

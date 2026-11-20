@@ -1,5 +1,4 @@
 import "server-only";
-import "@/lib/encryption";
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
     DATABASE_POOL_MAX,

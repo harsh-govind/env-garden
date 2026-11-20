@@ -18,8 +18,8 @@ import {
     EyeOff,
     MoreHorizontal,
     FilePlus2,
-    Loader2,
     Hash,
+    KeyRound,
     Pencil,
     Plus,
     RefreshCw,
@@ -65,25 +65,36 @@ import {
     formatEnvironmentFileName,
 } from "@/constants/environment";
 import {
+    ENV_VARIABLE_KEY_MAX_LENGTH,
     ENV_VARIABLE_NOTE_MAX_LENGTH,
-    HIDDEN_VALUE_MASK,
+    ENV_VARIABLE_VALUE_MAX_LENGTH,
     envKeyPattern,
     environmentOrder,
 } from "@/constants/environment";
+import { useAuthenticated } from "@/contexts/authenticated";
+import { useVault } from "@/contexts/vault";
+import { wipeEnvironmentKey } from "@/lib/crypto/environment";
+import {
+    createEnvironmentKeyForSelf,
+    decryptEnvFileVariables,
+    encryptEnvFileVariables,
+    openProjectEnvironmentKey,
+} from "@/lib/environment-crypto";
 import { buildEnvText, parseEnvText } from "@/utils/env/env-file";
 import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 import { formatTimeAgo } from "@/utils";
+import type { AccountKeys, EnvironmentKeyMaterial } from "@/types/crypto";
 import type {
     CreateEnvFileResponse,
     DeleteEnvFileResponse,
     DeleteProjectResponse,
-    EnvVariableValueResponse,
-    EnvVariablesValueResponse,
+    EnvVariablesCipherResponse,
     ParsedEnvRow,
     ProjectDetail,
     ProjectDetailResponse,
     ProjectEnvFile,
     ProjectEnvVariable,
+    ProjectEnvironmentKey,
     RenameEnvFileResponse,
     RenameProjectResponse,
     SaveEnvVariablesResponse,
@@ -156,14 +167,28 @@ function createDraftClientId() {
     return `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+type EnvironmentKeyStatus =
+    | { status: "ready" }
+    | { status: "awaiting" }
+    | { status: "error"; message: string };
+
+type CachedEnvironmentKey = {
+    version: number;
+    material: EnvironmentKeyMaterial;
+};
+
+type DecryptedProjectState = {
+    plainVariablesByFileId: Record<string, ProjectEnvVariable[]>;
+    environmentStatuses: Record<string, EnvironmentKeyStatus>;
+};
+
 function toVariableDraftRows(variables: ProjectEnvVariable[]): VariableDraftRow[] {
     const rows = variables.map((variable) => ({
         clientId: variable.id,
         variableId: variable.id,
         key: variable.key,
-        value: variable.value ?? "",
-        originalValue: variable.value ?? "",
-        isValueLoaded: typeof variable.value === "string",
+        value: variable.value,
+        originalValue: variable.value,
         isValueEditable: false,
         note: variable.note ?? "",
         isNoteOpen: Boolean(variable.note),
@@ -179,7 +204,6 @@ function createEmptyDraftRow(): VariableDraftRow {
         key: "",
         value: "",
         originalValue: "",
-        isValueLoaded: true,
         isValueEditable: true,
         note: "",
         isNoteOpen: false,
@@ -197,7 +221,6 @@ function createDraftRowFromParsedEnv(parsedRow: ParsedEnvRow): VariableDraftRow 
         key: parsedRow.key,
         value: parsedRow.value,
         originalValue: "",
-        isValueLoaded: true,
         isValueEditable: true,
         note: parsedRow.note,
         isNoteOpen: Boolean(parsedRow.note),
@@ -221,8 +244,7 @@ function areVariableDraftRowsEqual(
             currentRow.key === baselineRow.key &&
             currentRow.note === baselineRow.note &&
             currentRow.isCommented === baselineRow.isCommented &&
-            (!currentRow.isValueLoaded ||
-                currentRow.value === currentRow.originalValue)
+            currentRow.value === currentRow.originalValue
         );
     });
 }
@@ -334,13 +356,20 @@ export default function ProjectDetailPage() {
     const router = useRouter();
     const workspaceId = getRouteParam(params.workspaceId);
     const projectId = getRouteParam(params.projectId);
+    const { user } = useAuthenticated();
+    const { keys } = useVault();
+    const userId = user?.id ?? null;
+    const environmentKeyCacheRef = useRef(new Map<string, CachedEnvironmentKey>());
 
     const [project, setProject] = useState<ProjectDetail | null>(null);
+    const [plainVariablesByFileId, setPlainVariablesByFileId] = useState<
+        Record<string, ProjectEnvVariable[]>
+    >({});
+    const [environmentStatuses, setEnvironmentStatuses] = useState<
+        Record<string, EnvironmentKeyStatus>
+    >({});
     const [activeEnvFileId, setActiveEnvFileId] = useState<string | null>(null);
     const [revealedVariableIds, setRevealedVariableIds] = useState<Set<string>>(
-        () => new Set()
-    );
-    const [loadingVariableValueIds, setLoadingVariableValueIds] = useState<Set<string>>(
         () => new Set()
     );
     const [isLoading, setIsLoading] = useState(true);
@@ -387,6 +416,107 @@ export default function ProjectDetailPage() {
 
     const projectUrl = `/api/workspaces/${workspaceId}/projects/${projectId}`;
 
+    useEffect(() => {
+        const cache = environmentKeyCacheRef.current;
+
+        return () => {
+            cache.forEach(({ material }) => {
+                void wipeEnvironmentKey(material);
+            });
+            cache.clear();
+        };
+    }, []);
+
+    const getEnvironmentKeyMaterial = useCallback(
+        async (
+            environmentKey: ProjectEnvironmentKey,
+            accountKeys: AccountKeys,
+            accountUserId: string
+        ) => {
+            const cache = environmentKeyCacheRef.current;
+            const cached = cache.get(environmentKey.id);
+
+            if (cached && cached.version === environmentKey.version) {
+                return cached.material;
+            }
+
+            const material = await openProjectEnvironmentKey({
+                environmentKey,
+                keys: accountKeys,
+                userId: accountUserId,
+            });
+
+            if (!material) {
+                return null;
+            }
+
+            if (cached) {
+                void wipeEnvironmentKey(cached.material);
+            }
+
+            cache.set(environmentKey.id, { version: environmentKey.version, material });
+            return material;
+        },
+        []
+    );
+
+    const decryptProject = useCallback(
+        async (nextProject: ProjectDetail): Promise<DecryptedProjectState> => {
+            const plain: Record<string, ProjectEnvVariable[]> = {};
+            const statuses: Record<string, EnvironmentKeyStatus> = {};
+
+            if (!keys || !userId) {
+                return { plainVariablesByFileId: plain, environmentStatuses: statuses };
+            }
+
+            const materials = new Map<string, EnvironmentKeyMaterial>();
+
+            for (const environmentKey of nextProject.environmentKeys) {
+                try {
+                    const material = await getEnvironmentKeyMaterial(environmentKey, keys, userId);
+
+                    if (material) {
+                        materials.set(environmentKey.environment, material);
+                        statuses[environmentKey.environment] = { status: "ready" };
+                    } else {
+                        statuses[environmentKey.environment] = { status: "awaiting" };
+                    }
+                } catch (openError) {
+                    statuses[environmentKey.environment] = {
+                        status: "error",
+                        message: getErrorMessage(openError),
+                    };
+                }
+            }
+
+            for (const envFile of nextProject.envFiles) {
+                const material = materials.get(envFile.environment);
+                statuses[envFile.environment] ??= { status: "awaiting" };
+
+                if (!material) {
+                    continue;
+                }
+
+                try {
+                    plain[envFile.id] = await decryptEnvFileVariables({ envFile, material });
+                } catch (decryptError) {
+                    statuses[envFile.environment] = {
+                        status: "error",
+                        message: getErrorMessage(decryptError),
+                    };
+                }
+            }
+
+            return { plainVariablesByFileId: plain, environmentStatuses: statuses };
+        },
+        [getEnvironmentKeyMaterial, keys, userId]
+    );
+
+    const getPlainVariables = useCallback(
+        (envFileId: string) => plainVariablesByFileId[envFileId] ?? [],
+        [plainVariablesByFileId]
+    );
+
     const requestProject = useCallback(
         (signal?: AbortSignal) =>
             fetchJson<ProjectDetailResponse>(projectUrl, {
@@ -400,20 +530,27 @@ export default function ProjectDetailPage() {
         let isCurrent = true;
 
         requestProject(controller.signal)
-            .then((response) => {
+            .then(async (response) => {
+                const decrypted = await decryptProject(response.project);
+
                 if (!isCurrent) {
                     return;
                 }
 
                 setProject(response.project);
+                setPlainVariablesByFileId(decrypted.plainVariablesByFileId);
+                setEnvironmentStatuses(decrypted.environmentStatuses);
                 const firstEnvFile = response.project.envFiles[0] ?? null;
                 setActiveEnvFileId(firstEnvFile?.id ?? null);
                 setVariableDraftRows(
-                    firstEnvFile ? toVariableDraftRows(firstEnvFile.variables) : []
+                    firstEnvFile
+                        ? toVariableDraftRows(
+                            decrypted.plainVariablesByFileId[firstEnvFile.id] ?? []
+                        )
+                        : []
                 );
                 setSelectedDraftRowIds(new Set());
                 setRevealedVariableIds(new Set());
-                setLoadingVariableValueIds(new Set());
                 setError(null);
             })
             .catch((loadError) => {
@@ -432,7 +569,7 @@ export default function ProjectDetailPage() {
             isCurrent = false;
             controller.abort();
         };
-    }, [requestProject]);
+    }, [decryptProject, requestProject]);
 
     useEffect(() => {
         return () => {
@@ -447,6 +584,7 @@ export default function ProjectDetailPage() {
 
         try {
             const response = await requestProject();
+            const decrypted = await decryptProject(response.project);
             const nextActiveEnvFile =
                 (activeEnvFileId
                     ? response.project.envFiles.find(
@@ -457,22 +595,25 @@ export default function ProjectDetailPage() {
                 null;
 
             setProject(response.project);
+            setPlainVariablesByFileId(decrypted.plainVariablesByFileId);
+            setEnvironmentStatuses(decrypted.environmentStatuses);
             setActiveEnvFileId(nextActiveEnvFile?.id ?? null);
             setVariableDraftRows(
                 nextActiveEnvFile
-                    ? toVariableDraftRows(nextActiveEnvFile.variables)
+                    ? toVariableDraftRows(
+                        decrypted.plainVariablesByFileId[nextActiveEnvFile.id] ?? []
+                    )
                     : []
             );
             setSelectedDraftRowIds(new Set());
             setRevealedVariableIds(new Set());
-            setLoadingVariableValueIds(new Set());
             setError(null);
         } catch (refreshError) {
             setError(getErrorMessage(refreshError));
         } finally {
             setIsRefreshing(false);
         }
-    }, [activeEnvFileId, requestProject]);
+    }, [activeEnvFileId, decryptProject, requestProject]);
 
     const startRenamingProject = useCallback(() => {
         if (!project?.canManage) {
@@ -686,14 +827,14 @@ export default function ProjectDetailPage() {
                     setVariableDraftRows([]);
                     setSelectedDraftRowIds(new Set());
                     setRevealedVariableIds(new Set());
-                    setLoadingVariableValueIds(new Set());
                 } else if (activeEnvFileId === envFileId) {
                     const fallbackEnvFile = remainingEnvFiles[0];
                     setActiveEnvFileId(fallbackEnvFile.id);
-                    setVariableDraftRows(toVariableDraftRows(fallbackEnvFile.variables));
+                    setVariableDraftRows(
+                        toVariableDraftRows(getPlainVariables(fallbackEnvFile.id))
+                    );
                     setSelectedDraftRowIds(new Set());
                     setRevealedVariableIds(new Set());
-                    setLoadingVariableValueIds(new Set());
                 }
 
                 return {
@@ -717,6 +858,7 @@ export default function ProjectDetailPage() {
         activeEnvFileId,
         cancelRenamingEnvFile,
         envFileIdPendingDelete,
+        getPlainVariables,
         project?.canManage,
         projectUrl,
         renamingEnvFileId,
@@ -761,11 +903,24 @@ export default function ProjectDetailPage() {
 
     const hasVariableDraftChanges = useMemo(() => {
         const baselineRows = activeEnvFile
-            ? toVariableDraftRows(activeEnvFile.variables)
+            ? toVariableDraftRows(getPlainVariables(activeEnvFile.id))
             : [];
 
         return !areVariableDraftRowsEqual(variableDraftRows, baselineRows);
-    }, [activeEnvFile, variableDraftRows]);
+    }, [activeEnvFile, getPlainVariables, variableDraftRows]);
+
+    const activeEnvironmentKey = useMemo(
+        () =>
+            activeEnvFile && project
+                ? project.environmentKeys.find(
+                    (environmentKey) => environmentKey.environment === activeEnvFile.environment
+                ) ?? null
+                : null,
+        [activeEnvFile, project]
+    );
+    const activeEnvironmentStatus: EnvironmentKeyStatus = activeEnvFile
+        ? environmentStatuses[activeEnvFile.environment] ?? { status: "awaiting" }
+        : { status: "awaiting" };
 
     const variableSearchResult = useMemo(() => {
         const query = variableSearchQuery.trim();
@@ -823,7 +978,7 @@ export default function ProjectDetailPage() {
         async (event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
 
-            if (!project?.canManage) {
+            if (!project || !project.canManage) {
                 setEnvFileError("Only project or workspace admins can create env files.");
                 return;
             }
@@ -842,8 +997,25 @@ export default function ProjectDetailPage() {
             }
 
             setIsCreatingEnvFile(true);
+            let createdKey: Awaited<ReturnType<typeof createEnvironmentKeyForSelf>> | null = null;
 
             try {
+                const needsEnvironmentKey = !project.environmentKeys.some(
+                    (environmentKey) => environmentKey.environment === envFileEnvironment
+                );
+
+                if (needsEnvironmentKey) {
+                    if (!keys || !userId) {
+                        throw new Error("Unlock your vault first.");
+                    }
+
+                    createdKey = await createEnvironmentKeyForSelf({
+                        environment: envFileEnvironment,
+                        keys,
+                        userId,
+                    });
+                }
+
                 const response = await fetchJson<CreateEnvFileResponse>(
                     `${projectUrl}/env-files`,
                     {
@@ -855,9 +1027,25 @@ export default function ProjectDetailPage() {
                             name: name || undefined,
                             environment: envFileEnvironment,
                             description: description || undefined,
+                            environmentKey: createdKey
+                                ? {
+                                    id: createdKey.request.id,
+                                    sealedSecret: createdKey.request.sealedSecret,
+                                    signature: createdKey.request.signature,
+                                }
+                                : undefined,
                         }),
                     }
                 );
+                const responseKey = response.environmentKey;
+
+                if (createdKey && responseKey?.id === createdKey.request.id) {
+                    environmentKeyCacheRef.current.set(responseKey.id, {
+                        version: responseKey.version,
+                        material: createdKey.material,
+                    });
+                    createdKey = null;
+                }
 
                 setProject((currentProject) => {
                     if (!currentProject) {
@@ -870,13 +1058,32 @@ export default function ProjectDetailPage() {
                             ...currentProject.envFiles,
                             response.envFile,
                         ]),
+                        environmentKeys: responseKey
+                            ? [
+                                ...currentProject.environmentKeys.filter(
+                                    (environmentKey) => environmentKey.id !== responseKey.id
+                                ),
+                                responseKey,
+                            ]
+                            : currentProject.environmentKeys,
                     };
                 });
+                setPlainVariablesByFileId((current) => ({
+                    ...current,
+                    [response.envFile.id]: [],
+                }));
+
+                if (responseKey && environmentKeyCacheRef.current.has(responseKey.id)) {
+                    setEnvironmentStatuses((current) => ({
+                        ...current,
+                        [response.envFile.environment]: { status: "ready" },
+                    }));
+                }
+
                 setActiveEnvFileId(response.envFile.id);
-                setVariableDraftRows(toVariableDraftRows(response.envFile.variables));
+                setVariableDraftRows(toVariableDraftRows([]));
                 setSelectedDraftRowIds(new Set());
                 setRevealedVariableIds(new Set());
-                setLoadingVariableValueIds(new Set());
                 setEnvFileName("");
                 setEnvFileDescription("");
                 setIsCreateEnvFileOpen(false);
@@ -884,6 +1091,10 @@ export default function ProjectDetailPage() {
             } catch (createError) {
                 setEnvFileError(getErrorMessage(createError));
             } finally {
+                if (createdKey) {
+                    void wipeEnvironmentKey(createdKey.material);
+                }
+
                 setIsCreatingEnvFile(false);
             }
         },
@@ -891,8 +1102,10 @@ export default function ProjectDetailPage() {
             envFileDescription,
             envFileEnvironment,
             envFileName,
-            project?.canManage,
+            keys,
+            project,
             projectUrl,
+            userId,
         ]
     );
 
@@ -913,7 +1126,6 @@ export default function ProjectDetailPage() {
                         [field]: value,
                         ...(field === "value"
                             ? {
-                                isValueLoaded: true,
                                 isValueEditable: true,
                             }
                             : {}),
@@ -1013,13 +1225,12 @@ export default function ProjectDetailPage() {
 
     const resetVariableDraftRows = useCallback(() => {
         setVariableDraftRows(
-            activeEnvFile ? toVariableDraftRows(activeEnvFile.variables) : []
+            activeEnvFile ? toVariableDraftRows(getPlainVariables(activeEnvFile.id)) : []
         );
         setSelectedDraftRowIds(new Set());
         setRevealedVariableIds(new Set());
-        setLoadingVariableValueIds(new Set());
         setVariableError(null);
-    }, [activeEnvFile]);
+    }, [activeEnvFile, getPlainVariables]);
 
     const handleCopyAllVariables = useCallback(async () => {
         if (!activeEnvFile) {
@@ -1035,13 +1246,33 @@ export default function ProjectDetailPage() {
             return;
         }
 
+        if (!keys || !userId) {
+            setVariableError("Unlock your vault first.");
+            return;
+        }
+
         setIsCopyingVariables(true);
 
         try {
-            const response = await fetchJson<EnvVariablesValueResponse>(
+            const response = await fetchJson<EnvVariablesCipherResponse>(
                 `${projectUrl}/env-files/${activeEnvFile.id}/variables`
             );
-            const clipboardPayload = buildEnvClipboardText(response.variables);
+            const material = await getEnvironmentKeyMaterial(
+                response.environmentKey,
+                keys,
+                userId
+            );
+
+            if (!material) {
+                setVariableError("You don't have this environment's key yet.");
+                return;
+            }
+
+            const variables = await decryptEnvFileVariables({
+                envFile: { ...activeEnvFile, variables: response.variables },
+                material,
+            });
+            const clipboardPayload = buildEnvClipboardText(variables);
 
             if ("error" in clipboardPayload) {
                 setVariableError(clipboardPayload.error);
@@ -1060,14 +1291,16 @@ export default function ProjectDetailPage() {
                 setHasCopiedVariables(false);
                 copyFeedbackTimeoutRef.current = null;
             }, 1600);
-        } catch {
+        } catch (copyError) {
             setVariableError(
-                "Could not copy variables. Check browser clipboard permissions."
+                copyError instanceof Error && copyError.message !== "Request failed."
+                    ? copyError.message
+                    : "Could not copy variables. Check browser clipboard permissions."
             );
         } finally {
             setIsCopyingVariables(false);
         }
-    }, [activeEnvFile, projectUrl]);
+    }, [activeEnvFile, getEnvironmentKeyMaterial, keys, projectUrl, userId]);
 
     const handleSaveVariables = useCallback(async () => {
         if (!activeEnvFile) {
@@ -1075,7 +1308,12 @@ export default function ProjectDetailPage() {
             return;
         }
 
-        const variables = [];
+        if (!keys || !userId || !activeEnvironmentKey) {
+            setVariableError("You don't have this environment's key yet.");
+            return;
+        }
+
+        const plainVariables = [];
         const seenKeys = new Set<string>();
 
         for (const row of variableDraftRows) {
@@ -1098,13 +1336,17 @@ export default function ProjectDetailPage() {
                 return;
             }
 
-            if (key.length > 120) {
-                setVariableError("Variable keys must be 120 characters or less.");
+            if (key.length > ENV_VARIABLE_KEY_MAX_LENGTH) {
+                setVariableError(
+                    `Variable keys must be ${ENV_VARIABLE_KEY_MAX_LENGTH} characters or less.`
+                );
                 return;
             }
 
-            if (row.isValueLoaded && row.value.length > 10000) {
-                setVariableError(`Value for ${key} must be 10,000 characters or less.`);
+            if (row.value.length > ENV_VARIABLE_VALUE_MAX_LENGTH) {
+                setVariableError(
+                    `Value for ${key} must be ${ENV_VARIABLE_VALUE_MAX_LENGTH.toLocaleString()} characters or less.`
+                );
                 return;
             }
 
@@ -1121,22 +1363,9 @@ export default function ProjectDetailPage() {
             }
 
             seenKeys.add(key);
-            const shouldSendValue =
-                !row.variableId || row.value !== row.originalValue;
-
-            if (!row.variableId && !row.isValueLoaded) {
-                setVariableError(`Value is required for ${key}.`);
-                return;
-            }
-
-            variables.push({
-                id: row.variableId,
+            plainVariables.push({
                 key,
-                ...(shouldSendValue
-                    ? {
-                        value: row.value,
-                    }
-                    : {}),
+                value: row.value,
                 note: note || null,
                 isCommented: row.isCommented,
             });
@@ -1145,6 +1374,19 @@ export default function ProjectDetailPage() {
         setIsSavingVariables(true);
 
         try {
+            const material = await getEnvironmentKeyMaterial(activeEnvironmentKey, keys, userId);
+
+            if (!material) {
+                throw new Error("You don't have this environment's key yet.");
+            }
+
+            const encryptedVariables = await encryptEnvFileVariables({
+                envFile: activeEnvFile,
+                plainVariables,
+                currentVariables: getPlainVariables(activeEnvFile.id),
+                keyVersion: activeEnvironmentKey.version,
+                material,
+            });
             const response = await fetchJson<SaveEnvVariablesResponse>(
                 `${projectUrl}/env-files/${activeEnvFile.id}/variables`,
                 {
@@ -1153,10 +1395,19 @@ export default function ProjectDetailPage() {
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        variables,
+                        variables: encryptedVariables,
                     }),
                 }
             );
+            const savedEnvFile = {
+                ...activeEnvFile,
+                variableCount: response.variables.length,
+                variables: response.variables,
+            };
+            const savedPlainVariables = await decryptEnvFileVariables({
+                envFile: savedEnvFile,
+                material,
+            });
 
             setProject((currentProject) => {
                 if (!currentProject) {
@@ -1165,136 +1416,67 @@ export default function ProjectDetailPage() {
 
                 return {
                     ...currentProject,
-                    envFiles: currentProject.envFiles.map((envFile) => {
-                        if (envFile.id !== activeEnvFile.id) {
-                            return envFile;
-                        }
-
-                        return {
-                            ...envFile,
-                            variableCount: response.variables.length,
-                            variables: response.variables,
-                        };
-                    }),
+                    envFiles: currentProject.envFiles.map((envFile) =>
+                        envFile.id === activeEnvFile.id ? savedEnvFile : envFile
+                    ),
                 };
             });
-            setVariableDraftRows(toVariableDraftRows(response.variables));
+            setPlainVariablesByFileId((current) => ({
+                ...current,
+                [activeEnvFile.id]: savedPlainVariables,
+            }));
+            setVariableDraftRows(toVariableDraftRows(savedPlainVariables));
             setSelectedDraftRowIds(new Set());
             setRevealedVariableIds(new Set());
-            setLoadingVariableValueIds(new Set());
             setVariableError(null);
-        } catch (createError) {
-            setVariableError(getErrorMessage(createError));
+        } catch (saveError) {
+            setVariableError(getErrorMessage(saveError));
         } finally {
             setIsSavingVariables(false);
         }
-    },
-        [
-            activeEnvFile,
-            projectUrl,
-            variableDraftRows,
-        ]
-    );
+    }, [
+        activeEnvFile,
+        activeEnvironmentKey,
+        getEnvironmentKeyMaterial,
+        getPlainVariables,
+        keys,
+        projectUrl,
+        userId,
+        variableDraftRows,
+    ]);
 
-    const loadVariableValue = useCallback(
-        async (row: VariableDraftRow) => {
-            if (row.isValueLoaded || !row.variableId) {
-                return row.value;
-            }
+    const toggleVariableVisibility = useCallback((row: VariableDraftRow) => {
+        setRevealedVariableIds((currentIds) => {
+            const nextIds = new Set(currentIds);
 
-            if (!activeEnvFile) {
-                throw new Error("Select an env file first.");
-            }
-
-            setLoadingVariableValueIds((currentIds) => {
-                const nextIds = new Set(currentIds);
+            if (nextIds.has(row.clientId)) {
+                nextIds.delete(row.clientId);
+            } else {
                 nextIds.add(row.clientId);
-                return nextIds;
-            });
-
-            try {
-                const response = await fetchJson<EnvVariableValueResponse>(
-                    `${projectUrl}/env-files/${activeEnvFile.id}/variables?variableId=${encodeURIComponent(row.variableId)}`
-                );
-                const value = response.variable.value;
-
-                setVariableDraftRows((currentRows) =>
-                    currentRows.map((currentRow) =>
-                        currentRow.clientId === row.clientId
-                            ? {
-                                ...currentRow,
-                                value,
-                                originalValue: value,
-                                isValueLoaded: true,
-                            }
-                            : currentRow
-                    )
-                );
-                setVariableError(null);
-
-                return value;
-            } finally {
-                setLoadingVariableValueIds((currentIds) => {
-                    const nextIds = new Set(currentIds);
-                    nextIds.delete(row.clientId);
-                    return nextIds;
-                });
-            }
-        },
-        [activeEnvFile, projectUrl]
-    );
-
-    const toggleVariableVisibility = useCallback(
-        async (row: VariableDraftRow) => {
-            if (revealedVariableIds.has(row.clientId)) {
-                setRevealedVariableIds((currentIds) => {
-                    const nextIds = new Set(currentIds);
-                    nextIds.delete(row.clientId);
-                    return nextIds;
-                });
-                return;
             }
 
-            try {
-                await loadVariableValue(row);
-                setRevealedVariableIds((currentIds) => {
-                    const nextIds = new Set(currentIds);
-                    nextIds.add(row.clientId);
-                    return nextIds;
-                });
-            } catch (loadValueError) {
-                setVariableError(getErrorMessage(loadValueError));
-            }
-        },
-        [loadVariableValue, revealedVariableIds]
-    );
+            return nextIds;
+        });
+    }, []);
 
-    const startEditingVariableValue = useCallback(
-        async (row: VariableDraftRow) => {
-            try {
-                await loadVariableValue(row);
-                setVariableDraftRows((currentRows) =>
-                    currentRows.map((currentRow) =>
-                        currentRow.clientId === row.clientId
-                            ? {
-                                ...currentRow,
-                                isValueEditable: true,
-                            }
-                            : currentRow
-                    )
-                );
-                setRevealedVariableIds((currentIds) => {
-                    const nextIds = new Set(currentIds);
-                    nextIds.add(row.clientId);
-                    return nextIds;
-                });
-                setVariableError(null);
-            } catch (loadValueError) {
-                setVariableError(getErrorMessage(loadValueError));
-            }
-        },
-        [loadVariableValue]
-    );
+    const startEditingVariableValue = useCallback((row: VariableDraftRow) => {
+        setVariableDraftRows((currentRows) =>
+            currentRows.map((currentRow) =>
+                currentRow.clientId === row.clientId
+                    ? {
+                        ...currentRow,
+                        isValueEditable: true,
+                    }
+                    : currentRow
+            )
+        );
+        setRevealedVariableIds((currentIds) => {
+            const nextIds = new Set(currentIds);
+            nextIds.add(row.clientId);
+            return nextIds;
+        });
+        setVariableError(null);
+    }, []);
 
     if (isLoading) {
         return (
@@ -1605,11 +1787,12 @@ export default function ProjectDetailPage() {
                                                 onClick={() => {
                                                     setActiveEnvFileId(envFile.id);
                                                     setVariableDraftRows(
-                                                        toVariableDraftRows(envFile.variables)
+                                                        toVariableDraftRows(
+                                                            getPlainVariables(envFile.id)
+                                                        )
                                                     );
                                                     setSelectedDraftRowIds(new Set());
                                                     setRevealedVariableIds(new Set());
-                                                    setLoadingVariableValueIds(new Set());
                                                     setVariableError(null);
                                                 }}
                                             >
@@ -1798,6 +1981,25 @@ export default function ProjectDetailPage() {
                                 ) : null}
                             </div>
 
+                            {activeEnvironmentStatus.status !== "ready" ? (
+                                <div className="p-4">
+                                    <div className="flex max-w-xl gap-3 border border-border bg-background px-4 py-4">
+                                        <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                        <div className="space-y-1 text-sm">
+                                            <p className="font-medium text-foreground">
+                                                {activeEnvironmentStatus.status === "error"
+                                                    ? "This environment's key could not be opened"
+                                                    : "Waiting for this environment's key"}
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                {activeEnvironmentStatus.status === "error"
+                                                    ? activeEnvironmentStatus.message
+                                                    : `You have permission for ${environmentTypeLabels[activeEnvFile.environment]}, but its values are end-to-end encrypted. Someone who already has access needs to share the key with you.`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
                             <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
                                 <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex flex-wrap items-center gap-2">
@@ -1992,11 +2194,6 @@ export default function ProjectDetailPage() {
                                                 const isVisible = revealedVariableIds.has(
                                                     row.clientId
                                                 );
-                                                const isLoadingValue =
-                                                    loadingVariableValueIds.has(row.clientId);
-                                                const displayedValue = row.isValueLoaded
-                                                    ? row.value
-                                                    : HIDDEN_VALUE_MASK;
 
                                                 return (
                                                     <div
@@ -2055,12 +2252,8 @@ export default function ProjectDetailPage() {
                                                             </div>
 
                                                             <input
-                                                                type={
-                                                                    row.isValueLoaded && !isVisible
-                                                                        ? "password"
-                                                                        : "text"
-                                                                }
-                                                                value={displayedValue}
+                                                                type={isVisible ? "text" : "password"}
+                                                                value={row.value}
                                                                 readOnly={!row.isValueEditable}
                                                                 onChange={(event) => {
                                                                     if (!row.isValueEditable) {
@@ -2098,20 +2291,13 @@ export default function ProjectDetailPage() {
                                                                     variant="outline"
                                                                     size="icon-xs"
                                                                     onClick={() => {
-                                                                        void startEditingVariableValue(row);
+                                                                        startEditingVariableValue(row);
                                                                     }}
-                                                                    disabled={
-                                                                        isLoadingValue ||
-                                                                        row.isValueEditable
-                                                                    }
+                                                                    disabled={row.isValueEditable}
                                                                     aria-label="Edit variable value"
                                                                     title="Edit variable value"
                                                                 >
-                                                                    {isLoadingValue ? (
-                                                                        <Loader2 className="animate-spin" />
-                                                                    ) : (
-                                                                        <Pencil />
-                                                                    )}
+                                                                    <Pencil />
                                                                 </Button>
                                                             </div>
 
@@ -2165,24 +2351,15 @@ export default function ProjectDetailPage() {
                                                                 variant="outline"
                                                                 size="icon-xs"
                                                                 onClick={() => {
-                                                                    void toggleVariableVisibility(row);
+                                                                    toggleVariableVisibility(row);
                                                                 }}
-                                                                disabled={isLoadingValue}
                                                                 aria-label={
                                                                     isVisible
                                                                         ? "Hide variable value"
-                                                                        : row.isValueLoaded
-                                                                            ? "Show variable value"
-                                                                            : "Load and show variable value"
+                                                                        : "Show variable value"
                                                                 }
                                                             >
-                                                                {isLoadingValue ? (
-                                                                    <Loader2 className="animate-spin" />
-                                                                ) : isVisible ? (
-                                                                    <EyeOff />
-                                                                ) : (
-                                                                    <Eye />
-                                                                )}
+                                                                {isVisible ? <EyeOff /> : <Eye />}
                                                             </Button>
                                                         </div>
 
@@ -2213,6 +2390,7 @@ export default function ProjectDetailPage() {
                                     </div>
                                 </div>
                             </div>
+                            )}
                         </>
                     ) : (
                         <div className="p-4 text-sm text-muted-foreground">

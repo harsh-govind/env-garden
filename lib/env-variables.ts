@@ -1,11 +1,28 @@
+import "server-only";
 import {
+    AEAD_OVERHEAD_BYTES,
+    KEY_DIGEST_BYTE_LENGTH,
+    MAX_UTF8_BYTES_PER_CHARACTER,
+} from "@/constants/crypto";
+import {
+    ENV_VARIABLE_KEY_MAX_LENGTH,
     ENV_VARIABLE_NOTE_MAX_LENGTH,
+    ENV_VARIABLE_VALUE_MAX_LENGTH,
     MAX_ENV_VARIABLES_PER_SAVE,
-    envKeyPattern,
 } from "@/constants/environment";
+import { decodeBase64Field, decodeBase64FieldWithin } from "@/lib/crypto-payload";
+import type { EncryptedVariable } from "@/types/crypto";
 import type { SaveEnvVariablesBody } from "@/types/project";
 
-export function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
+const MAX_KEY_CIPHERTEXT_BYTES = ENV_VARIABLE_KEY_MAX_LENGTH + AEAD_OVERHEAD_BYTES;
+const MAX_VALUE_CIPHERTEXT_BYTES =
+    ENV_VARIABLE_VALUE_MAX_LENGTH * MAX_UTF8_BYTES_PER_CHARACTER + AEAD_OVERHEAD_BYTES;
+const MAX_NOTE_CIPHERTEXT_BYTES =
+    ENV_VARIABLE_NOTE_MAX_LENGTH * MAX_UTF8_BYTES_PER_CHARACTER + AEAD_OVERHEAD_BYTES;
+
+export function parseSaveEnvVariablesBody(
+    body: SaveEnvVariablesBody
+): { value: { variables: EncryptedVariable[] } } | { error: string } {
     if (!Array.isArray(body.variables)) {
         return { error: "Variables must be an array." };
     }
@@ -14,14 +31,9 @@ export function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
         return { error: `You can save up to ${MAX_ENV_VARIABLES_PER_SAVE} variables at a time.` };
     }
 
-    const seenKeys = new Set<string>();
-    const variables: {
-        id?: string;
-        key: string;
-        value?: string;
-        note: string | null;
-        isCommented: boolean;
-    }[] = [];
+    const seenDigests = new Set<string>();
+    const variables: EncryptedVariable[] = [];
+    let keyVersion: number | null = null;
 
     for (const rawVariable of body.variables) {
         if (!rawVariable || typeof rawVariable !== "object") {
@@ -29,55 +41,60 @@ export function parseSaveEnvVariablesBody(body: SaveEnvVariablesBody) {
         }
 
         const variable = rawVariable as Record<string, unknown>;
-        const id =
-            typeof variable.id === "string" && variable.id.trim().length > 0
-                ? variable.id.trim()
-                : undefined;
-        const key = typeof variable.key === "string" ? variable.key.trim() : "";
-        const hasValue = typeof variable.value === "string";
-        const value = hasValue ? (variable.value as string) : undefined;
-        const note = typeof variable.note === "string" ? variable.note.trim() : "";
+        const keyDigest = decodeBase64Field(variable.keyDigest, KEY_DIGEST_BYTE_LENGTH);
+        const encryptedKey = decodeBase64FieldWithin(
+            variable.encryptedKey,
+            AEAD_OVERHEAD_BYTES + 1,
+            MAX_KEY_CIPHERTEXT_BYTES
+        );
+        const encryptedValue = decodeBase64FieldWithin(
+            variable.encryptedValue,
+            AEAD_OVERHEAD_BYTES,
+            MAX_VALUE_CIPHERTEXT_BYTES
+        );
+        const encryptedNote = variable.encryptedNote === null || variable.encryptedNote === undefined
+            ? null
+            : decodeBase64FieldWithin(
+                variable.encryptedNote,
+                AEAD_OVERHEAD_BYTES + 1,
+                MAX_NOTE_CIPHERTEXT_BYTES
+            );
 
-        if (!envKeyPattern.test(key)) {
-            return {
-                error:
-                    "Variable keys must start with a letter or underscore and contain only letters, numbers, and underscores.",
-            };
+        if (!keyDigest || !encryptedKey || !encryptedValue) {
+            return { error: "Each variable must be encrypted before it is saved." };
         }
 
-        if (key.length > 120) {
-            return { error: "Variable keys must be 120 characters or less." };
+        if (variable.encryptedNote !== null && variable.encryptedNote !== undefined && !encryptedNote) {
+            return { error: "Variable notes must be encrypted before they are saved." };
         }
 
-        if (!id && !hasValue) {
-            return { error: `Value is required for ${key}.` };
+        if (!Number.isInteger(variable.keyVersion) || (variable.keyVersion as number) < 1) {
+            return { error: "Each variable needs a key version." };
         }
 
-        if (value !== undefined && value.length > 10000) {
-            return { error: `Value for ${key} must be 10,000 characters or less.` };
+        if (keyVersion !== null && keyVersion !== variable.keyVersion) {
+            return { error: "All variables must be encrypted with the same key version." };
         }
 
-        if (note.length > ENV_VARIABLE_NOTE_MAX_LENGTH) {
-            return { error: `Note for ${key} must be ${ENV_VARIABLE_NOTE_MAX_LENGTH} characters or less.` };
+        if (typeof variable.isCommented !== "boolean") {
+            return { error: "Each variable needs an isCommented flag." };
         }
 
-        if (seenKeys.has(key)) {
-            return { error: `Duplicate variable key: ${key}.` };
+        if (seenDigests.has(keyDigest)) {
+            return { error: "Variable keys must be unique within this env file." };
         }
 
-        seenKeys.add(key);
+        keyVersion = variable.keyVersion as number;
+        seenDigests.add(keyDigest);
         variables.push({
-            id,
-            key,
-            value,
-            note: note || null,
-            isCommented: variable.isCommented === true,
+            keyDigest,
+            encryptedKey,
+            encryptedValue,
+            encryptedNote,
+            isCommented: variable.isCommented,
+            keyVersion,
         });
     }
 
-    return {
-        value: {
-            variables,
-        },
-    };
+    return { value: { variables } };
 }

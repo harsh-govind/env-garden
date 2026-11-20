@@ -42,6 +42,11 @@ export const VARIABLE_FIELDS = ["key", "value", "note"] as const;
 
 export const ENVIRONMENT_KEY_ID_BYTE_LENGTH = 16;
 
+export const AEAD_OVERHEAD_BYTES = 24 + 16;
+export const SEALED_SECRET_BYTE_LENGTH = 32 + 48;
+export const SIGNATURE_BYTE_LENGTH = 64;
+export const MAX_UTF8_BYTES_PER_CHARACTER = 4;
+
 export const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
 export const environmentKeyIdPattern = /^[A-Za-z0-9_-]{22}$/;
 export const keyDigestPattern = /^[A-Za-z0-9+/]{43}=$/;

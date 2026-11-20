@@ -1,27 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import {
-    defaultProjectEnvironmentTypes,
     environmentTypeLabels,
     formatEnvironmentFileName,
 } from "@/constants/environment";
-import {
-    decryptEnvValue,
-    decryptEnvValueToBuffer,
-    decryptProjectKey,
-    destroyBuffer,
-    encryptEnvValue,
-    encryptEnvValueBuffer,
-    encryptProjectKey,
-    generateProjectKey,
-} from "@/lib/encryption";
+import { verifySelfShare } from "@/lib/environment-keys";
 import { Prisma } from "@/prisma/generated/client";
+import type { EncryptedVariable } from "@/types/crypto";
 import type {
+    NewEnvironmentKeyInput,
     ProjectAccessContext,
     ProjectDetailRecord,
     ProjectEnvFileRecord,
-    ProjectEnvVariableEncryptedRecord,
-    ProjectEnvVariableMetadataRecord,
-    ProjectEnvVariableRecord,
+    ProjectEnvVariableCipherRecord,
+    ProjectEnvironmentKeyRecord,
 } from "@/types/project";
 import type {
     CreateWorkspaceHistoryEntryInput,
@@ -164,58 +155,155 @@ async function getProjectAccessContext(
     };
 }
 
-async function getProjectKeyForProject(
-    tx: Prisma.TransactionClient,
-    projectId: string
-) {
-    const encryptionKey = await tx.projectEncryptionKey.findUnique({
-        where: {
-            projectId,
-        },
-        select: {
-            encryptedKey: true,
-            iv: true,
-            authTag: true,
-        },
-    });
+const variableCipherSelect = {
+    id: true,
+    keyDigest: true,
+    encryptedKey: true,
+    encryptedValue: true,
+    encryptedNote: true,
+    keyVersion: true,
+    isCommented: true,
+    position: true,
+    createdAt: true,
+    updatedAt: true,
+} as const;
 
-    if (!encryptionKey) {
-        throw new Error("Project encryption key not found.");
-    }
+const envFileSelect = {
+    id: true,
+    name: true,
+    environment: true,
+    description: true,
+    createdAt: true,
+    updatedAt: true,
+    variables: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: variableCipherSelect,
+    },
+} satisfies Prisma.EnvFileSelect;
 
-    return decryptProjectKey(encryptionKey);
+function environmentKeySelect(userId: string) {
+    return {
+        id: true,
+        environment: true,
+        version: true,
+        rotationRequired: true,
+        shares: {
+            where: { userId },
+            select: {
+                version: true,
+                recipientBoxPublicKey: true,
+                sealedSecret: true,
+                signature: true,
+                granterSignPublicKey: true,
+                grantedBy: {
+                    select: {
+                        id: true,
+                        email: true,
+                    },
+                },
+            },
+        },
+    } satisfies Prisma.EnvironmentKeySelect;
 }
 
-function mapEncryptedEnvVariableRecord(
-    input: ProjectEnvVariableEncryptedRecord,
-    projectKey: Buffer
-): ProjectEnvVariableRecord {
+type EnvironmentKeyRow = Prisma.EnvironmentKeyGetPayload<{
+    select: ReturnType<typeof environmentKeySelect>;
+}>;
+
+function mapEnvironmentKeyRow(row: EnvironmentKeyRow): ProjectEnvironmentKeyRecord {
+    const share = row.shares.find((candidate) => candidate.version === row.version) ?? null;
+
     return {
-        id: input.id,
-        key: input.key,
-        value: decryptEnvValue(
-            {
-                encryptedValue: input.encryptedValue,
-                iv: input.iv,
-                authTag: input.authTag,
-            },
-            projectKey
-        ),
-        note: input.note,
-        isCommented: input.isCommented,
-        position: input.position,
-        createdAt: input.createdAt,
-        updatedAt: input.updatedAt,
+        id: row.id,
+        environment: row.environment as EnvironmentTypeValue,
+        version: row.version,
+        rotationRequired: row.rotationRequired,
+        share: share
+            ? {
+                version: share.version,
+                recipientBoxPublicKey: share.recipientBoxPublicKey,
+                sealedSecret: share.sealedSecret,
+                signature: share.signature,
+                granter: {
+                    userId: share.grantedBy?.id ?? null,
+                    email: share.grantedBy?.email ?? null,
+                    signPublicKey: share.granterSignPublicKey,
+                },
+            }
+            : null,
     };
 }
 
-function mapEnvVariableMetadataRecord(
-    input: ProjectEnvVariableMetadataRecord
-): ProjectEnvVariableMetadataRecord {
+async function getEnvironmentKeyForUser(
+    tx: Prisma.TransactionClient,
+    input: { projectId: string; environment: string; userId: string }
+) {
+    const row = await tx.environmentKey.findUnique({
+        where: {
+            projectId_environment: {
+                projectId: input.projectId,
+                environment: input.environment,
+            },
+        },
+        select: environmentKeySelect(input.userId),
+    });
+
+    return row ? mapEnvironmentKeyRow(row) : null;
+}
+
+async function getKeyringForUserInTransaction(tx: Prisma.TransactionClient, userId: string) {
+    return tx.userKeyring.findUnique({
+        where: { userId },
+        select: {
+            signPublicKey: true,
+            boxPublicKey: true,
+        },
+    });
+}
+
+async function createEnvironmentKeyWithSelfShare(
+    tx: Prisma.TransactionClient,
+    input: {
+        workspaceId: string;
+        projectId: string;
+        userId: string;
+        key: NewEnvironmentKeyInput;
+        keyring: { signPublicKey: string; boxPublicKey: string };
+    }
+) {
+    await tx.environmentKey.create({
+        data: {
+            id: input.key.id,
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            environment: input.key.environment,
+            version: 1,
+            createdById: input.userId,
+            shares: {
+                create: {
+                    userId: input.userId,
+                    version: 1,
+                    recipientBoxPublicKey: input.keyring.boxPublicKey,
+                    sealedSecret: input.key.sealedSecret,
+                    signature: input.key.signature,
+                    grantedById: input.userId,
+                    granterSignPublicKey: input.keyring.signPublicKey,
+                },
+            },
+        },
+    });
+}
+
+function mapEnvVariableCipherRecord(
+    input: ProjectEnvVariableCipherRecord
+): ProjectEnvVariableCipherRecord {
     return {
         id: input.id,
-        key: input.key,
-        note: input.note,
+        keyDigest: input.keyDigest,
+        encryptedKey: input.encryptedKey,
+        encryptedValue: input.encryptedValue,
+        encryptedNote: input.encryptedNote,
+        keyVersion: input.keyVersion,
         isCommented: input.isCommented,
         position: input.position,
         createdAt: input.createdAt,
@@ -230,7 +318,7 @@ function mapEnvFileRecord(input: {
     description: string | null;
     createdAt: Date;
     updatedAt: Date;
-    variables: ProjectEnvVariableMetadataRecord[];
+    variables: ProjectEnvVariableCipherRecord[];
 }): ProjectEnvFileRecord {
     return {
         id: input.id,
@@ -240,8 +328,18 @@ function mapEnvFileRecord(input: {
         variableCount: input.variables.length,
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
-        variables: input.variables.map(mapEnvVariableMetadataRecord),
+        variables: input.variables.map(mapEnvVariableCipherRecord),
     };
+}
+
+function isSameCiphertext(left: EncryptedVariable, right: EncryptedVariable) {
+    return (
+        left.encryptedKey === right.encryptedKey
+        && left.encryptedValue === right.encryptedValue
+        && left.encryptedNote === right.encryptedNote
+        && left.isCommented === right.isCommented
+        && left.keyVersion === right.keyVersion
+    );
 }
 
 export async function createProjectForWorkspace(
@@ -250,195 +348,208 @@ export async function createProjectForWorkspace(
         userId: string;
         name: string;
         description?: string | null;
-        environments?: EnvironmentTypeValue[] | null;
+        environments: EnvironmentTypeValue[];
+        environmentKeys: NewEnvironmentKeyInput[];
     }
 ) {
     const name = input.name.trim();
     const description = input.description?.trim() || null;
-    const environments = Array.from(
-        new Set(
-            input.environments?.length
-                ? input.environments
-                : defaultProjectEnvironmentTypes
-        )
-    );
+    const environments = Array.from(new Set(input.environments));
 
-    const result = await prisma.$transaction(async (tx) => {
-        const member = await tx.workspaceMember.findFirst({
-            where: {
-                workspaceId: input.workspaceId,
-                userId: input.userId,
-            },
-            select: {
-                id: true,
-            },
-        });
-
-        if (!member) {
-            throw new Error("Workspace not found or access denied.");
-        }
-
-        const creator = await tx.user.findUnique({
-            where: { id: input.userId },
-            select: { email: true },
-        });
-
-        const creatorEmail = formatUserEmail(creator?.email, input.userId);
-
-        const createdProject = await tx.project.create({
-            data: {
-                workspaceId: input.workspaceId,
-                name,
-                description,
-                createdById: input.userId,
-            },
-        });
-
-        const projectKey = generateProjectKey();
-
-        try {
-            await tx.projectEncryptionKey.create({
-                data: {
-                    projectId: createdProject.id,
-                    ...encryptProjectKey(projectKey),
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const member = await tx.workspaceMember.findFirst({
+                where: {
+                    workspaceId: input.workspaceId,
+                    userId: input.userId,
+                },
+                select: {
+                    id: true,
                 },
             });
-        } finally {
-            destroyBuffer(projectKey);
+
+            if (!member) {
+                return { status: "NOT_FOUND" as const };
+            }
+
+            const keyring = await getKeyringForUserInTransaction(tx, input.userId);
+
+            if (!keyring) {
+                return { status: "KEYRING_REQUIRED" as const };
+            }
+
+            for (const key of input.environmentKeys) {
+                const isValid = await verifySelfShare({ key, version: 1, userId: input.userId, keyring });
+
+                if (!isValid) {
+                    return { status: "INVALID_KEY" as const };
+                }
+            }
+
+            const creator = await tx.user.findUnique({
+                where: { id: input.userId },
+                select: { email: true },
+            });
+
+            const creatorEmail = formatUserEmail(creator?.email, input.userId);
+
+            const createdProject = await tx.project.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    name,
+                    description,
+                    createdById: input.userId,
+                },
+            });
+
+            for (const key of input.environmentKeys) {
+                await createEnvironmentKeyWithSelfShare(tx, {
+                    workspaceId: input.workspaceId,
+                    projectId: createdProject.id,
+                    userId: input.userId,
+                    key,
+                    keyring,
+                });
+            }
+
+            const createdProjectMember = await tx.projectMember.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    projectId: createdProject.id,
+                    workspaceMemberId: member.id,
+                    role: "OWNER",
+                    environmentAccessScope: "ALL_ENVIRONMENTS",
+                    addedById: input.userId,
+                },
+            });
+
+            const createdEnvFiles = await Promise.all(
+                environments.map((environment) =>
+                    tx.envFile.create({
+                        data: {
+                            workspaceId: input.workspaceId,
+                            projectId: createdProject.id,
+                            name: formatEnvironmentFileName(environment),
+                            environment,
+                            description: `${environmentTypeLabels[environment]} environment variables for ${createdProject.name}.`,
+                            createdById: input.userId,
+                        },
+                        select: {
+                            id: true,
+                            name: true,
+                            environment: true,
+                        },
+                    })
+                )
+            );
+
+            const createdEnvAccesses = await Promise.all(
+                environments.map((environment) =>
+                    tx.projectEnvAccess.create({
+                        data: {
+                            workspaceId: input.workspaceId,
+                            projectId: createdProject.id,
+                            projectMemberId: createdProjectMember.id,
+                            environment,
+                            grantedById: input.userId,
+                        },
+                        select: {
+                            id: true,
+                            environment: true,
+                        },
+                    })
+                )
+            );
+
+            await tx.workspaceHistory.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    operation: "PROJECT_CREATED",
+                    message: `Project \"${createdProject.name}\" was created by ${creatorEmail}.`,
+                    data: {
+                        project: {
+                            id: createdProject.id,
+                            name: createdProject.name,
+                        },
+                        actor: {
+                            userId: input.userId,
+                            email: creatorEmail,
+                        },
+                        hasDescription: Boolean(description),
+                    } as CreateWorkspaceHistoryEntryInput["data"],
+                },
+            });
+
+            await tx.workspaceHistory.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    operation: "PROJECT_ENVIRONMENTS_CREATED",
+                    message: `${environments.length} environment files (${formatEnvironmentLabels(
+                        environments
+                    )}) were created for project ${createdProject.name}.`,
+                    data: {
+                        project: {
+                            id: createdProject.id,
+                            name: createdProject.name,
+                        },
+                        actor: {
+                            userId: input.userId,
+                            email: creatorEmail,
+                        },
+                        envFiles: createdEnvFiles.map((envFile) => ({
+                            id: envFile.id,
+                            name: envFile.name,
+                            environment: envFile.environment,
+                        })),
+                        projectMember: {
+                            id: createdProjectMember.id,
+                        },
+                        projectEnvAccesses: createdEnvAccesses.map((envAccess) => ({
+                            id: envAccess.id,
+                            environment: envAccess.environment,
+                        })),
+                    } as CreateWorkspaceHistoryEntryInput["data"],
+                },
+            });
+
+            await tx.workspaceHistory.create({
+                data: {
+                    workspaceId: input.workspaceId,
+                    operation: "PROJECT_MEMBER_ADDED",
+                    message: `${creatorEmail} was added by ${creatorEmail} as OWNER for project ${createdProject.name}.`,
+                    data: {
+                        project: {
+                            id: createdProject.id,
+                            name: createdProject.name,
+                        },
+                        target: {
+                            userId: input.userId,
+                            email: creatorEmail,
+                            workspaceMemberId: member.id,
+                            projectMemberId: createdProjectMember.id,
+                        },
+                        role: "OWNER",
+                        actor: {
+                            userId: input.userId,
+                            email: creatorEmail,
+                        },
+                    } as CreateWorkspaceHistoryEntryInput["data"],
+                },
+            });
+
+            return {
+                status: "OK" as const,
+                envFileCount: environments.length,
+                project: createdProject,
+            };
+        });
+    } catch (error) {
+        if (isUniqueConstraintError(error)) {
+            return { status: "CONFLICT" as const };
         }
 
-        const createdProjectMember = await tx.projectMember.create({
-            data: {
-                workspaceId: input.workspaceId,
-                projectId: createdProject.id,
-                workspaceMemberId: member.id,
-                role: "OWNER",
-                environmentAccessScope: "ALL_ENVIRONMENTS",
-                addedById: input.userId,
-            },
-        });
-
-        const createdEnvFiles = await Promise.all(
-            environments.map((environment) =>
-                tx.envFile.create({
-                    data: {
-                        workspaceId: input.workspaceId,
-                        projectId: createdProject.id,
-                        name: formatEnvironmentFileName(environment),
-                        environment,
-                        description: `${environmentTypeLabels[environment]} environment variables for ${createdProject.name}.`,
-                        createdById: input.userId,
-                    },
-                    select: {
-                        id: true,
-                        name: true,
-                        environment: true,
-                    },
-                })
-            )
-        );
-
-        const createdEnvAccesses = await Promise.all(
-            environments.map((environment) =>
-                tx.projectEnvAccess.create({
-                    data: {
-                        workspaceId: input.workspaceId,
-                        projectId: createdProject.id,
-                        projectMemberId: createdProjectMember.id,
-                        environment,
-                        grantedById: input.userId,
-                    },
-                    select: {
-                        id: true,
-                        environment: true,
-                    },
-                })
-            )
-        );
-
-        await tx.workspaceHistory.create({
-            data: {
-                workspaceId: input.workspaceId,
-                operation: "PROJECT_CREATED",
-                message: `Project \"${createdProject.name}\" was created by ${creatorEmail}.`,
-                data: {
-                    project: {
-                        id: createdProject.id,
-                        name: createdProject.name,
-                    },
-                    actor: {
-                        userId: input.userId,
-                        email: creatorEmail,
-                    },
-                    hasDescription: Boolean(description),
-                } as CreateWorkspaceHistoryEntryInput["data"],
-            },
-        });
-
-        await tx.workspaceHistory.create({
-            data: {
-                workspaceId: input.workspaceId,
-                operation: "PROJECT_ENVIRONMENTS_CREATED",
-                message: `${environments.length} environment files (${formatEnvironmentLabels(
-                    environments
-                )}) were created for project ${createdProject.name}.`,
-                data: {
-                    project: {
-                        id: createdProject.id,
-                        name: createdProject.name,
-                    },
-                    actor: {
-                        userId: input.userId,
-                        email: creatorEmail,
-                    },
-                    envFiles: createdEnvFiles.map((envFile) => ({
-                        id: envFile.id,
-                        name: envFile.name,
-                        environment: envFile.environment,
-                    })),
-                    projectMember: {
-                        id: createdProjectMember.id,
-                    },
-                    projectEnvAccesses: createdEnvAccesses.map((envAccess) => ({
-                        id: envAccess.id,
-                        environment: envAccess.environment,
-                    })),
-                } as CreateWorkspaceHistoryEntryInput["data"],
-            },
-        });
-
-        await tx.workspaceHistory.create({
-            data: {
-                workspaceId: input.workspaceId,
-                operation: "PROJECT_MEMBER_ADDED",
-                message: `${creatorEmail} was added by ${creatorEmail} as OWNER for project ${createdProject.name}.`,
-                data: {
-                    project: {
-                        id: createdProject.id,
-                        name: createdProject.name,
-                    },
-                    target: {
-                        userId: input.userId,
-                        email: creatorEmail,
-                        workspaceMemberId: member.id,
-                        projectMemberId: createdProjectMember.id,
-                    },
-                    role: "OWNER",
-                    actor: {
-                        userId: input.userId,
-                        email: creatorEmail,
-                    },
-                } as CreateWorkspaceHistoryEntryInput["data"],
-            },
-        });
-
-        return {
-            envFileCount: environments.length,
-            project: createdProject,
-        };
-    });
-
-    return result;
+        throw error;
+    }
 }
 
 export async function getProjectDetailForUser(input: {
@@ -474,26 +585,10 @@ export async function getProjectDetailForUser(input: {
                             name: "asc",
                         },
                     ],
-                    select: {
-                        id: true,
-                        name: true,
-                        environment: true,
-                        description: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        variables: {
-                            orderBy: [{ position: "asc" }, { key: "asc" }],
-                            select: {
-                                id: true,
-                                key: true,
-                                note: true,
-                                isCommented: true,
-                                position: true,
-                                createdAt: true,
-                                updatedAt: true,
-                            },
-                        },
-                    },
+                    select: envFileSelect,
+                },
+                environmentKeys: {
+                    select: environmentKeySelect(input.userId),
                 },
             },
         });
@@ -504,6 +599,9 @@ export async function getProjectDetailForUser(input: {
 
         const accessibleEnvFiles = project.envFiles.filter((envFile) =>
             hasEnvironmentAccess(access, envFile.environment)
+        );
+        const accessibleEnvironmentKeys = project.environmentKeys.filter((key) =>
+            hasEnvironmentAccess(access, key.environment)
         );
 
         return {
@@ -516,6 +614,7 @@ export async function getProjectDetailForUser(input: {
             createdAt: project.createdAt,
             updatedAt: project.updatedAt,
             envFiles: accessibleEnvFiles.map(mapEnvFileRecord),
+            environmentKeys: accessibleEnvironmentKeys.map(mapEnvironmentKeyRow),
         };
     });
 }
@@ -695,6 +794,7 @@ export async function createEnvFileForProject(input: {
     name?: string | null;
     environment: EnvironmentTypeValue;
     description?: string | null;
+    environmentKey?: NewEnvironmentKeyInput | null;
 }) {
     try {
         return await prisma.$transaction(async (tx) => {
@@ -732,6 +832,53 @@ export async function createEnvFileForProject(input: {
                 };
             }
 
+            const existingEnvironmentKey = await tx.environmentKey.findUnique({
+                where: {
+                    projectId_environment: {
+                        projectId: input.projectId,
+                        environment: input.environment,
+                    },
+                },
+                select: { id: true },
+            });
+
+            if (!existingEnvironmentKey) {
+                if (!input.environmentKey) {
+                    return {
+                        status: "KEY_REQUIRED" as const,
+                    };
+                }
+
+                const keyring = await getKeyringForUserInTransaction(tx, input.userId);
+
+                if (!keyring) {
+                    return {
+                        status: "KEYRING_REQUIRED" as const,
+                    };
+                }
+
+                const isValid = await verifySelfShare({
+                    key: input.environmentKey,
+                    version: 1,
+                    userId: input.userId,
+                    keyring,
+                });
+
+                if (!isValid) {
+                    return {
+                        status: "INVALID_KEY" as const,
+                    };
+                }
+
+                await createEnvironmentKeyWithSelfShare(tx, {
+                    workspaceId: input.workspaceId,
+                    projectId: input.projectId,
+                    userId: input.userId,
+                    key: { ...input.environmentKey, environment: input.environment },
+                    keyring,
+                });
+            }
+
             const creator = await tx.user.findUnique({
                 where: { id: input.userId },
                 select: { email: true },
@@ -747,28 +894,7 @@ export async function createEnvFileForProject(input: {
                     description,
                     createdById: input.userId,
                 },
-                select: {
-                    id: true,
-                    name: true,
-                    environment: true,
-                    description: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    variables: {
-                        select: {
-                            id: true,
-                            key: true,
-                            encryptedValue: true,
-                            iv: true,
-                            authTag: true,
-                            note: true,
-                            isCommented: true,
-                            position: true,
-                            createdAt: true,
-                            updatedAt: true,
-                        },
-                    },
-                },
+                select: envFileSelect,
             });
 
             const envAccess = access.projectMember
@@ -832,6 +958,11 @@ export async function createEnvFileForProject(input: {
             return {
                 status: "OK" as const,
                 envFile: mapEnvFileRecord(envFile),
+                environmentKey: await getEnvironmentKeyForUser(tx, {
+                    projectId: input.projectId,
+                    environment: input.environment,
+                    userId: input.userId,
+                }),
             };
         });
     } catch (error) {
@@ -909,25 +1040,7 @@ export async function renameEnvFile(input: {
                         workspaceId: input.workspaceId,
                         projectId: input.projectId,
                     },
-                    select: {
-                        id: true,
-                        name: true,
-                        environment: true,
-                        description: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        variables: {
-                            select: {
-                                id: true,
-                                key: true,
-                                note: true,
-                                isCommented: true,
-                                position: true,
-                                createdAt: true,
-                                updatedAt: true,
-                            },
-                        },
-                    },
+                    select: envFileSelect,
                 });
 
                 return {
@@ -961,25 +1074,7 @@ export async function renameEnvFile(input: {
                 data: {
                     name,
                 },
-                select: {
-                    id: true,
-                    name: true,
-                    environment: true,
-                    description: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    variables: {
-                        select: {
-                            id: true,
-                            key: true,
-                            note: true,
-                            isCommented: true,
-                            position: true,
-                            createdAt: true,
-                            updatedAt: true,
-                        },
-                    },
-                },
+                select: envFileSelect,
             });
 
             await tx.workspaceHistory.create({
@@ -1109,149 +1204,35 @@ export async function deleteEnvFile(input: {
     });
 }
 
-export async function createEnvVariableForFile(input: {
-    workspaceId: string;
-    projectId: string;
-    envFileId: string;
-    userId: string;
-    key: string;
-    value: string;
-    note?: string | null;
-    isCommented?: boolean;
-}) {
-    try {
-        return await prisma.$transaction(async (tx) => {
-            const access = await getProjectAccessContext(tx, input);
-
-            if (!access) {
-                return {
-                    status: "NOT_FOUND" as const,
-                };
-            }
-
-            const envFile = await tx.envFile.findFirst({
-                where: {
-                    id: input.envFileId,
-                    workspaceId: input.workspaceId,
-                    projectId: input.projectId,
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    environment: true,
-                },
-            });
-
-            if (!envFile) {
-                return {
-                    status: "NOT_FOUND" as const,
-                };
-            }
-
-            if (!canEditEnvironment(access, envFile.environment)) {
-                return {
-                    status: "FORBIDDEN" as const,
-                };
-            }
-
-            const key = input.key.trim();
-            const note = input.note?.trim() || null;
-
-            const existingVariable = await tx.envVariable.findFirst({
-                where: {
-                    envFileId: input.envFileId,
-                    key,
-                },
-                select: {
-                    id: true,
-                },
-            });
-
-            if (existingVariable) {
-                return {
-                    status: "CONFLICT" as const,
-                };
-            }
-
-            const creator = await tx.user.findUnique({
-                where: { id: input.userId },
-                select: { email: true },
-            });
-            const creatorEmail = formatUserEmail(creator?.email, input.userId);
-
-            const projectKey = await getProjectKeyForProject(tx, input.projectId);
-
-            try {
-                const lastVariable = await tx.envVariable.findFirst({
-                    where: { envFileId: input.envFileId },
-                    orderBy: { position: "desc" },
-                    select: { position: true },
-                });
-                const variable = await tx.envVariable.create({
-                    data: {
-                        envFileId: input.envFileId,
-                        key,
-                        ...encryptEnvValue(input.value, projectKey),
-                        note,
-                        isCommented: input.isCommented ?? false,
-                        position: (lastVariable?.position ?? -1) + 1,
-                    },
-                    select: {
-                        id: true,
-                        key: true,
-                        note: true,
-                        isCommented: true,
-                        position: true,
-                        createdAt: true,
-                        updatedAt: true,
-                    },
-                });
-
-                await tx.workspaceHistory.create({
-                    data: {
-                        workspaceId: input.workspaceId,
-                        operation: "PROJECT_ENV_VARIABLE_CREATED",
-                        message: `${creatorEmail} added ${variable.key} to ${envFile.name} for project ${access.project.name}.`,
-                        data: {
-                            project: {
-                                id: input.projectId,
-                                name: access.project.name,
-                            },
-                            envFile: {
-                                id: input.envFileId,
-                                name: envFile.name,
-                                environment: envFile.environment,
-                            },
-                            variable: {
-                                id: variable.id,
-                                key: variable.key,
-                            },
-                            hasNote: Boolean(note),
-                            actor: {
-                                userId: input.userId,
-                                email: creatorEmail,
-                            },
-                        } as CreateWorkspaceHistoryEntryInput["data"],
-                    },
-                });
-
-                return {
-                    status: "OK" as const,
-                    variable: mapEnvVariableMetadataRecord(variable),
-                };
-            } finally {
-                destroyBuffer(projectKey);
-            }
-        });
-    } catch (error) {
-        if (isUniqueConstraintError(error)) {
-            return {
-                status: "CONFLICT" as const,
-            };
-        }
-
-        throw error;
+async function getEnvFileAccess(
+    tx: Prisma.TransactionClient,
+    input: {
+        workspaceId: string;
+        projectId: string;
+        envFileId: string;
+        userId: string;
     }
+) {
+    const access = await getProjectAccessContext(tx, input);
+
+    if (!access) {
+        return null;
+    }
+
+    const envFile = await tx.envFile.findFirst({
+        where: {
+            id: input.envFileId,
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+        },
+        select: {
+            id: true,
+            name: true,
+            environment: true,
+        },
+    });
+
+    return envFile ? { access, envFile } : null;
 }
 
 export async function getEnvVariablesForFile(input: {
@@ -1262,32 +1243,15 @@ export async function getEnvVariablesForFile(input: {
     via?: "cli";
 }) {
     return prisma.$transaction(async (tx) => {
-        const access = await getProjectAccessContext(tx, input);
+        const context = await getEnvFileAccess(tx, input);
 
-        if (!access) {
+        if (!context) {
             return {
                 status: "NOT_FOUND" as const,
             };
         }
 
-        const envFile = await tx.envFile.findFirst({
-            where: {
-                id: input.envFileId,
-                workspaceId: input.workspaceId,
-                projectId: input.projectId,
-            },
-            select: {
-                id: true,
-                name: true,
-                environment: true,
-            },
-        });
-
-        if (!envFile) {
-            return {
-                status: "NOT_FOUND" as const,
-            };
-        }
+        const { access, envFile } = context;
 
         if (!hasEnvironmentAccess(access, envFile.environment)) {
             return {
@@ -1295,169 +1259,183 @@ export async function getEnvVariablesForFile(input: {
             };
         }
 
-        const project = access.project;
-        const readableEnvFile = envFile;
+        const environmentKey = await getEnvironmentKeyForUser(tx, {
+            projectId: input.projectId,
+            environment: envFile.environment,
+            userId: input.userId,
+        });
+
+        if (!environmentKey?.share) {
+            return {
+                status: "NO_KEY" as const,
+            };
+        }
+
         const variables = await tx.envVariable.findMany({
             where: {
                 envFileId: input.envFileId,
             },
-            orderBy: [{ position: "asc" }, { key: "asc" }],
-            select: {
-                id: true,
-                key: true,
-                encryptedValue: true,
-                iv: true,
-                authTag: true,
-                note: true,
-                isCommented: true,
-                position: true,
-                createdAt: true,
-                updatedAt: true,
-            },
+            orderBy: [{ position: "asc" }, { id: "asc" }],
+            select: variableCipherSelect,
         });
         const actorEmail = await getActorEmail(tx, input.userId);
-        const variableMetadata = variables.map((variable) => ({
-            id: variable.id,
-            key: variable.key,
-        }));
 
-        async function createCopyHistoryEntry() {
-            await tx.workspaceHistory.create({
+        await tx.workspaceHistory.create({
+            data: {
+                workspaceId: input.workspaceId,
+                operation: "PROJECT_ENV_VARIABLES_ACCESSED",
+                message: input.via === "cli"
+                    ? `${actorEmail} pulled ${envFile.name} for project ${access.project.name} via CLI.`
+                    : `${actorEmail} downloaded ${envFile.name} for project ${access.project.name}.`,
                 data: {
-                    workspaceId: input.workspaceId,
-                    operation: "PROJECT_ENV_VARIABLES_COPIED",
-                    message: input.via === "cli"
-                        ? `${actorEmail} pulled all variables from ${readableEnvFile.name} for project ${project.name} via CLI.`
-                        : `${actorEmail} copied all variables from ${readableEnvFile.name} for project ${project.name}.`,
-                    data: {
-                        project: {
-                            id: input.projectId,
-                            name: project.name,
-                        },
-                        envFile: {
-                            id: input.envFileId,
-                            name: readableEnvFile.name,
-                            environment: readableEnvFile.environment,
-                        },
-                        variables: variableMetadata,
-                        variableCount: variableMetadata.length,
-                        actor: {
-                            userId: input.userId,
-                            email: actorEmail,
-                        },
-                    } as CreateWorkspaceHistoryEntryInput["data"],
-                },
-            });
-        }
+                    project: {
+                        id: input.projectId,
+                        name: access.project.name,
+                    },
+                    envFile: {
+                        id: input.envFileId,
+                        name: envFile.name,
+                        environment: envFile.environment,
+                    },
+                    variableCount: variables.length,
+                    via: input.via ?? "web",
+                    actor: {
+                        userId: input.userId,
+                        email: actorEmail,
+                    },
+                } as CreateWorkspaceHistoryEntryInput["data"],
+            },
+        });
 
-        if (variables.length === 0) {
-            await createCopyHistoryEntry();
-
-            return {
-                status: "OK" as const,
-                variables: [],
-            };
-        }
-
-        const projectKey = await getProjectKeyForProject(tx, input.projectId);
-
-        try {
-            const decryptedVariables = variables.map((variable) =>
-                mapEncryptedEnvVariableRecord(variable, projectKey)
-            );
-
-            await createCopyHistoryEntry();
-
-            return {
-                status: "OK" as const,
-                variables: decryptedVariables,
-            };
-        } finally {
-            destroyBuffer(projectKey);
-        }
+        return {
+            status: "OK" as const,
+            variables: variables.map(mapEnvVariableCipherRecord),
+            environmentKey,
+        };
     });
 }
 
-export async function getEnvVariableForFile(input: {
+export async function replaceEnvVariablesForFile(input: {
     workspaceId: string;
     projectId: string;
     envFileId: string;
-    variableId: string;
     userId: string;
+    variables: EncryptedVariable[];
+    via?: "cli";
 }) {
-    return prisma.$transaction(async (tx) => {
-        const access = await getProjectAccessContext(tx, input);
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const context = await getEnvFileAccess(tx, input);
 
-        if (!access) {
-            return {
-                status: "NOT_FOUND" as const,
-            };
-        }
+            if (!context) {
+                return {
+                    status: "NOT_FOUND" as const,
+                };
+            }
 
-        const envFile = await tx.envFile.findFirst({
-            where: {
-                id: input.envFileId,
-                workspaceId: input.workspaceId,
-                projectId: input.projectId,
-            },
-            select: {
-                id: true,
-                name: true,
-                environment: true,
-            },
-        });
+            const { access, envFile } = context;
 
-        if (!envFile) {
-            return {
-                status: "NOT_FOUND" as const,
-            };
-        }
+            if (!canEditEnvironment(access, envFile.environment)) {
+                return {
+                    status: "FORBIDDEN" as const,
+                };
+            }
 
-        if (!hasEnvironmentAccess(access, envFile.environment)) {
-            return {
-                status: "FORBIDDEN" as const,
-            };
-        }
+            const environmentKey = await tx.environmentKey.findUnique({
+                where: {
+                    projectId_environment: {
+                        projectId: input.projectId,
+                        environment: envFile.environment,
+                    },
+                },
+                select: {
+                    id: true,
+                    version: true,
+                    shares: {
+                        where: { userId: input.userId },
+                        select: { version: true },
+                    },
+                },
+            });
 
-        const variable = await tx.envVariable.findFirst({
-            where: {
-                id: input.variableId,
-                envFileId: input.envFileId,
-            },
-            select: {
-                id: true,
-                key: true,
-                encryptedValue: true,
-                iv: true,
-                authTag: true,
-                note: true,
-                isCommented: true,
-                position: true,
-                createdAt: true,
-                updatedAt: true,
-            },
-        });
+            if (!environmentKey || !environmentKey.shares.some((share) => share.version === environmentKey.version)) {
+                return {
+                    status: "NO_KEY" as const,
+                };
+            }
 
-        if (!variable) {
-            return {
-                status: "NOT_FOUND" as const,
-            };
-        }
+            if (input.variables.some((variable) => variable.keyVersion !== environmentKey.version)) {
+                return {
+                    status: "STALE_KEY" as const,
+                };
+            }
 
-        const projectKey = await getProjectKeyForProject(tx, input.projectId);
+            await tx.$executeRaw`SELECT id FROM "EnvFile" WHERE id = ${input.envFileId} FOR UPDATE`;
 
-        try {
-            const decryptedVariable = mapEncryptedEnvVariableRecord(
-                variable,
-                projectKey
+            const existingVariables = await tx.envVariable.findMany({
+                where: {
+                    envFileId: input.envFileId,
+                },
+                select: {
+                    keyDigest: true,
+                    encryptedKey: true,
+                    encryptedValue: true,
+                    encryptedNote: true,
+                    isCommented: true,
+                    keyVersion: true,
+                },
+            });
+            const existingByDigest = new Map(
+                existingVariables.map((variable) => [variable.keyDigest, variable])
             );
+            const nextDigests = new Set(input.variables.map((variable) => variable.keyDigest));
+            const addedCount = input.variables.filter(
+                (variable) => !existingByDigest.has(variable.keyDigest)
+            ).length;
+            const changedCount = input.variables.filter((variable) => {
+                const existing = existingByDigest.get(variable.keyDigest);
+                return existing ? !isSameCiphertext(existing, variable) : false;
+            }).length;
+            const removedCount = existingVariables.filter(
+                (variable) => !nextDigests.has(variable.keyDigest)
+            ).length;
+
+            await tx.envVariable.deleteMany({
+                where: {
+                    envFileId: input.envFileId,
+                },
+            });
+
+            if (input.variables.length > 0) {
+                await tx.envVariable.createMany({
+                    data: input.variables.map((variable, position) => ({
+                        envFileId: input.envFileId,
+                        keyDigest: variable.keyDigest,
+                        encryptedKey: variable.encryptedKey,
+                        encryptedValue: variable.encryptedValue,
+                        encryptedNote: variable.encryptedNote,
+                        keyVersion: variable.keyVersion,
+                        isCommented: variable.isCommented,
+                        position,
+                    })),
+                });
+            }
+
+            const variables = await tx.envVariable.findMany({
+                where: {
+                    envFileId: input.envFileId,
+                },
+                orderBy: [{ position: "asc" }, { id: "asc" }],
+                select: variableCipherSelect,
+            });
             const actorEmail = await getActorEmail(tx, input.userId);
+            const changeSummary = `${addedCount} added, ${changedCount} changed, ${removedCount} removed`;
 
             await tx.workspaceHistory.create({
                 data: {
                     workspaceId: input.workspaceId,
-                    operation: "PROJECT_ENV_VARIABLE_VIEWED",
-                    message: `${actorEmail} viewed ${variable.key} in ${envFile.name} for project ${access.project.name}.`,
+                    operation: "PROJECT_ENV_VARIABLES_SAVED",
+                    message: `${actorEmail} saved ${envFile.name} in project ${access.project.name}${input.via === "cli" ? " via CLI" : ""} (${changeSummary}).`,
                     data: {
                         project: {
                             id: input.projectId,
@@ -1468,10 +1446,12 @@ export async function getEnvVariableForFile(input: {
                             name: envFile.name,
                             environment: envFile.environment,
                         },
-                        variable: {
-                            id: variable.id,
-                            key: variable.key,
-                        },
+                        variableCount: variables.length,
+                        addedCount,
+                        changedCount,
+                        removedCount,
+                        keyVersion: environmentKey.version,
+                        via: input.via ?? "web",
                         actor: {
                             userId: input.userId,
                             email: actorEmail,
@@ -1482,215 +1462,8 @@ export async function getEnvVariableForFile(input: {
 
             return {
                 status: "OK" as const,
-                variable: decryptedVariable,
+                variables: variables.map(mapEnvVariableCipherRecord),
             };
-        } finally {
-            destroyBuffer(projectKey);
-        }
-    });
-}
-
-export async function replaceEnvVariablesForFile(input: {
-    workspaceId: string;
-    projectId: string;
-    envFileId: string;
-    userId: string;
-    variables: {
-        id?: string;
-        key: string;
-        value?: string;
-        note?: string | null;
-        isCommented?: boolean;
-    }[];
-    via?: "cli";
-}) {
-    try {
-        return await prisma.$transaction(async (tx) => {
-            const access = await getProjectAccessContext(tx, input);
-
-            if (!access) {
-                return {
-                    status: "NOT_FOUND" as const,
-                };
-            }
-
-            const envFile = await tx.envFile.findFirst({
-                where: {
-                    id: input.envFileId,
-                    workspaceId: input.workspaceId,
-                    projectId: input.projectId,
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    environment: true,
-                },
-            });
-
-            if (!envFile) {
-                return {
-                    status: "NOT_FOUND" as const,
-                };
-            }
-
-            if (!canEditEnvironment(access, envFile.environment)) {
-                return {
-                    status: "FORBIDDEN" as const,
-                };
-            }
-
-            const existingVariables = await tx.envVariable.findMany({
-                where: {
-                    envFileId: input.envFileId,
-                },
-                select: {
-                    id: true,
-                    key: true,
-                    encryptedValue: true,
-                    iv: true,
-                    authTag: true,
-                },
-            });
-            const existingVariablesById = new Map(
-                existingVariables.map((variable) => [variable.id, variable])
-            );
-
-            if (
-                input.variables.some(
-                    (variable) =>
-                        variable.id && !existingVariablesById.has(variable.id)
-                )
-            ) {
-                return {
-                    status: "NOT_FOUND" as const,
-                };
-            }
-
-            const needsProjectKey = input.variables.some(
-                (variable) => !variable.id || typeof variable.value === "string"
-            );
-            const projectKey = needsProjectKey
-                ? await getProjectKeyForProject(tx, input.projectId)
-                : null;
-
-            try {
-                const variableData = input.variables.map((variable, position) => {
-                    const key = variable.key.trim();
-                    const note = variable.note?.trim() || null;
-                    const isCommented = variable.isCommented === true;
-
-                    if (!variable.id) {
-                        if (!projectKey || typeof variable.value !== "string") {
-                            throw new Error("New variables require a value.");
-                        }
-
-                        return {
-                            envFileId: input.envFileId,
-                            key,
-                            ...encryptEnvValue(variable.value, projectKey),
-                            note,
-                            isCommented,
-                            position,
-                        };
-                    }
-
-                    const existingVariable = existingVariablesById.get(variable.id);
-
-                    if (!existingVariable) {
-                        throw new Error("Variable not found.");
-                    }
-
-                    return {
-                        id: variable.id,
-                        envFileId: input.envFileId,
-                        key,
-                        ...(typeof variable.value === "string"
-                            ? encryptEnvValue(variable.value, projectKey as Buffer)
-                            : {
-                                encryptedValue: existingVariable.encryptedValue,
-                                iv: existingVariable.iv,
-                                authTag: existingVariable.authTag,
-                            }),
-                        note,
-                        isCommented,
-                        position,
-                    };
-                });
-
-                await tx.envVariable.deleteMany({
-                    where: {
-                        envFileId: input.envFileId,
-                    },
-                });
-
-                if (variableData.length > 0) {
-                    await tx.envVariable.createMany({
-                        data: variableData,
-                    });
-                }
-
-                const variables = await tx.envVariable.findMany({
-                    where: {
-                        envFileId: input.envFileId,
-                    },
-                    orderBy: [{ position: "asc" }, { key: "asc" }],
-                    select: {
-                        id: true,
-                        key: true,
-                        note: true,
-                        isCommented: true,
-                        position: true,
-                        createdAt: true,
-                        updatedAt: true,
-                    },
-                });
-                const previousVariables = existingVariables.map((variable) => ({
-                    id: variable.id,
-                    key: variable.key,
-                }));
-                const savedVariables = variables.map((variable) => ({
-                    id: variable.id,
-                    key: variable.key,
-                }));
-
-                const actor = await tx.user.findUnique({
-                    where: { id: input.userId },
-                    select: { email: true },
-                });
-                const actorEmail = formatUserEmail(actor?.email, input.userId);
-
-                await tx.workspaceHistory.create({
-                    data: {
-                        workspaceId: input.workspaceId,
-                        operation: "PROJECT_ENV_VARIABLES_SAVED",
-                        message: `${actorEmail} saved ${variables.length} variables for ${envFile.name} in project ${access.project.name}${input.via === "cli" ? " via CLI" : ""}.`,
-                        data: {
-                            project: {
-                                id: input.projectId,
-                                name: access.project.name,
-                            },
-                            envFile: {
-                                id: input.envFileId,
-                                name: envFile.name,
-                                environment: envFile.environment,
-                            },
-                            previousVariables,
-                            variables: savedVariables,
-                            actor: {
-                                userId: input.userId,
-                                email: actorEmail,
-                            },
-                        } as CreateWorkspaceHistoryEntryInput["data"],
-                    },
-                });
-
-                return {
-                    status: "OK" as const,
-                    variables: variables.map(mapEnvVariableMetadataRecord),
-                };
-            } finally {
-                destroyBuffer(projectKey);
-            }
         });
     } catch (error) {
         if (isUniqueConstraintError(error)) {
@@ -1701,99 +1474,4 @@ export async function replaceEnvVariablesForFile(input: {
 
         throw error;
     }
-}
-
-export async function rotateProjectKey(projectId: string) {
-    return prisma.$transaction(async (tx) => {
-        const currentProjectKey = await tx.projectEncryptionKey.findUnique({
-            where: {
-                projectId,
-            },
-            select: {
-                encryptedKey: true,
-                iv: true,
-                authTag: true,
-                version: true,
-            },
-        });
-
-        if (!currentProjectKey) {
-            return {
-                status: "NOT_FOUND" as const,
-            };
-        }
-
-        const encryptedVariables = await tx.envVariable.findMany({
-            where: {
-                envFile: {
-                    projectId,
-                },
-            },
-            select: {
-                id: true,
-                encryptedValue: true,
-                iv: true,
-                authTag: true,
-            },
-        });
-
-        let oldProjectKey: Buffer | null = null;
-        let newProjectKey: Buffer | null = null;
-        const decryptedValues: {
-            id: string;
-            value: Buffer;
-        }[] = [];
-
-        try {
-            oldProjectKey = decryptProjectKey(currentProjectKey);
-            newProjectKey = generateProjectKey();
-
-            for (const variable of encryptedVariables) {
-                decryptedValues.push({
-                    id: variable.id,
-                    value: decryptEnvValueToBuffer(
-                        {
-                            encryptedValue: variable.encryptedValue,
-                            iv: variable.iv,
-                            authTag: variable.authTag,
-                        },
-                        oldProjectKey
-                    ),
-                });
-            }
-
-            for (const variable of decryptedValues) {
-                await tx.envVariable.update({
-                    where: {
-                        id: variable.id,
-                    },
-                    data: encryptEnvValueBuffer(variable.value, newProjectKey),
-                });
-            }
-
-            await tx.projectEncryptionKey.update({
-                where: {
-                    projectId,
-                },
-                data: {
-                    ...encryptProjectKey(newProjectKey),
-                    version: {
-                        increment: 1,
-                    },
-                },
-            });
-
-            return {
-                status: "OK" as const,
-                rotatedVariableCount: encryptedVariables.length,
-                version: currentProjectKey.version + 1,
-            };
-        } finally {
-            destroyBuffer(oldProjectKey);
-            destroyBuffer(newProjectKey);
-            for (const variable of decryptedValues) {
-                destroyBuffer(variable.value);
-            }
-        }
-    });
 }
