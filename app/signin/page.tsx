@@ -9,7 +9,6 @@ import { LogoMark } from "@/components/brand/logo";
 import { AUTH_ERROR_MESSAGES, DEFAULT_AUTH_ERROR_MESSAGE } from "@/constants/auth";
 import { useAuthenticated } from "@/contexts/authenticated";
 
-// Only allow same-origin relative paths as post-login destinations.
 function getSafeCallbackUrl(value: string | null) {
     if (!value) {
         return "/";

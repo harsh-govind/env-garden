@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { APP_REPOSITORY_NAME } from "@/constants/app";
 import type { GitHubRepoResponse, UnghRepoResponse } from "@/types/github";
 
-// Cache for an hour so visitors don't burn GitHub's unauthenticated
-// rate limit (60 requests/hour per IP).
 export const revalidate = 3600;
 
 async function fromGitHub(): Promise<number | null> {
@@ -25,7 +23,6 @@ async function fromGitHub(): Promise<number | null> {
     return typeof data.stargazers_count === "number" ? data.stargazers_count : null;
 }
 
-// Fallback: ungh.cc is a cached, rate-limit-free GitHub API proxy.
 async function fromUngh(): Promise<number | null> {
     const response = await fetch(`https://ungh.cc/repos/${APP_REPOSITORY_NAME}`, {
         next: { revalidate },

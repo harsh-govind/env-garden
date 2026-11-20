@@ -6,7 +6,6 @@ import {
 } from "@/prisma/services/workspace";
 import type { CliProjectsResponse, CliWorkspaceSummary } from "@/types/cli";
 
-/** Lists every workspace, project and env file the CLI user can read. */
 export async function GET(request: Request) {
     return withCliUser(request, async (user) => {
         const workspaces = await listWorkspacesForUser(user.id);

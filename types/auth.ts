@@ -30,7 +30,6 @@ export type AuthenticatedProviderProps = {
     children: ReactNode | ((value: AuthenticatedContextValue) => ReactNode);
 };
 
-/** The signed-in user as exposed to the app (from Better Auth's session). */
 export type AuthUser = {
     id: string;
     email: string;

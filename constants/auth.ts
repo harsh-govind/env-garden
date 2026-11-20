@@ -1,6 +1,5 @@
 import type { SocialProviderOption } from "@/types/auth";
 
-/** Error codes Better Auth appends as `?error=` to the sign-in page. */
 export const AUTH_ERROR_MESSAGES: Record<string, string> = {
     INVALID_TOKEN: "This sign-in link is invalid or has already been used. Request a new one.",
     EXPIRED_TOKEN: "This sign-in link has expired. Request a new one.",
@@ -25,9 +24,7 @@ export const AUTH_SESSION_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
 export const AUTH_SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
 export const MAGIC_LINK_EXPIRES_IN_SECONDS = 15 * 60;
 
-/** Sign-in endpoints Better Auth's 2FA plugin doesn't gate on its own. */
 export const TWO_FACTOR_ENFORCED_PATH_PREFIXES = ["/magic-link/verify", "/callback/"];
-/** Must match the cookie name and identifier format used by better-auth/plugins/two-factor. */
 export const TWO_FACTOR_COOKIE_NAME = "two_factor";
 export const TWO_FACTOR_IDENTIFIER_PREFIX = "2fa-";
 export const TWO_FACTOR_ATTEMPTS_IDENTIFIER_PREFIX = "2fa-attempts-";

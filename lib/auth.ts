@@ -25,13 +25,6 @@ import { sendSignInEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import type { TwoFactorAwareUser } from "@/types/auth";
 
-/**
- * Better Auth's 2FA plugin only challenges password sign-ins. env.garden signs
- * in with magic links and Google/GitHub, so this hook applies the same
- * challenge to those: drop the new session, set the plugin's signed
- * `two_factor` cookie, and send the user to enter a code. The plugin's own
- * verify endpoints then create the session.
- */
 const enforceTwoFactorOnAllSignIns = createAuthMiddleware(async (ctx) => {
     const path = ctx.path ?? "";
 
@@ -99,9 +92,6 @@ export const auth = betterAuth({
     account: {
         accountLinking: {
             enabled: true,
-            // No trustedProviders: Google/GitHub accounts link only when the
-            // provider confirms the email address is verified.
-            // Email magic link always works, so every provider can be disconnected.
             allowUnlinkingAll: true,
         },
     },
@@ -118,7 +108,6 @@ export const auth = betterAuth({
     plugins: [
         magicLink({
             expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
-            // Only a hash is stored, so a database read can't produce a working link.
             storeToken: "hashed",
             async sendMagicLink({ email, url }) {
                 const result = await sendSignInEmail({
@@ -156,7 +145,6 @@ export const auth = betterAuth({
     },
 });
 
-/** The signed-in user and session for the current request, or null. */
 export async function getSession() {
     return auth.api.getSession({ headers: await headers() });
 }

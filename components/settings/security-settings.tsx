@@ -35,7 +35,6 @@ export default function SecuritySettings() {
         }
     };
 
-    /** Confirms the user still holds the authenticator before a sensitive change. */
     const requireValidCode = async (code: string) => {
         const { error: verifyError } = await authClient.twoFactor.verifyTotp({ code });
 

@@ -67,7 +67,6 @@ export default function UnauthenticatedHome() {
             </header>
 
             <div className="mx-auto max-w-6xl md:border-x">
-                {/* Hero */}
                 <section className="relative overflow-hidden">
                     <div aria-hidden="true" className="landing-grid pointer-events-none absolute inset-0" />
 
@@ -108,7 +107,6 @@ export default function UnauthenticatedHome() {
                     </div>
                 </section>
 
-                {/* Stats */}
                 <Section>
                     <dl className="grid grid-cols-2 md:grid-cols-4">
                         {LANDING_STATS.map((stat, index) => (
@@ -128,7 +126,6 @@ export default function UnauthenticatedHome() {
                     </dl>
                 </Section>
 
-                {/* Before / after */}
                 <Section id="product">
                     <div className="px-5 py-20 sm:px-10">
                         <Label>The problem</Label>
@@ -183,7 +180,6 @@ export default function UnauthenticatedHome() {
                     </div>
                 </Section>
 
-                {/* Features */}
                 <Section>
                     <div className="grid md:grid-cols-3">
                         {LANDING_FEATURES.map((feature, index) => (
@@ -205,7 +201,6 @@ export default function UnauthenticatedHome() {
                     </div>
                 </Section>
 
-                {/* Security */}
                 <Section id="security" className="bg-foreground text-background">
                     <div className="grid md:grid-cols-[1fr_1.2fr]">
                         <div className="px-5 py-20 sm:px-10">
@@ -242,7 +237,6 @@ export default function UnauthenticatedHome() {
                     </div>
                 </Section>
 
-                {/* CLI */}
                 <Section id="cli">
                     <div className="grid md:grid-cols-[1fr_1.2fr]">
                         <div className="px-5 py-20 sm:px-10">
@@ -285,7 +279,6 @@ export default function UnauthenticatedHome() {
                     </div>
                 </Section>
 
-                {/* FAQ */}
                 <Section id="faq">
                     <div className="grid md:grid-cols-[1fr_1.2fr]">
                         <div className="px-5 py-20 sm:px-10">
@@ -311,7 +304,6 @@ export default function UnauthenticatedHome() {
                     </div>
                 </Section>
 
-                {/* CTA */}
                 <Section className="overflow-hidden">
                     <div aria-hidden="true" className="landing-grid pointer-events-none absolute inset-0 rotate-180" />
                     <div className="relative flex flex-col items-start justify-between gap-10 px-5 py-24 sm:px-10 md:flex-row md:items-end">

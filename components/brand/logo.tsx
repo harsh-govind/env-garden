@@ -1,10 +1,6 @@
 import type { LogoMarkProps, LogoProps } from "@/types/brand";
 import { cn } from "@/utils";
 
-/**
- * env.garden mark: ".E" — a dot followed by an E whose three bars
- * read like lines in a .env file. Monochrome; follows the theme.
- */
 export function LogoMark({ className }: LogoMarkProps) {
     return (
         <svg

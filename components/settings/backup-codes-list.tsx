@@ -16,7 +16,6 @@ export default function BackupCodesList({ codes }: BackupCodesListProps) {
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1600);
         } catch {
-            // Clipboard may be unavailable; codes are still visible.
         }
     };
 

@@ -17,7 +17,6 @@ import type {
     SaveEnvVariablesBody,
 } from "@/types/project";
 
-
 function parseCreateEnvVariableBody(body: CreateEnvVariableBody) {
     const key = typeof body.key === "string" ? body.key.trim() : "";
     const value = typeof body.value === "string" ? body.value : "";

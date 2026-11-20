@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { TWO_FACTOR_CODE_LENGTH } from "@/constants/auth";
 import type { CodeFormProps } from "@/types/settings";
 
-/** A 6-digit authenticator code input with a submit button. */
 export default function CodeForm({ label, submitLabel, isPending, onSubmit }: CodeFormProps) {
     const [code, setCode] = useState("");
 

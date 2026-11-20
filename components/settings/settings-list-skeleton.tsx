@@ -1,7 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SettingsListSkeletonProps } from "@/types/settings";
 
-/** Placeholder rows matching the session lists while they load. */
 export default function SettingsListSkeleton({ rows = 2 }: SettingsListSkeletonProps) {
     return (
         <ul aria-busy="true" aria-label="Loading" className="divide-y divide-border border border-border">
