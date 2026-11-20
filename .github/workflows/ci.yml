@@ -18,7 +18,7 @@ jobs:
       BETTER_AUTH_SECRET: ci-only-secret-not-used-in-production-000000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
