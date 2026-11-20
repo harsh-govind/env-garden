@@ -14,14 +14,17 @@
     "heroku-postbuild": "npx prisma generate && pnpm run build",
     "start": "next start",
     "lint": "eslint",
-    "db:sync": "set -a && . ./.env && set +a && prisma db push && prisma generate"
+    "db:sync": "set -a && . ./.env && set +a && prisma db push && prisma generate",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "7.10.1",
+    "@scure/bip39": "2.4.0",
     "better-auth": "^1.7.23",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "libsodium-wrappers-sumo": "0.8.4",
     "lodash": "^4.18.1",
     "lucide-react": "^1.73.0",
     "next": "16.4.6",
@@ -50,6 +53,7 @@
     "eslint-config-next": "16.4.6",
     "prisma": "7.10.1",
     "tailwindcss": "^4.3.5",
+    "tsx": "4.23.15",
     "typescript": "^6.0.3"
   }
 }

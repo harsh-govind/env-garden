@@ -29,6 +29,7 @@ jobs:
       - run: pnpm exec prisma generate
       - run: pnpm lint
       - run: pnpm exec tsc --noEmit
+      - run: pnpm test
       - run: pnpm build
       - name: Audit dependencies (fail on high/critical)
         run: pnpm audit --audit-level high
