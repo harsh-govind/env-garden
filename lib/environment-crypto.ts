@@ -15,6 +15,11 @@ import type {
     PlainVariable,
 } from "@/types/crypto";
 import type {
+    KeyRecipient,
+    RotateEnvironmentKeyInput,
+    RotationBundle,
+} from "@/types/environment-key";
+import type {
     NewEnvironmentKeyInput,
     ProjectEnvFile,
     ProjectEnvVariable,
@@ -168,4 +173,79 @@ export async function encryptEnvFileVariables(input: {
             });
         })
     );
+}
+
+export async function sealEnvironmentKeyFor(input: {
+    environmentKeyId: string;
+    version: number;
+    material: EnvironmentKeyMaterial;
+    recipient: KeyRecipient;
+    keys: AccountKeys;
+}) {
+    return sealEnvironmentKey({
+        key: input.material,
+        context: {
+            environmentKeyId: input.environmentKeyId,
+            version: input.version,
+            recipientUserId: input.recipient.userId,
+            recipientBoxPublicKey: input.recipient.boxPublicKey,
+        },
+        signer: input.keys,
+    });
+}
+
+export async function buildEnvironmentKeyRotation(input: {
+    bundle: RotationBundle;
+    currentMaterial: EnvironmentKeyMaterial;
+    keys: AccountKeys;
+}): Promise<{ body: RotateEnvironmentKeyInput; material: EnvironmentKeyMaterial }> {
+    const nextVersion = input.bundle.environmentKey.version + 1;
+    const material = await generateEnvironmentKey();
+
+    try {
+        const envFiles = await Promise.all(
+            input.bundle.envFiles.map(async (envFile) => ({
+                id: envFile.id,
+                expectedVariableIds: envFile.variables.map((variable) => variable.id),
+                variables: await Promise.all(
+                    envFile.variables.map(async (variable) =>
+                        encryptVariable({
+                            variable: await decryptVariable({
+                                variable,
+                                envFileId: envFile.id,
+                                key: input.currentMaterial,
+                            }),
+                            envFileId: envFile.id,
+                            keyVersion: nextVersion,
+                            key: material,
+                        })
+                    )
+                ),
+            }))
+        );
+        const shares = await Promise.all(
+            input.bundle.recipients.map(async (recipient) => ({
+                userId: recipient.userId,
+                ...(await sealEnvironmentKeyFor({
+                    environmentKeyId: input.bundle.environmentKey.id,
+                    version: nextVersion,
+                    material,
+                    recipient,
+                    keys: input.keys,
+                })),
+            }))
+        );
+
+        return {
+            body: {
+                expectedVersion: input.bundle.environmentKey.version,
+                shares,
+                envFiles,
+            },
+            material,
+        };
+    } catch (error) {
+        await wipeEnvironmentKey(material);
+        throw error;
+    }
 }

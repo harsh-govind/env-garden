@@ -71,3 +71,11 @@ export type VaultPanelProps = {
     description: string;
     children: ReactNode;
 };
+
+export type KeyTrust = "new" | "pinned" | "changed";
+
+export type KeyPin = {
+    signPublicKey: string;
+    boxPublicKey: string | null;
+    pinnedAt: string;
+};

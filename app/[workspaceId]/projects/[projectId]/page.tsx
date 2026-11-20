@@ -57,6 +57,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import KeyAccessBar from "@/components/project/key-access-bar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     defaultProjectEnvironmentTypes,
@@ -75,15 +76,24 @@ import { useAuthenticated } from "@/contexts/authenticated";
 import { useVault } from "@/contexts/vault";
 import { wipeEnvironmentKey } from "@/lib/crypto/environment";
 import {
+    buildEnvironmentKeyRotation,
     createEnvironmentKeyForSelf,
     decryptEnvFileVariables,
     encryptEnvFileVariables,
     openProjectEnvironmentKey,
+    sealEnvironmentKeyFor,
 } from "@/lib/environment-crypto";
+import { getKeyTrust, pinKey, trustOnFirstUse } from "@/lib/key-pins";
 import { buildEnvText, parseEnvText } from "@/utils/env/env-file";
 import { findMostRecentUpdatedAt } from "@/utils/time/updated-at";
 import { formatTimeAgo } from "@/utils";
 import type { AccountKeys, EnvironmentKeyMaterial } from "@/types/crypto";
+import type {
+    EnvironmentKeyAccess,
+    EnvironmentKeyAccessResponse,
+    KeyRecipient,
+    RotationBundleResponse,
+} from "@/types/environment-key";
 import type {
     CreateEnvFileResponse,
     DeleteEnvFileResponse,
@@ -170,7 +180,13 @@ function createDraftClientId() {
 type EnvironmentKeyStatus =
     | { status: "ready" }
     | { status: "awaiting" }
-    | { status: "error"; message: string };
+    | { status: "error"; message: string }
+    | {
+        status: "untrusted";
+        granterUserId: string;
+        granterEmail: string | null;
+        signPublicKey: string;
+    };
 
 type CachedEnvironmentKey = {
     version: number;
@@ -357,7 +373,7 @@ export default function ProjectDetailPage() {
     const workspaceId = getRouteParam(params.workspaceId);
     const projectId = getRouteParam(params.projectId);
     const { user } = useAuthenticated();
-    const { keys } = useVault();
+    const { keys, keyring } = useVault();
     const userId = user?.id ?? null;
     const environmentKeyCacheRef = useRef(new Map<string, CachedEnvironmentKey>());
 
@@ -368,6 +384,10 @@ export default function ProjectDetailPage() {
     const [environmentStatuses, setEnvironmentStatuses] = useState<
         Record<string, EnvironmentKeyStatus>
     >({});
+    const [keyAccess, setKeyAccess] = useState<EnvironmentKeyAccess[]>([]);
+    const [busyRecipientId, setBusyRecipientId] = useState<string | null>(null);
+    const [isRotatingKey, setIsRotatingKey] = useState(false);
+    const [keyAccessError, setKeyAccessError] = useState<string | null>(null);
     const [activeEnvFileId, setActiveEnvFileId] = useState<string | null>(null);
     const [revealedVariableIds, setRevealedVariableIds] = useState<Set<string>>(
         () => new Set()
@@ -472,6 +492,33 @@ export default function ProjectDetailPage() {
             const materials = new Map<string, EnvironmentKeyMaterial>();
 
             for (const environmentKey of nextProject.environmentKeys) {
+                const granter = environmentKey.share?.granter;
+
+                if (granter) {
+                    const isSelfGranted = granter.userId === userId;
+                    const isTrusted = isSelfGranted
+                        ? granter.signPublicKey === keyring?.signPublicKey
+                        : !granter.userId
+                            || trustOnFirstUse(userId, granter.userId, {
+                                signPublicKey: granter.signPublicKey,
+                            }) !== "changed";
+
+                    if (!isTrusted) {
+                        statuses[environmentKey.environment] = isSelfGranted || !granter.userId
+                            ? {
+                                status: "error",
+                                message: "This key was signed by a key that isn't yours. Ask a teammate to share it again.",
+                            }
+                            : {
+                                status: "untrusted",
+                                granterUserId: granter.userId,
+                                granterEmail: granter.email,
+                                signPublicKey: granter.signPublicKey,
+                            };
+                        continue;
+                    }
+                }
+
                 try {
                     const material = await getEnvironmentKeyMaterial(environmentKey, keys, userId);
 
@@ -509,8 +556,19 @@ export default function ProjectDetailPage() {
 
             return { plainVariablesByFileId: plain, environmentStatuses: statuses };
         },
-        [getEnvironmentKeyMaterial, keys, userId]
+        [getEnvironmentKeyMaterial, keyring?.signPublicKey, keys, userId]
     );
+
+    const loadKeyAccess = useCallback(async () => {
+        try {
+            const response = await fetchJson<EnvironmentKeyAccessResponse>(
+                `/api/workspaces/${workspaceId}/environment-keys?projectId=${encodeURIComponent(projectId)}`
+            );
+            setKeyAccess(response.keys);
+        } catch (loadError) {
+            setKeyAccessError(getErrorMessage(loadError));
+        }
+    }, [projectId, workspaceId]);
 
     const getPlainVariables = useCallback(
         (envFileId: string) => plainVariablesByFileId[envFileId] ?? [],
@@ -552,6 +610,7 @@ export default function ProjectDetailPage() {
                 setSelectedDraftRowIds(new Set());
                 setRevealedVariableIds(new Set());
                 setError(null);
+                void loadKeyAccess();
             })
             .catch((loadError) => {
                 if (!controller.signal.aborted && isCurrent) {
@@ -569,7 +628,7 @@ export default function ProjectDetailPage() {
             isCurrent = false;
             controller.abort();
         };
-    }, [decryptProject, requestProject]);
+    }, [decryptProject, loadKeyAccess, requestProject]);
 
     useEffect(() => {
         return () => {
@@ -608,12 +667,13 @@ export default function ProjectDetailPage() {
             setSelectedDraftRowIds(new Set());
             setRevealedVariableIds(new Set());
             setError(null);
+            await loadKeyAccess();
         } catch (refreshError) {
             setError(getErrorMessage(refreshError));
         } finally {
             setIsRefreshing(false);
         }
-    }, [activeEnvFileId, decryptProject, requestProject]);
+    }, [activeEnvFileId, decryptProject, loadKeyAccess, requestProject]);
 
     const startRenamingProject = useCallback(() => {
         if (!project?.canManage) {
@@ -918,9 +978,13 @@ export default function ProjectDetailPage() {
                 : null,
         [activeEnvFile, project]
     );
-    const activeEnvironmentStatus: EnvironmentKeyStatus = activeEnvFile
-        ? environmentStatuses[activeEnvFile.environment] ?? { status: "awaiting" }
-        : { status: "awaiting" };
+    const activeEnvironmentStatus = useMemo<EnvironmentKeyStatus>(
+        () =>
+            activeEnvFile
+                ? environmentStatuses[activeEnvFile.environment] ?? { status: "awaiting" }
+                : { status: "awaiting" },
+        [activeEnvFile, environmentStatuses]
+    );
 
     const variableSearchResult = useMemo(() => {
         const query = variableSearchQuery.trim();
@@ -1444,6 +1508,150 @@ export default function ProjectDetailPage() {
         userId,
         variableDraftRows,
     ]);
+
+    const activeKeyAccess = useMemo(
+        () =>
+            activeEnvFile
+                ? keyAccess.find((access) => access.environment === activeEnvFile.environment) ?? null
+                : null,
+        [activeEnvFile, keyAccess]
+    );
+
+    const handleShareKey = useCallback(
+        async (recipient: KeyRecipient) => {
+            if (!keys || !userId || !activeEnvironmentKey || !activeKeyAccess) {
+                return;
+            }
+
+            setBusyRecipientId(recipient.userId);
+            setKeyAccessError(null);
+
+            try {
+                const material = await getEnvironmentKeyMaterial(activeEnvironmentKey, keys, userId);
+
+                if (!material) {
+                    throw new Error("You don't hold this environment's key.");
+                }
+
+                const share = await sealEnvironmentKeyFor({
+                    environmentKeyId: activeEnvironmentKey.id,
+                    version: activeEnvironmentKey.version,
+                    material,
+                    recipient,
+                    keys,
+                });
+                await fetchJson(
+                    `/api/workspaces/${workspaceId}/environment-keys/${activeEnvironmentKey.id}/shares`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            recipientUserId: recipient.userId,
+                            version: activeEnvironmentKey.version,
+                            ...share,
+                        }),
+                    }
+                );
+                pinKey(userId, recipient.userId, recipient);
+                await loadKeyAccess();
+            } catch (shareError) {
+                setKeyAccessError(getErrorMessage(shareError));
+            } finally {
+                setBusyRecipientId(null);
+            }
+        },
+        [
+            activeEnvironmentKey,
+            activeKeyAccess,
+            getEnvironmentKeyMaterial,
+            keys,
+            loadKeyAccess,
+            userId,
+            workspaceId,
+        ]
+    );
+
+    const handleRotateKey = useCallback(async () => {
+        if (!keys || !userId || !activeKeyAccess) {
+            return;
+        }
+
+        setIsRotatingKey(true);
+        setKeyAccessError(null);
+        let rotatedMaterial: EnvironmentKeyMaterial | null = null;
+
+        try {
+            const bundle = await fetchJson<RotationBundleResponse>(
+                `/api/workspaces/${workspaceId}/environment-keys/${activeKeyAccess.id}/rotation`
+            );
+            const changedRecipient = bundle.recipients.find(
+                (recipient) =>
+                    recipient.userId !== userId
+                    && getKeyTrust(userId, recipient.userId, recipient) === "changed"
+            );
+
+            if (changedRecipient) {
+                throw new Error(
+                    `${changedRecipient.email}'s key changed. Verify their fingerprint and share the key with them first.`
+                );
+            }
+
+            const currentMaterial = await getEnvironmentKeyMaterial(bundle.environmentKey, keys, userId);
+
+            if (!currentMaterial) {
+                throw new Error("You don't hold this environment's key.");
+            }
+
+            const rotation = await buildEnvironmentKeyRotation({
+                bundle,
+                currentMaterial,
+                keys,
+            });
+            rotatedMaterial = rotation.material;
+            const result = await fetchJson<{ version: number }>(
+                `/api/workspaces/${workspaceId}/environment-keys/${activeKeyAccess.id}/rotation`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(rotation.body),
+                }
+            );
+            const cache = environmentKeyCacheRef.current;
+            const previous = cache.get(activeKeyAccess.id);
+            cache.set(activeKeyAccess.id, { version: result.version, material: rotation.material });
+            rotatedMaterial = null;
+
+            if (previous) {
+                void wipeEnvironmentKey(previous.material);
+            }
+
+            bundle.recipients.forEach((recipient) => {
+                if (recipient.userId !== userId) {
+                    pinKey(userId, recipient.userId, recipient);
+                }
+            });
+            await refreshProject();
+        } catch (rotateError) {
+            setKeyAccessError(getErrorMessage(rotateError));
+        } finally {
+            if (rotatedMaterial) {
+                void wipeEnvironmentKey(rotatedMaterial);
+            }
+
+            setIsRotatingKey(false);
+        }
+    }, [activeKeyAccess, getEnvironmentKeyMaterial, keys, refreshProject, userId, workspaceId]);
+
+    const handleTrustGranter = useCallback(async () => {
+        if (!userId || activeEnvironmentStatus.status !== "untrusted") {
+            return;
+        }
+
+        pinKey(userId, activeEnvironmentStatus.granterUserId, {
+            signPublicKey: activeEnvironmentStatus.signPublicKey,
+        });
+        await refreshProject();
+    }, [activeEnvironmentStatus, refreshProject, userId]);
 
     const toggleVariableVisibility = useCallback((row: VariableDraftRow) => {
         setRevealedVariableIds((currentIds) => {
@@ -1989,18 +2197,58 @@ export default function ProjectDetailPage() {
                                             <p className="font-medium text-foreground">
                                                 {activeEnvironmentStatus.status === "error"
                                                     ? "This environment's key could not be opened"
-                                                    : "Waiting for this environment's key"}
+                                                    : activeEnvironmentStatus.status === "untrusted"
+                                                        ? "This key was shared by a key you haven't seen before"
+                                                        : "Waiting for this environment's key"}
                                             </p>
                                             <p className="text-muted-foreground">
                                                 {activeEnvironmentStatus.status === "error"
                                                     ? activeEnvironmentStatus.message
-                                                    : `You have permission for ${environmentTypeLabels[activeEnvFile.environment]}, but its values are end-to-end encrypted. Someone who already has access needs to share the key with you.`}
+                                                    : activeEnvironmentStatus.status === "untrusted"
+                                                        ? `${activeEnvironmentStatus.granterEmail ?? "A teammate"} shared it, but their signing key is different from the one this browser saw before. That happens when they reset their keys. Check with them before trusting it.`
+                                                        : `You have permission for ${environmentTypeLabels[activeEnvFile.environment]}, but its values are end-to-end encrypted. Someone who already has access needs to share the key with you.`}
                                             </p>
+                                            {activeEnvironmentStatus.status === "untrusted" ? (
+                                                <div className="space-y-2 pt-1">
+                                                    <p className="font-mono text-[11px] break-all text-muted-foreground">
+                                                        {activeEnvironmentStatus.signPublicKey}
+                                                    </p>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            void handleTrustGranter();
+                                                        }}
+                                                    >
+                                                        Trust this key
+                                                    </Button>
+                                                </div>
+                                            ) : null}
                                         </div>
                                     </div>
                                 </div>
                             ) : (
                             <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+                                {userId ? (
+                                    <KeyAccessBar
+                                        access={activeKeyAccess}
+                                        viewerUserId={userId}
+                                        busyRecipientId={busyRecipientId}
+                                        isRotating={isRotatingKey}
+                                        onShare={(recipient) => {
+                                            void handleShareKey(recipient);
+                                        }}
+                                        onRotate={() => {
+                                            void handleRotateKey();
+                                        }}
+                                    />
+                                ) : null}
+                                {keyAccessError ? (
+                                    <p className="shrink-0 border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-200">
+                                        {keyAccessError}
+                                    </p>
+                                ) : null}
                                 <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Button

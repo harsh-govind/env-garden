@@ -31,6 +31,7 @@ import {
 import { useAuthenticated } from "@/contexts/authenticated";
 import { useWorkspace } from "@/contexts/workspace";
 import debounce from "lodash/debounce";
+import PendingKeyRequestsNotice from "@/components/home/pending-key-requests-notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTimeAgo } from "@/utils";
 import type {
@@ -437,6 +438,10 @@ export default function AuthenticatedHome() {
                         </Button>
                     </form>
                 </section>
+            ) : null}
+
+            {!isLoading && activeWorkspace ? (
+                <PendingKeyRequestsNotice key={activeWorkspace.id} workspaceId={activeWorkspace.id} />
             ) : null}
 
             {!isLoading && activeWorkspace ? (

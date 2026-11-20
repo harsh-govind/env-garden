@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/prisma/generated/client";
+import { revokeAllSharesForUser } from "@/prisma/services/environment-key";
 import type { EncryptedKeyringPayload } from "@/types/crypto";
 import type { KeyringRecord, SaveKeyringResult } from "@/types/keyring";
 
@@ -126,17 +127,21 @@ export async function replaceKeyringForUser(
     payload: EncryptedKeyringPayload
 ): Promise<SaveKeyringResult> {
     try {
-        const row = await prisma.userKeyring.upsert({
-            where: { userId },
-            create: {
-                userId,
-                ...toKeyringData(payload),
-            },
-            update: toKeyringData(payload),
-            select: keyringSelect,
-        });
+        return await prisma.$transaction(async (tx) => {
+            await revokeAllSharesForUser(tx, userId);
 
-        return { status: "OK", keyring: mapKeyringRow(row) };
+            const row = await tx.userKeyring.upsert({
+                where: { userId },
+                create: {
+                    userId,
+                    ...toKeyringData(payload),
+                },
+                update: toKeyringData(payload),
+                select: keyringSelect,
+            });
+
+            return { status: "OK" as const, keyring: mapKeyringRow(row) };
+        });
     } catch (error) {
         if (isUniqueConstraintError(error)) {
             return { status: "CONFLICT" };

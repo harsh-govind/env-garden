@@ -11,3 +11,5 @@ export const VAULT_SESSION_KEY_ID = "session";
 export const VAULT_BROADCAST_CHANNEL = "env-garden-vault";
 
 export const RECOVERY_PHRASE_CONFIRM_WORD_COUNT = 3;
+
+export const KEY_PINS_STORAGE_PREFIX = "env-garden:key-pins:";

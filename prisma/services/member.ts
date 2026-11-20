@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageWorkspaceMembers } from "@/constants/access";
 import { isEnvironmentTypeValue } from "@/constants/environment";
 import { Prisma } from "@/prisma/generated/client";
+import { revokeUnpermittedShares } from "@/prisma/services/environment-key";
 import type {
     MemberAccessInput,
     MemberProjectAccessInput,
@@ -1070,6 +1071,11 @@ export async function updateWorkspaceMember(input: {
             },
         });
 
+        await revokeUnpermittedShares(tx, {
+            workspaceId: input.workspaceId,
+            actorUserId: input.actorUserId,
+        });
+
         return {
             status: "OK" as const,
             member: {
@@ -1185,6 +1191,11 @@ export async function removeWorkspaceMember(input: {
                     },
                 },
             },
+        });
+
+        await revokeUnpermittedShares(tx, {
+            workspaceId: input.workspaceId,
+            actorUserId: input.actorUserId,
         });
 
         return {

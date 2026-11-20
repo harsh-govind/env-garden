@@ -4,11 +4,16 @@ import {
     formatEnvironmentFileName,
 } from "@/constants/environment";
 import { verifySelfShare } from "@/lib/environment-keys";
+import {
+    canEditEnvironment,
+    canManageProject,
+    getProjectAccessContext,
+    hasEnvironmentAccess,
+} from "@/prisma/services/project-access";
 import { Prisma } from "@/prisma/generated/client";
 import type { EncryptedVariable } from "@/types/crypto";
 import type {
     NewEnvironmentKeyInput,
-    ProjectAccessContext,
     ProjectDetailRecord,
     ProjectEnvFileRecord,
     ProjectEnvVariableCipherRecord,
@@ -23,7 +28,7 @@ function formatUserEmail(email: string | null | undefined, userId: string) {
     return email ?? `user:${userId}`;
 }
 
-async function getActorEmail(tx: Prisma.TransactionClient, userId: string) {
+export async function getActorEmail(tx: Prisma.TransactionClient, userId: string) {
     const actor = await tx.user.findUnique({
         where: { id: userId },
         select: { email: true },
@@ -45,117 +50,7 @@ function isUniqueConstraintError(error: unknown) {
     );
 }
 
-function canManageProject(context: ProjectAccessContext) {
-    return (
-        context.workspaceMember.role === "OWNER" ||
-        context.workspaceMember.role === "ADMIN" ||
-        context.projectRole === "OWNER"
-    );
-}
-
-function hasEnvironmentAccess(
-    context: ProjectAccessContext,
-    environment: string
-) {
-    return (
-        canManageProject(context) ||
-        context.workspaceMember.projectAccessScope === "ALL_PROJECTS" ||
-        context.projectMember?.environmentAccessScope === "ALL_ENVIRONMENTS" ||
-        context.projectMember?.envAccesses.some(
-            (envAccess) => envAccess.environment === environment
-        ) === true
-    );
-}
-
-function canEditEnvironment(context: ProjectAccessContext, environment: string) {
-    return (
-        canManageProject(context) ||
-        (context.projectRole === "CONTRIBUTOR" &&
-            hasEnvironmentAccess(context, environment))
-    );
-}
-
-async function getProjectAccessContext(
-    tx: Prisma.TransactionClient,
-    input: {
-        workspaceId: string;
-        projectId: string;
-        userId: string;
-    }
-): Promise<ProjectAccessContext | null> {
-    const workspaceMember = await tx.workspaceMember.findFirst({
-        where: {
-            workspaceId: input.workspaceId,
-            userId: input.userId,
-        },
-        select: {
-            id: true,
-            role: true,
-            defaultProjectRole: true,
-            projectAccessScope: true,
-        },
-    });
-
-    if (!workspaceMember) {
-        return null;
-    }
-
-    const project = await tx.project.findFirst({
-        where: {
-            id: input.projectId,
-            workspaceId: input.workspaceId,
-        },
-        select: {
-            id: true,
-            name: true,
-        },
-    });
-
-    if (!project) {
-        return null;
-    }
-
-    const projectMember = await tx.projectMember.findFirst({
-        where: {
-            projectId: input.projectId,
-            workspaceId: input.workspaceId,
-            workspaceMemberId: workspaceMember.id,
-        },
-        select: {
-            id: true,
-            role: true,
-            environmentAccessScope: true,
-            envAccesses: {
-                select: {
-                    environment: true,
-                },
-            },
-        },
-    });
-
-    if (
-        workspaceMember.projectAccessScope !== "ALL_PROJECTS" &&
-        !projectMember
-    ) {
-        return null;
-    }
-
-    return {
-        project,
-        projectMember: projectMember
-            ? {
-                id: projectMember.id,
-                role: projectMember.role,
-                environmentAccessScope: projectMember.environmentAccessScope,
-                envAccesses: projectMember.envAccesses,
-            }
-            : null,
-        projectRole: projectMember?.role ?? workspaceMember.defaultProjectRole,
-        workspaceMember,
-    };
-}
-
-const variableCipherSelect = {
+export const variableCipherSelect = {
     id: true,
     keyDigest: true,
     encryptedKey: true,
@@ -181,7 +76,7 @@ const envFileSelect = {
     },
 } satisfies Prisma.EnvFileSelect;
 
-function environmentKeySelect(userId: string) {
+export function environmentKeySelect(userId: string) {
     return {
         id: true,
         environment: true,
@@ -210,7 +105,7 @@ type EnvironmentKeyRow = Prisma.EnvironmentKeyGetPayload<{
     select: ReturnType<typeof environmentKeySelect>;
 }>;
 
-function mapEnvironmentKeyRow(row: EnvironmentKeyRow): ProjectEnvironmentKeyRecord {
+export function mapEnvironmentKeyRow(row: EnvironmentKeyRow): ProjectEnvironmentKeyRecord {
     const share = row.shares.find((candidate) => candidate.version === row.version) ?? null;
 
     return {
@@ -294,7 +189,7 @@ async function createEnvironmentKeyWithSelfShare(
     });
 }
 
-function mapEnvVariableCipherRecord(
+export function mapEnvVariableCipherRecord(
     input: ProjectEnvVariableCipherRecord
 ): ProjectEnvVariableCipherRecord {
     return {
@@ -1341,6 +1236,8 @@ export async function replaceEnvVariablesForFile(input: {
                 };
             }
 
+            await tx.$executeRaw`SELECT id FROM "EnvFile" WHERE id = ${input.envFileId} FOR UPDATE`;
+
             const environmentKey = await tx.environmentKey.findUnique({
                 where: {
                     projectId_environment: {
@@ -1369,8 +1266,6 @@ export async function replaceEnvVariablesForFile(input: {
                     status: "STALE_KEY" as const,
                 };
             }
-
-            await tx.$executeRaw`SELECT id FROM "EnvFile" WHERE id = ${input.envFileId} FOR UPDATE`;
 
             const existingVariables = await tx.envVariable.findMany({
                 where: {
