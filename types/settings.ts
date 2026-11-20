@@ -41,3 +41,5 @@ export type SecurityAction = "idle" | "setup" | "backup-codes" | "disable" | "re
 export type SettingsListSkeletonProps = {
     rows?: number;
 };
+
+export type EncryptionSettingsAction = "idle" | "change-passphrase" | "show-phrase" | "reset";
